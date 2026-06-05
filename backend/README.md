@@ -63,19 +63,35 @@ tests/
 
 ## API Endpoints
 
-### Weather & Wellbeing
+### Production Endpoints (Real WeatherAI API)
 
 **GET /api/forecast/{location}**
 
 - Returns current weather + 7-day forecast + AI summary
 - Cached for 10 minutes
+- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/forecast/Nairobi`
 
 **GET /api/wellbeing/{location}**
 
 - Returns mood score, energy level, risk rating, recommendations
 - Cached for 10 minutes
+- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
+
+### Demo Endpoints (Mock Data - No API Key Needed)
+
+**GET /api/demo/forecast/{location}**
+
+- Returns mock weather data (Sunny, 21.5°C, 65% humidity)
+- Great for testing frontend without API key
+- Example: `curl http://localhost:8000/api/demo/forecast/Nairobi`
+
+**GET /api/demo/wellbeing/{location}**
+
+- Returns mock wellbeing data (mood_score: 80, High energy, Minimal risk)
+- Great for testing frontend without API key
+- Example: `curl http://localhost:8000/api/demo/wellbeing/Nairobi`
 
 ### Subscriptions
 
@@ -129,13 +145,23 @@ pytest tests/ -v
 
 ## Environment Variables
 
-| Variable | Description | Example |
-| ---------- | ------------- | --------- |
-| `WEATHERAI_API_KEY` | **Required**. Your WeatherAI API key | `wai_...` |
-| `DATABASE_URL` | PostgreSQL or SQLite connection string | `sqlite:///./moodforecast.db` |
-| `REDIS_URL` | Optional. Redis URL for cache upgrade | `redis://localhost:6379/0` |
-| `CACHE_TTL_SECONDS` | Cache TTL in seconds | `600` |
-| `ENVIRONMENT` | Deployment environment | `development`, `production` |
+| Variable | Required | Description | Example |
+| ---------- | ---- | ------------- | --------- |
+| `WEATHERAI_API_KEY` | ✓ Yes | Your Weather-AI.co API key (for production endpoints) | `wai_fac7de...` |
+| `DATABASE_URL` | ✓ Yes | SQLite or PostgreSQL connection string | `sqlite:///./moodforecast.db` |
+| `ENVIRONMENT` | ✓ Yes | Deployment environment | `development` or `production` |
+| `REDIS_URL` | No | Redis URL for distributed caching | `redis://localhost:6379/0` |
+| `CACHE_TTL_SECONDS` | No | Cache time-to-live in seconds | `600` (default: 10 minutes) |
+
+### Getting a Weather-AI.co API Key
+
+1. Visit [weather-ai.co](https://weather-ai.co)
+2. Sign up for an account
+3. Navigate to your dashboard
+4. Copy your API key
+5. Add to `.env` file: `WEATHERAI_API_KEY=your_key_here`
+
+**Note**: Demo endpoints (`/api/demo/*`) work without an API key!
 
 ## Deployment on Railway
 

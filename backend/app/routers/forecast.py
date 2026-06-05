@@ -19,44 +19,44 @@ async def get_forecast(location: str) -> ForecastResponse:
         client = get_weatherai_client()
         
         # Resolve location to coordinates
-        geo_data = await client.get_geo_lookup(location)
+        geo_data = await client.get_location_by_name(location)
+        if "error" in geo_data:
+            raise HTTPException(status_code=422, detail=geo_data["error"])
+        
         lat = geo_data.get("lat")
         lon = geo_data.get("lon")
         resolved_location = geo_data.get("name", location)
         
-        if not lat or not lon:
+        if lat is None or lon is None:
             raise HTTPException(status_code=422, detail="Location not found")
         
         # Fetch forecast
         forecast_data = await client.get_forecast(lat, lon, days=7)
         current = forecast_data.get("current", {})
         
-        # Fetch AI insights
-        try:
-            insights = await client.get_insights(lat, lon)
-            ai_summary = insights.get("summary")
-        except:
-            ai_summary = None
+        # Extract weather data from weather-ai.co format
+        condition_code = current.get("condition_code")
+        condition = client._get_condition_text(condition_code)
         
         weather = WeatherData(
-            temp_c=current.get("temp_c", 0),
-            condition=current.get("condition", "Unknown"),
-            humidity=current.get("humidity", 0),
-            wind_kph=current.get("wind_kph", 0)
+            temp_c=float(current.get("temperature", 0)),
+            condition=condition or "Unknown",
+            humidity=float(current.get("humidity", 0)),
+            wind_kph=float(current.get("wind_speed", 0))
         )
         
         return ForecastResponse(
             location=resolved_location,
             weather=weather,
             forecast_days=7,
-            ai_summary=ai_summary
+            ai_summary=f"Weather in {resolved_location}: {condition}"
         )
     
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="WeatherAI API timeout")
+        raise HTTPException(status_code=504, detail="Weather-AI API timeout")
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="WeatherAI service unavailable")
+        raise HTTPException(status_code=503, detail="Weather-AI service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
