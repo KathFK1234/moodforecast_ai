@@ -107,17 +107,31 @@ pytest tests/ -v
 
 ## 🔌 API Endpoints
 
-### Weather & Wellbeing
+### Production Endpoints (Real WeatherAI API)
 
 **GET `/api/forecast/{location}`**
 - Returns: current weather + 7-day forecast + AI summary
 - Cached: 10 minutes
+- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/forecast/Nairobi`
 
 **GET `/api/wellbeing/{location}`**
 - Returns: mood score, energy level, risk rating, recommendations
 - Cached: 10 minutes
+- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
+
+### Demo Endpoints (Mock Data - No API Key Needed!)
+
+Perfect for testing the frontend without needing an actual API key:
+
+**GET `/api/demo/forecast/{location}`**
+- Returns: mock weather data (Sunny, 21.5°C, 65% humidity)
+- Example: `curl http://localhost:8000/api/demo/forecast/Nairobi`
+
+**GET `/api/demo/wellbeing/{location}`**
+- Returns: mock wellbeing data (mood_score: 80, High energy, Minimal risk)
+- Example: `curl http://localhost:8000/api/demo/wellbeing/Nairobi`
 
 ### SMS Subscriptions
 

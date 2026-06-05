@@ -64,11 +64,11 @@ if [ -f ".env" ]; then
     if grep -q "WEATHERAI_API_KEY" .env; then
         pass "WEATHERAI_API_KEY configured"
         api_key=$(grep "WEATHERAI_API_KEY" .env | cut -d= -f2)
-        if [ -z "$api_key" ] || [ "$api_key" = "test_key_for_testing" ]; then
-            fail "API key is still test key or empty"
-            echo "   Run: Update .env with real API key from https://weatherapi.com"
+        if [ -z "$api_key" ] || [ "$api_key" = "your_api_key_here" ]; then
+            fail "API key is still placeholder or empty"
+            echo "   Get API key from: https://weather-ai.co"
         else
-            pass "Real API key present"
+            pass "API key configured (weather-ai.co)"
         fi
     else
         fail "WEATHERAI_API_KEY not in .env"
