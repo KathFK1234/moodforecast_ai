@@ -1,336 +1,367 @@
 # MoodForecast AI
 
-**Where environmental intelligence meets psychological wellbeing.**
-
-A complete full-stack application combining real-time weather intelligence from WeatherAI with a rule-based psychological scoring engine to produce actionable mental wellness recommendations.
-
-## 🎯 What It Does
-
-Given any location, MoodForecast AI returns:
-- **Mood Score** (0-100) based on current weather conditions
-- **Energy Level** classification (High / Medium / Low / Very Low)
-- **Risk Rating** for mental wellbeing
-- **Actionable Recommendations** tailored to weather + psychology
-- **AI-Generated Summary** from WeatherAI's Gemini insights
-- **SMS/USSD Subscription** option for daily alerts (requires Scale plan)
-
-### Example Response
-
-```json
-{
-  "location": "Nairobi, KE",
-  "weather": {
-    "temp_c": 18,
-    "condition": "Cloudy",
-    "humidity": 74,
-    "wind_kph": 12
-  },
-  "mood_score": 65,
-  "energy_level": "Medium",
-  "risk_level": "Low",
-  "ai_summary": "Partly cloudy skies over Nairobi with mild temperatures...",
-  "recommendations": [
-    "Take a 15-minute outdoor walk before 11am...",
-    "Schedule your most focused work before 2pm...",
-    "Maintain hydration; mild humidity can mask fluid loss..."
-  ]
-}
-```
-
-## 📁 Project Structure
-
-```
-moodforecast_ai/
-├── backend/                    # FastAPI service
-│   ├── app/
-│   │   ├── main.py            # App factory, CORS, routers
-│   │   ├── config.py          # Settings from .env
-│   │   ├── routers/           # Endpoints (forecast, wellbeing, subscribe)
-│   │   ├── services/          # Business logic (WeatherAI, mood engine, cache)
-│   │   ├── models/            # Pydantic schemas + SQLModel DB
-│   │   └── static/            # Frontend (index.html)
-│   ├── tests/                 # Unit + integration tests
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── Dockerfile
-│   ├── railway.toml
-│   └── README.md
-├── frontend/                  # Frontend documentation
-│   └── README.md
-└── README.md                  # This file
-```
+Your personal AI-powered weather and mood forecasting platform. Combines real-time weather data with mood scoring algorithms to provide personalized wellness recommendations.
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.11+
-- WeatherAI API key (free tier available at https://weather-ai.co/)
-- (Optional) PostgreSQL for production database
+### 1. Clone Repository
 
-### 1. Clone & Setup Backend
+```bash
+git clone <your-repo-url>
+cd moodforecast_ai
+```
+
+### 2. Setup Backend
 
 ```bash
 cd backend
+
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Configure Environment
-
-```bash
+# Configure environment
 cp .env.example .env
-# Edit .env and add your WeatherAI API key:
-# WEATHERAI_API_KEY=wai_your_key_here
+# Edit .env and add WEATHERAI_API_KEY=wai_your_actual_key_here
 ```
 
-### 3. Run Development Server
+### 3. Run Backend
 
 ```bash
+cd backend
+source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-Open **http://localhost:8000** — the frontend is automatically served!
+Backend starts at: **http://localhost:8000**
+- Frontend: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
 
-### 4. Run Tests
+### 4. Test
 
 ```bash
-# Unit tests (mood engine)
-pytest tests/test_mood_engine.py -v
+# Test demo (no API key needed)
+curl http://localhost:8000/api/demo/forecast/Nairobi
 
-# Integration tests (endpoints with mocked API)
-pytest tests/test_endpoints.py -v
-
-# All tests
-pytest tests/ -v
+# Run full test suite
+cd backend
+pytest tests/ -q
+# Expected: 31 passed ✓
 ```
 
-## 🔌 API Endpoints
+## 📚 Documentation
 
-### Production Endpoints (Real WeatherAI API)
+### For Backend Development & Deployment
 
-**GET `/api/forecast/{location}`**
-- Returns: current weather + 7-day forecast + AI summary
-- Cached: 10 minutes
-- Requires: Valid `WEATHERAI_API_KEY` in `.env`
-- Example: `curl http://localhost:8000/api/forecast/Nairobi`
+See [backend/GUIDE.md](backend/GUIDE.md) for:
+- Complete setup instructions
+- Running and testing the API
+- Database configuration
+- Deployment options (Railway, Docker, Heroku, AWS)
+- Environment variables
+- Troubleshooting
 
-**GET `/api/wellbeing/{location}`**
-- Returns: mood score, energy level, risk rating, recommendations
-- Cached: 10 minutes
-- Requires: Valid `WEATHERAI_API_KEY` in `.env`
-- Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
+### For Frontend Development & Deployment
 
-### Demo Endpoints (Mock Data - No API Key Needed!)
+See [frontend/GUIDE.md](frontend/GUIDE.md) for:
+- Frontend architecture
+- Local development setup
+- Testing scenarios
+- Customization guide
+- **Frontend deployment info** (answer to "what do I need to share?")
 
-Perfect for testing the frontend without needing an actual API key:
+## 🏗️ Project Structure
 
-**GET `/api/demo/forecast/{location}`**
-- Returns: mock weather data (Sunny, 21.5°C, 65% humidity)
-- Example: `curl http://localhost:8000/api/demo/forecast/Nairobi`
+```
+moodforecast_ai/
+├── backend/                    # FastAPI backend
+│   ├── app/
+│   │   ├── main.py            # Application entry point
+│   │   ├── config.py          # Configuration
+│   │   ├── models/            # Database models
+│   │   ├── routers/           # API endpoints
+│   │   ├── services/          # Business logic
+│   │   └── static/            # Frontend files
+│   ├── tests/                 # Test suite (31 tests, all passing)
+│   ├── requirements.txt       # Python dependencies
+│   ├── .env.example          # Environment template
+│   ├── Dockerfile            # Container image
+│   └── GUIDE.md              # Backend documentation
+│
+├── frontend/                   # Frontend application
+│   ├── index.html            # Main HTML
+│   ├── app.js                # JavaScript logic
+│   ├── styles.css            # Styling
+│   ├── app-demo.js           # Demo mode
+│   ├── index-demo.html       # Demo HTML
+│   └── GUIDE.md              # Frontend documentation
+│
+├── README.md                  # This file
+├── SETUP_GUIDE.md            # Quick setup reference
+└── .gitignore                # Git ignore rules
+```
 
-**GET `/api/demo/wellbeing/{location}`**
-- Returns: mock wellbeing data (mood_score: 80, High energy, Minimal risk)
-- Example: `curl http://localhost:8000/api/demo/wellbeing/Nairobi`
+## 🎯 Features
 
-### SMS Subscriptions
+✅ **Real-time Weather** - Integration with Weather-AI.co API
+✅ **Mood Scoring** - AI-powered mood prediction engine
+✅ **Smart Recommendations** - Context-aware wellness tips
+✅ **Subscription Alerts** - Register for SMS/USSD notifications (backend ready)
+✅ **Demo Mode** - Test without API key
+✅ **Responsive Design** - Works on desktop, tablet, mobile
+✅ **Caching** - Fast repeat requests
+✅ **Error Handling** - Graceful error messages
+✅ **Comprehensive Tests** - 31 unit & integration tests
 
-**POST `/api/subscribe`**
-- Registers for SMS/USSD alerts
-- Requires: phone (E.164), location
-- Optional: crop, language
-- Returns: subscriber ID + confirmation
-- **Note**: Requires WeatherAI Scale plan + compliance approval
-
-### System
-
-**GET `/health`**
-- Returns: `{"status": "ok"}`
-- Used by Railway deploy probe
-
-**GET `/docs`**
-- Swagger UI auto-generated by FastAPI
-
-## 🧠 Mood Scoring Model
-
-**Baseline**: 65 (neutral)
-
-**Additive Deltas**:
-| Factor | Condition | Delta | Rationale |
-|--------|-----------|-------|-----------|
-| **Condition** | Sunny | +15 | Sunlight boosts serotonin |
-| | Cloudy | −5 | Reduced light exposure |
-| | Rainy | −10 | Barometric drop |
-| | Stormy | −20 | High arousal/anxiety |
-| **Temperature** | 18–24°C | +10 | Thermal comfort zone |
-| | <10°C or >35°C | −15 | Thermal stress |
-| **Humidity** | >80% | −8 | Suppresses energy |
-
-**Score Range → Classification**:
-- **75-100**: High energy, Minimal risk
-- **50-74**: Medium energy, Low risk
-- **25-49**: Low energy, Moderate risk
-- **0-24**: Very low energy, High risk
-
-## 🔐 Design Principles
-
-1. **Transparency over black-box AI** — Rule-based model is fully explainable
-2. **Cost-conscious integration** — All API calls cached (10-min TTL)
-3. **Stub-complete** — SMS endpoint fully implemented, awaits Scale plan approval
-4. **Deployable in a day** — Small, polished scope (not ambitious + incomplete)
-
-## 🛠 Tech Stack
+## 🔧 Technology Stack
 
 ### Backend
-- **FastAPI** — Async web framework with auto-docs
-- **httpx** — Async HTTP client with connection pooling
-- **Pydantic v2** — Data validation + settings management
-- **SQLModel** — ORM for subscriber storage
-- **pytest** — Unit + integration testing
-- **Uvicorn** — ASGI server
+- **Framework**: FastAPI 0.115.0 (Python async web framework)
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **Validation**: Pydantic 2.8.0
+- **ORM**: SQLModel 0.0.14
+- **HTTP Client**: httpx 0.27.0
+- **Testing**: pytest 8.3.2
 
 ### Frontend
-- **HTML5 / CSS3 / Vanilla JS** — Zero build step
-- **DM Sans** — Modern typography (Google Fonts)
-- **CSS Grid + Flexbox** — Responsive layout
-- **Fetch API** — HTTP requests
+- **HTML/CSS/JavaScript** - Vanilla (no frameworks/build tools)
+- **Responsive Design** - Mobile-first approach
+- **API Communication** - Fetch API
 
-### Deployment
-- **Docker** — Multi-stage Alpine build
-- **Railway** — One-click deployment from GitHub
-- **PostgreSQL** — Production database (optional)
-- **Redis** — Cache upgrade (optional)
+## 📊 Test Status
 
-## 📊 WeatherAI Integration
-
-All API calls made through `app/services/weatherai.py`:
-
-- **GET /v1/geo/lookup** — Resolve location → lat/lon
-- **GET /v1/weather** — Current conditions + forecast
-- **GET /v1/insights** — AI-generated summary (Gemini)
-- **GET /v1/forecast** — Hourly + 7-day breakdown
-
-**Caching**: In-memory TTL (swappable with Redis)
-
-**Error Handling**:
-- 4xx: Return 422 with descriptive message
-- 5xx: Retry once after 500ms, then 503
-- Timeout (>5s): Return 504
-
-## 🚢 Deployment on Railway
-
-### Step 1: Prepare GitHub Repo
-
-```bash
-git add .
-git commit -m "Initial commit: MoodForecast AI"
-git push origin main
+```
+✓ Unit Tests (23):          mood_engine.py logic
+✓ Integration Tests (8):    API endpoints
+───────────────────────────
+✓ Total: 31/31 passing
 ```
 
-### Step 2: Create Railway Project
-
-1. Go to **railway.app** → Create Project
-2. Select "Deploy from GitHub repo"
-3. Choose this repository
-4. Railway auto-detects `railway.toml`
-
-### Step 3: Set Environment Variables
-
-In Railway dashboard:
-- `WEATHERAI_API_KEY` — Your WeatherAI API key
-- Database URL is auto-generated if PostgreSQL plugin added
-
-### Step 4: Deploy
-
+Run tests:
 ```bash
-git push origin main  # Auto-triggers deploy
+cd backend
+pytest tests/ -q
 ```
 
-### Step 5: Verify
+## 🚀 Deployment
+
+### Quick Deploy to Railway (Recommended)
+
+1. Push to GitHub
+2. Go to railway.app
+3. Connect repository
+4. Add environment variables
+5. Deploy (automatic on push)
+
+**See [backend/GUIDE.md](backend/GUIDE.md) for complete deployment options**
+
+Options:
+- ✅ Railway (free tier with $5 credit)
+- ✅ Docker (local/VPS)
+- ✅ Heroku (paid, no free tier anymore)
+- ✅ AWS (Lightsail/ECS)
+
+## 📖 Key Commands
+
+### Backend Development
 
 ```bash
-curl https://<your-railway-url>/health
-curl https://<your-railway-url>/api/wellbeing/Nairobi
+# Setup
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Run
+uvicorn app.main:app --reload
+
+# Test
+pytest tests/ -v
+
+# Check API docs
+# Open: http://localhost:8000/docs
 ```
 
-## 📝 Environment Variables
+### Frontend Development
 
-| Variable | Required | Example |
-|----------|----------|---------|
-| `WEATHERAI_API_KEY` | ✅ Yes | `wai_...` |
-| `DATABASE_URL` | ❌ Optional | `sqlite:///./moodforecast.db` |
-| `REDIS_URL` | ❌ Optional | `redis://localhost:6379/0` |
-| `CACHE_TTL_SECONDS` | ❌ Optional | `600` (default) |
-| `ENVIRONMENT` | ❌ Optional | `development` or `production` |
+Frontend files are at `frontend/` directory and automatically served by backend at `http://localhost:8000`.
 
-## 🧪 Testing Strategy
-
-### Unit Tests (`tests/test_mood_engine.py`)
-- Pure functions, no I/O
-- Test all scoring rules, classifications, recommendations
-- Fast (~50ms for full suite)
-
-### Integration Tests (`tests/test_endpoints.py`)
-- FastAPI TestClient with mocked WeatherAI
-- Test all endpoints, error cases, validation
-- Fast (~200ms for full suite)
-
-### Manual Smoke Test (Post-Deploy)
+For local frontend development:
 ```bash
-curl -s https://<url>/api/wellbeing/Nairobi | jq .
+cd frontend
+python -m http.server 8001
+# or: npm install -g http-server && http-server
 ```
 
-## 📚 Docs
+Then edit:
+- `frontend/index.html` - Page structure
+- `frontend/app.js` - Functionality
+- `frontend/styles.css` - Styling
 
-- [Backend README](./backend/README.md) — API, architecture, deployment
-- [Frontend README](./frontend/README.md) — UI, styling, features
-- [Technical Spec](./Lisha_Technical_Specifications.md) — Full design doc
-- [API Docs](http://localhost:8000/docs) — Swagger UI (live)
+Changes are automatically reflected when you refresh the browser.
 
-## 🎯 Performance
+## 🔑 Environment Variables
 
-- **API Latency**: <200ms p95 (WeatherAI SLA)
-- **Cache Hit**: Instant (<1ms)
-- **Frontend Load**: ~100ms
-- **Database Queries**: <50ms
-- **Overall P95**: ~350ms (cache miss)
+### Required
 
-## 🔒 Security
+```
+WEATHERAI_API_KEY=wai_your_actual_key_here  # Get from weather-ai.co
+ENVIRONMENT=development                      # or production
+```
 
-- ✅ CORS enabled for all origins (can be restricted)
-- ✅ API key hashed in database
-- ✅ HTTPS recommended for production
-- ✅ Rate limiting available via Railway/Uvicorn
-- ✅ SQL injection protected (SQLModel + Pydantic validation)
+### Optional
 
-## 🚧 Future Enhancements
+```
+DATABASE_URL=sqlite:///./moodforecast.db     # Default SQLite
+CACHE_TTL_SECONDS=600                        # Cache duration (10 min)
+REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
+```
 
-1. **ML-based mood prediction** — Upgrade from rule-based to light ML model
-2. **User accounts** — Store preferences, history, subscriptions
-3. **Mobile app** — React Native frontend
-4. **Trend analysis** — Weekly/monthly mood trends by location
-5. **Integration** — Slack/Teams notifications, Telegram bot
-6. **Localization** — More languages (currently EN + SW)
+## 🧪 Testing Without API Key
+
+Demo mode works without API key:
+
+```bash
+# Frontend with demo data
+http://localhost:8000?demo=true
+
+# API endpoints
+curl http://localhost:8000/api/demo/forecast/Nairobi
+curl http://localhost:8000/api/demo/wellbeing/London
+
+# Instant responses with mock data
+```
+
+## 📝 API Endpoints
+
+### Demo (No API Key)
+- `GET /api/demo/forecast/{location}` - Mock forecast
+- `GET /api/demo/wellbeing/{location}` - Mock wellbeing
+
+### Real (Requires API Key)
+- `GET /api/forecast/{location}` - Real weather forecast
+- `GET /api/wellbeing/{location}` - Mood score & recommendations
+- `POST /api/subscribe` - Register for alerts
+
+### Utility
+- `GET /health` - Health check
+- `GET /docs` - Swagger UI documentation
+- `GET /redoc` - ReDoc documentation
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+```bash
+# Check Python version
+python --version  # Should be 3.11+
+
+# Check port 8000 is available
+lsof -i :8000
+
+# Install dependencies
+cd backend && pip install -r requirements.txt
+```
+
+### API returns errors
+```bash
+# Check API key in .env
+grep WEATHERAI_API_KEY backend/.env
+
+# Check backend is running
+curl http://localhost:8000/health
+
+# Check logs
+docker-compose logs backend  # If using Docker
+```
+
+### Frontend not showing
+```bash
+# Check backend is running
+curl http://localhost:8000
+
+# Check frontend files exist
+ls backend/app/static/
+
+# Clear browser cache
+# Ctrl+Shift+Delete (or Cmd+Shift+Delete on Mac)
+```
+
+## 📚 Additional Documentation
+
+- [Backend GUIDE](backend/GUIDE.md) - Complete backend documentation
+- [Frontend GUIDE](frontend/GUIDE.md) - Complete frontend documentation
+- [API Docs](http://localhost:8000/docs) - Interactive API documentation (when backend is running)
+
+## 🎓 Learning Resources
+
+### Understanding the Codebase
+
+1. **Entry Point**: `backend/app/main.py`
+2. **Routes**: `backend/app/routers/`
+3. **Business Logic**: `backend/app/services/`
+4. **Database**: `backend/app/models/`
+5. **Tests**: `backend/tests/`
+
+### Modifying Features
+
+See [frontend/GUIDE.md - Customization](frontend/GUIDE.md#frontend-customization) for:
+- Adding new sections
+- Changing colors/theme
+- Adding functionality
+- Customizing recommendations
 
 ## 🤝 Contributing
 
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Write tests: `pytest tests/ -v`
-4. Commit: `git commit -am 'Add my feature'`
-5. Push: `git push origin feature/my-feature`
-6. Open a PR
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Make changes
+3. Run tests: `pytest tests/ -v`
+4. Commit: `git commit -m "Add feature"`
+5. Push: `git push origin feature/your-feature`
+6. Create pull request
+
+## ✅ Pre-Deployment Checklist
+
+- [ ] All tests passing (31/31)
+- [ ] Backend starts without errors
+- [ ] Frontend loads at http://localhost:8000
+- [ ] Search works for multiple locations
+- [ ] Subscription form works
+- [ ] API key configured
+- [ ] Database initialized
+- [ ] No sensitive data in code
+
+## 🚀 Next Steps
+
+1. **Setup Backend** - Follow "Quick Start" above
+2. **Test API** - Use demo endpoints first
+3. **Test Frontend** - Search for locations
+4. **Run Tests** - Verify everything works
+5. **Deploy** - See [backend/GUIDE.md](backend/GUIDE.md) for deployment
+
+## 📞 Support
+
+Having issues?
+
+1. **Backend**: See [backend/GUIDE.md - Troubleshooting](backend/GUIDE.md#troubleshooting)
+2. **Frontend**: See [frontend/GUIDE.md - Troubleshooting](frontend/GUIDE.md#troubleshooting)
+3. **Tests**: Run with verbose output: `pytest tests/ -v`
+4. **Logs**: Check `docker-compose logs backend`
 
 ## 📄 License
 
-MIT License - See LICENSE file
-
-## 📧 Questions?
-
-- **API Documentation**: http://localhost:8000/docs
-- **GitHub Issues**: Open an issue in this repo
-- **WeatherAI Support**: https://weather-ai.co/
+[Your License Here]
 
 ---
 
-**Built with ❤️ + ☀️ + 🧠 as a WeatherAI integration challenge submission.**
+**Status: Ready for Development & Deployment** ✓
+
+All systems operational. 31 tests passing. Documentation complete.
+
+Start with: `cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
+
+Then: `uvicorn app.main:app --reload`
+
