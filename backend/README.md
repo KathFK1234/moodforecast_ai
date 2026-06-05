@@ -28,9 +28,9 @@ uvicorn app.main:app --reload
 
 The API will be available at `http://localhost:8000`
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+- **Health Check**: `http://localhost:8000/health`
 
 ## Project Structure
 
@@ -66,11 +66,13 @@ tests/
 ### Weather & Wellbeing
 
 **GET /api/forecast/{location}**
+
 - Returns current weather + 7-day forecast + AI summary
 - Cached for 10 minutes
 - Example: `curl http://localhost:8000/api/forecast/Nairobi`
 
 **GET /api/wellbeing/{location}**
+
 - Returns mood score, energy level, risk rating, recommendations
 - Cached for 10 minutes
 - Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
@@ -78,9 +80,11 @@ tests/
 ### Subscriptions
 
 **POST /api/subscribe**
+
 - Register for SMS/USSD alerts
 - Requires: phone (E.164), location, optional: crop, language
 - Example:
+
   ```bash
   curl -X POST http://localhost:8000/api/subscribe \
     -H "Content-Type: application/json" \
@@ -95,6 +99,7 @@ tests/
 ### System
 
 **GET /health**
+
 - Health check for Railway deploy probe
 - Example: `curl http://localhost:8000/health`
 
@@ -125,7 +130,7 @@ pytest tests/ -v
 ## Environment Variables
 
 | Variable | Description | Example |
-|----------|-------------|---------|
+| ---------- | ------------- | --------- |
 | `WEATHERAI_API_KEY` | **Required**. Your WeatherAI API key | `wai_...` |
 | `DATABASE_URL` | PostgreSQL or SQLite connection string | `sqlite:///./moodforecast.db` |
 | `REDIS_URL` | Optional. Redis URL for cache upgrade | `redis://localhost:6379/0` |
@@ -154,6 +159,7 @@ pytest tests/ -v
    - Railway auto-builds and deploys
 
 4. **Smoke Test**
+
    ```bash
    curl https://<your-railway-url>/health
    curl https://<your-railway-url>/api/wellbeing/Nairobi
@@ -164,7 +170,7 @@ pytest tests/ -v
 The mood engine applies additive deltas to a baseline of 65:
 
 | Factor | Condition | Delta | Rationale |
-|--------|-----------|-------|-----------|
+| -------- | ----------- | ------- | ----------- |
 | **Condition** | Sunny | +15 | Sunlight boosts serotonin |
 | | Cloudy | −5 | Reduced UV/light exposure |
 | | Rainy | −10 | Barometric drop + reduced activity |
@@ -174,12 +180,14 @@ The mood engine applies additive deltas to a baseline of 65:
 | **Humidity** | >80% | −8 | Suppresses energy/concentration |
 
 **Energy Level** (0-100 scale):
+
 - 75-100: High
 - 50-74: Medium
 - 25-49: Low
 - 0-24: Very Low
 
 **Risk Level**:
+
 - 75-100: Minimal
 - 50-74: Low
 - 25-49: Moderate
