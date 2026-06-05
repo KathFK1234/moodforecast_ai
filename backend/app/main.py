@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.models.db import create_tables
-from app.routers import forecast, wellbeing, subscribe
+from app.routers import forecast, wellbeing, subscribe, demo
 from app.models.schemas import HealthResponse
 from app.services.weatherai import get_weatherai_client
 
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(forecast.router)
     app.include_router(wellbeing.router)
     app.include_router(subscribe.router)
+    app.include_router(demo.router)
     
     # Health check
     @app.get("/health")
