@@ -36,10 +36,11 @@ source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-Backend starts at: **http://localhost:8000**
-- Frontend: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- Health: http://localhost:8000/health
+Backend starts at: **`http://localhost:8000`**
+
+- Frontend: `http://localhost:8000`
+- API Docs: `http://localhost:8000/docs`
+- Health: `http://localhost:8000/health`
 
 ### 4. Test
 
@@ -55,6 +56,7 @@ pytest tests/ -q
 ### For Backend Development & Deployment
 
 See [backend/GUIDE.md](backend/GUIDE.md) for:
+
 - Complete setup instructions
 - Running and testing the API
 - Database configuration
@@ -65,6 +67,7 @@ See [backend/GUIDE.md](backend/GUIDE.md) for:
 ### For Frontend Development & Deployment
 
 See [frontend/GUIDE.md](frontend/GUIDE.md) for:
+
 - Frontend architecture
 - Local development setup
 - Testing scenarios
@@ -116,6 +119,7 @@ moodforecast_ai/
 ## 🔧 Technology Stack
 
 ### Backend
+
 - **Framework**: FastAPI 0.115.0 (Python async web framework)
 - **Database**: SQLite (development) / PostgreSQL (production)
 - **Validation**: Pydantic 2.8.0
@@ -124,6 +128,7 @@ moodforecast_ai/
 - **Testing**: pytest 8.3.2
 
 ### Frontend
+
 - **HTML/CSS/JavaScript** - Vanilla (no frameworks/build tools)
 - **Responsive Design** - Mobile-first approach
 - **API Communication** - Fetch API
@@ -138,6 +143,7 @@ moodforecast_ai/
 ```
 
 Run tests:
+
 ```bash
 cd backend
 pytest tests/ -q
@@ -156,6 +162,7 @@ pytest tests/ -q
 **See [backend/GUIDE.md](backend/GUIDE.md) for complete deployment options**
 
 Options:
+
 - ✅ Railway (free tier with $5 credit)
 - ✅ Docker (local/VPS)
 - ✅ Heroku (paid, no free tier anymore)
@@ -187,6 +194,7 @@ pytest tests/ -v
 Frontend files are at `frontend/` directory and automatically served by backend at `http://localhost:8000`.
 
 For local frontend development:
+
 ```bash
 cd frontend
 python -m http.server 8001
@@ -194,6 +202,7 @@ python -m http.server 8001
 ```
 
 Then edit:
+
 - `frontend/index.html` - Page structure
 - `frontend/app.js` - Functionality
 - `frontend/styles.css` - Styling
@@ -220,11 +229,13 @@ REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
 ## 📝 API Endpoints
 
 ### Production (Requires API Key)
+
 - `GET /api/forecast/{location}` - Real weather forecast
 - `GET /api/wellbeing/{location}` - Mood score & recommendations
 - `POST /api/subscribe` - Register for alerts
 
 ### Utility
+
 - `GET /health` - Health check
 - `GET /docs` - Swagger UI documentation
 - `GET /redoc` - ReDoc documentation
@@ -232,6 +243,7 @@ REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
 ## 🐛 Troubleshooting
 
 ### Backend won't start
+
 ```bash
 # Check Python version
 python --version  # Should be 3.11+
@@ -244,6 +256,7 @@ cd backend && pip install -r requirements.txt
 ```
 
 ### API returns errors
+
 ```bash
 # Check API key in .env
 grep WEATHERAI_API_KEY backend/.env
@@ -256,6 +269,7 @@ docker-compose logs backend  # If using Docker
 ```
 
 ### Frontend not showing
+
 ```bash
 # Check backend is running
 curl http://localhost:8000
@@ -286,6 +300,7 @@ ls backend/app/static/
 ### Modifying Features
 
 See [frontend/GUIDE.md - Customization](frontend/GUIDE.md#frontend-customization) for:
+
 - Adding new sections
 - Changing colors/theme
 - Adding functionality
@@ -304,7 +319,7 @@ See [frontend/GUIDE.md - Customization](frontend/GUIDE.md#frontend-customization
 
 - [ ] All tests passing (31/31)
 - [ ] Backend starts without errors
-- [ ] Frontend loads at http://localhost:8000
+- [ ] Frontend loads at `http://localhost:8000`
 - [ ] Search works for multiple locations
 - [ ] Subscription form works
 - [ ] API key configured
@@ -341,4 +356,3 @@ All systems operational. 31 tests passing. Documentation complete.
 Start with: `cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
 
 Then: `uvicorn app.main:app --reload`
-
