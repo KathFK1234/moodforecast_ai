@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoodForecast AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌤️ MoodForecast AI</h1>
+            <p>Where environmental intelligence meets psychological wellbeing</p>
+        </div>
+
+        <div class="content">
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        id="locationInput" 
+                        placeholder="Enter city name or coordinates..." 
+                        value="Nairobi"
+                    >
+                    <button id="searchButton" onclick="handleSearch()">Search</button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading hidden">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px;">Loading forecast...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error hidden"></div>
+
+            <!-- Weather Card -->
+            <div id="weatherCard" class="weather-card hidden">
+                <div class="location-header" id="locationName">Nairobi, KE</div>
+                <div class="weather-grid">
+                    <div class="weather-item">
+                        <div class="weather-label">Temperature</div>
+                        <div class="weather-value" id="tempValue">18°C</div>
+                    </div>
+                    <div class="weather-item">
+                        <div class="weather-label">Humidity</div>
+                        <div class="weather-value" id="humidityValue">74%</div>
+                    </div>
+                    <div class="weather-item">
+                        <div class="weather-label">Condition</div>
+                        <div class="weather-value" id="conditionValue" style="font-size: 18px;">Cloudy</div>
+                    </div>
+                    <div class="weather-item">
+                        <div class="weather-label">Wind</div>
+                        <div class="weather-value" id="windValue" style="font-size: 18px;">12 kph</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wellbeing Section -->
+            <div id="wellbeingSection" class="wellbeing-section hidden">
+                <div class="mood-score">
+                    <div class="score-left">
+                        <h3>Mood Score</h3>
+                        <div class="score-value" id="moodScore">65</div>
+                    </div>
+                    <div class="score-right">
+                        <div>
+                            <span class="level-badge level-medium" id="energyBadge">Medium Energy</span>
+                            <span class="level-badge level-low" id="riskBadge">Low Risk</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="aiSummaryDiv" class="ai-summary hidden"></div>
+
+                <div class="recommendations">
+                    <h4>Wellbeing Recommendations</h4>
+                    <ul id="recommendationsList"></ul>
+                </div>
+            </div>
+
+            <!-- Subscribe Section -->
+            <div id="subscribeSection" class="subscribe-section hidden">
+                <h3>📱 Subscribe to Daily Alerts</h3>
+                <form onsubmit="handleSubscribe(event)">
+                    <div class="form-group">
+                        <label>Phone Number (E.164)</label>
+                        <input 
+                            type="tel" 
+                            id="phoneInput" 
+                            placeholder="+254712345678" 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input 
+                            type="text" 
+                            id="cropLocationInput" 
+                            placeholder="Your location" 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>Crop (Optional)</label>
+                        <input 
+                            type="text" 
+                            id="cropInput" 
+                            placeholder="e.g., Maize, Tea, Wheat"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>Language</label>
+                        <select id="languageSelect">
+                            <option value="en">English</option>
+                            <option value="sw">Swahili</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
+                    <div id="subscribeMessage"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
