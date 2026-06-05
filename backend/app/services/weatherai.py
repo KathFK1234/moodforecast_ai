@@ -155,34 +155,15 @@ class WeatherAIClient:
     
     async def get_location_by_name(self, location: str) -> dict[str, Any]:
         """
-        Resolve location name to lat/lon using current endpoint.
+        Resolve location name to lat/lon using geocoding service.
         
-        The weather-ai.co API resolves location names automatically.
+        Uses Nominatim (OpenStreetMap) for online lookup, falls back to hardcoded list.
         Cache key: geo:{location}
         """
-        cache_key = f"geo:{location}"
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
+        from app.services.geocoding import get_coordinates
         
-        params = {"location": location}
-        try:
-            data = await self._request("GET", "/current", params=params)
-            # Extract location info from the response
-            loc_info = data.get("location", {})
-            result = {
-                "name": location,
-                "lat": loc_info.get("lat"),
-                "lon": loc_info.get("lon"),
-                "timezone": loc_info.get("timezone", ""),
-                "country": loc_info.get("country", ""),
-            }
-            cache.set(cache_key, result)
-            return result
-        except (ValueError, RuntimeError):
-            # Return error if location not found (don't cache errors)
-            result = {"error": f"Location '{location}' not found"}
-            return result
+        result = await get_coordinates(location)
+        return result
     
     async def get_ip_lookup(self, ip: str) -> dict[str, Any]:
         """Resolve IP address to weather data."""
