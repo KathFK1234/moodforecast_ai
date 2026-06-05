@@ -10,7 +10,7 @@ from app.models.schemas import SubscribeRequest, SubscribeResponse
 router = APIRouter(prefix="/api", tags=["subscribe"])
 
 
-@router.post("/subscribe")
+@router.post("/subscribe", status_code=201)
 async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     """
     Register a subscriber for SMS/USSD alerts.
