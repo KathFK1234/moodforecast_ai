@@ -5,6 +5,7 @@ Single-page HTML/CSS/JS application for the MoodForecast AI service.
 ## Overview
 
 The frontend is intentionally minimal — **one well-crafted HTML page** with:
+
 - No build step or compilation
 - Vanilla JavaScript (no frameworks)
 - Responsive design (mobile-first)
@@ -13,6 +14,7 @@ The frontend is intentionally minimal — **one well-crafted HTML page** with:
 ## File Location
 
 The actual frontend files are served from `/backend/app/static/`:
+
 - `index.html` — Complete single-page application
 - Styling: Embedded CSS
 - Logic: Embedded JavaScript
@@ -28,19 +30,23 @@ The actual frontend files are served from `/backend/app/static/`:
 ## Features
 
 ### Weather Display
+
 - Current temperature, humidity, wind speed, condition
 - Real-time data from WeatherAI API
 
 ### Wellbeing Score
+
 - **Mood Score**: 0-100 based on weather conditions
 - **Energy Level**: High / Medium / Low / Very Low
 - **Risk Level**: Minimal / Low / Moderate / High
 - **Recommendations**: Context-aware wellness tips
 
 ### AI Summary
+
 - Natural language forecast summary from WeatherAI's Gemini AI
 
 ### SMS Subscription
+
 - E.164 phone format validation
 - Crop selection (optional)
 - Language preference (English / Swahili)
@@ -49,6 +55,7 @@ The actual frontend files are served from `/backend/app/static/`:
 ## Styling
 
 Uses modern CSS with:
+
 - **Color Scheme**: Purple gradient (#667eea → #764ba2)
 - **Font**: DM Sans (Google Fonts)
 - **Layout**: CSS Grid and Flexbox
@@ -58,6 +65,7 @@ Uses modern CSS with:
 ## API Integration
 
 All requests to the same domain (relative URLs):
+
 - `GET /api/forecast/{location}`
 - `GET /api/wellbeing/{location}`
 - `POST /api/subscribe`
@@ -78,11 +86,12 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Then open: **http://localhost:8000**
+Then open: **`http://localhost:8000`**
 
 ## No Build Step
 
 This frontend requires **zero build tools**:
+
 - No npm, webpack, or bundler
 - No TypeScript or JSX compilation
 - Serve directly as static files
@@ -98,6 +107,7 @@ This makes deployment trivial and keeps the stack simple.
 ## Browser Support
 
 Modern browsers (ES2020+):
+
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
