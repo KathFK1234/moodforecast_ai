@@ -79,20 +79,6 @@ tests/
 - Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
 
-### Demo Endpoints (Mock Data - No API Key Needed)
-
-**GET /api/demo/forecast/{location}**
-
-- Returns mock weather data (Sunny, 21.5°C, 65% humidity)
-- Great for testing frontend without API key
-- Example: `curl http://localhost:8000/api/demo/forecast/Nairobi`
-
-**GET /api/demo/wellbeing/{location}**
-
-- Returns mock wellbeing data (mood_score: 80, High energy, Minimal risk)
-- Great for testing frontend without API key
-- Example: `curl http://localhost:8000/api/demo/wellbeing/Nairobi`
-
 ### Subscriptions
 
 **POST /api/subscribe**
@@ -160,8 +146,6 @@ pytest tests/ -v
 3. Navigate to your dashboard
 4. Copy your API key
 5. Add to `.env` file: `WEATHERAI_API_KEY=your_key_here`
-
-**Note**: Demo endpoints (`/api/demo/*`) work without an API key!
 
 ## Deployment on Railway
 

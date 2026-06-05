@@ -44,9 +44,6 @@ Backend starts at: **http://localhost:8000**
 ### 4. Test
 
 ```bash
-# Test demo (no API key needed)
-curl http://localhost:8000/api/demo/forecast/Nairobi
-
 # Run full test suite
 cd backend
 pytest tests/ -q
@@ -96,8 +93,7 @@ moodforecast_ai/
 │   ├── index.html            # Main HTML
 │   ├── app.js                # JavaScript logic
 │   ├── styles.css            # Styling
-│   ├── app-demo.js           # Demo mode
-│   ├── index-demo.html       # Demo HTML
+
 │   └── GUIDE.md              # Frontend documentation
 │
 ├── README.md                  # This file
@@ -111,7 +107,7 @@ moodforecast_ai/
 ✅ **Mood Scoring** - AI-powered mood prediction engine
 ✅ **Smart Recommendations** - Context-aware wellness tips
 ✅ **Subscription Alerts** - Register for SMS/USSD notifications (backend ready)
-✅ **Demo Mode** - Test without API key
+
 ✅ **Responsive Design** - Works on desktop, tablet, mobile
 ✅ **Caching** - Fast repeat requests
 ✅ **Error Handling** - Graceful error messages
@@ -221,28 +217,9 @@ CACHE_TTL_SECONDS=600                        # Cache duration (10 min)
 REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
 ```
 
-## 🧪 Testing Without API Key
-
-Demo mode works without API key:
-
-```bash
-# Frontend with demo data
-http://localhost:8000?demo=true
-
-# API endpoints
-curl http://localhost:8000/api/demo/forecast/Nairobi
-curl http://localhost:8000/api/demo/wellbeing/London
-
-# Instant responses with mock data
-```
-
 ## 📝 API Endpoints
 
-### Demo (No API Key)
-- `GET /api/demo/forecast/{location}` - Mock forecast
-- `GET /api/demo/wellbeing/{location}` - Mock wellbeing
-
-### Real (Requires API Key)
+### Production (Requires API Key)
 - `GET /api/forecast/{location}` - Real weather forecast
 - `GET /api/wellbeing/{location}` - Mood score & recommendations
 - `POST /api/subscribe` - Register for alerts
@@ -337,7 +314,7 @@ See [frontend/GUIDE.md - Customization](frontend/GUIDE.md#frontend-customization
 ## 🚀 Next Steps
 
 1. **Setup Backend** - Follow "Quick Start" above
-2. **Test API** - Use demo endpoints first
+2. **Test API** - Use actual endpoints
 3. **Test Frontend** - Search for locations
 4. **Run Tests** - Verify everything works
 5. **Deploy** - See [backend/GUIDE.md](backend/GUIDE.md) for deployment

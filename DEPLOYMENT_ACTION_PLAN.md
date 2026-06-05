@@ -24,7 +24,6 @@ uvicorn app.main:app --reload
 
 # In another terminal:
 curl http://localhost:8000/health
-curl http://localhost:8000/api/demo/forecast/Nairobi
 curl http://localhost:8000/api/forecast/Nairobi
 
 # 3. Verify frontend loads
@@ -130,7 +129,6 @@ curl https://your-domain/health
 # Expected: {"status":"ok"}
 
 # 2. API endpoints
-curl https://your-domain/api/demo/forecast/Nairobi | jq .
 curl https://your-domain/api/forecast/Nairobi | jq .
 
 # 3. Frontend loads
@@ -164,7 +162,7 @@ curl https://your-domain | grep "<html"
 - [x] All 31 tests passing
 - [x] Backend starts without errors
 - [x] Frontend loads at http://localhost:8000
-- [x] API endpoints work (demo + real)
+- [x] API endpoints working
 - [x] Database initialized
 - [x] WEATHERAI_API_KEY configured
 - [x] ENVIRONMENT set to production
@@ -224,10 +222,7 @@ pip install -r requirements.txt --force-reinstall
 # Check logs
 curl -v http://localhost:8000/health
 
-# Test demo endpoints first
-curl http://localhost:8000/api/demo/forecast/Nairobi
-
-# Then test real endpoints
+# Test endpoints
 curl http://localhost:8000/api/forecast/Nairobi
 
 # Check API key

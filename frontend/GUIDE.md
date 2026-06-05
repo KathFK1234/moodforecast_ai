@@ -25,7 +25,6 @@ The MoodForecast AI frontend is a lightweight, responsive single-page applicatio
 - **Dark/Light Theme** - Auto-detects system preference
 - **Real-time Weather** - Fetches live data from Weather-AI.co API
 - **Mood Scoring** - Displays AI-powered mood predictions
-- **Demo Mode** - Works without API key for testing
 - **Subscription Management** - Easy alert registration
 - **Error Handling** - Graceful error messages
 - **Caching** - Fast repeat requests
@@ -55,10 +54,8 @@ The MoodForecast AI frontend is a lightweight, responsive single-page applicatio
 
 ```
 frontend/
-├── index.html              # Main HTML file (production)
-├── index-demo.html         # Demo version (for testing without API)
-├── app.js                  # Main application logic (production)
-├── app-demo.js            # Demo version (mock data)
+├── index.html              # Main HTML file
+├── app.js                  # Main application logic
 ├── styles.css             # All styling
 ├── GUIDE.md               # This file
 └── README.md              # Quick overview
@@ -267,13 +264,6 @@ open http://localhost:8000
    - [ ] Mobile (< 768px): Full width, touch-friendly
    - [ ] Buttons/links easily clickable on mobile
 
-7. **Test Demo Mode**
-   - [ ] Open: `http://localhost:8000?demo=true`
-   - [ ] Instant responses (no network call)
-   - [ ] Mock data displays
-   - [ ] Search any location, gets same mock response
-   - [ ] Useful for testing without API key
-
 ### Automated Testing
 
 Create test file (optional):
@@ -284,12 +274,12 @@ async function testFrontend() {
   console.log('Testing frontend...');
   
   // Test 1: Can fetch weather
-  const response = await fetch('/api/demo/forecast/Nairobi');
+  const response = await fetch('/api/forecast/Nairobi');
   const data = await response.json();
   console.assert(data.weather.temp_c > 0, 'Temperature should be > 0');
   
   // Test 2: Can fetch wellbeing
-  const wellbeing = await fetch('/api/demo/wellbeing/Nairobi').then(r => r.json());
+  const wellbeing = await fetch('/api/wellbeing/Nairobi').then(r => r.json());
   console.assert(wellbeing.mood_score >= 0, 'Mood score should be >= 0');
   
   console.log('✓ All tests passed');
@@ -419,7 +409,7 @@ curl https://your-domain.com/health
 curl https://your-domain.com | grep "<html"
 
 # API works
-curl https://your-domain.com/api/demo/forecast/Nairobi
+curl https://your-domain.com/api/forecast/Nairobi
 ```
 
 ---
@@ -556,7 +546,7 @@ If needed:
 // 500? Backend error - check backend logs
 
 // Manual test
-fetch('/api/demo/forecast/Nairobi')
+fetch('/api/forecast/Nairobi')
   .then(r => r.json())
   .then(d => console.log(d))
   .catch(e => console.error(e));
@@ -715,8 +705,8 @@ docker-compose logs backend
 ```javascript
 // In browser console
 fetch('/health').then(r => r.json()).then(console.log);
-fetch('/api/demo/forecast/Nairobi').then(r => r.json()).then(console.log);
-fetch('/api/demo/wellbeing/London').then(r => r.json()).then(console.log);
+fetch('/api/forecast/Nairobi').then(r => r.json()).then(console.log);
+fetch('/api/wellbeing/London').then(r => r.json()).then(console.log);
 ```
 
 ---
