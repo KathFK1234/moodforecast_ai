@@ -63,45 +63,6 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
-def test_demo_forecast_endpoint():
-    """GET /api/demo/forecast/{location} returns mock forecast data."""
-    response = client.get("/api/demo/forecast/Nairobi")
-    assert response.status_code == 200
-    data = response.json()
-    
-    assert "location" in data
-    assert data["location"] == "Nairobi"
-    assert "weather" in data
-    
-    weather = data["weather"]
-    assert "temp_c" in weather
-    assert "condition" in weather
-    assert "humidity" in weather
-    assert "wind_kph" in weather
-
-
-def test_demo_wellbeing_endpoint():
-    """GET /api/demo/wellbeing/{location} returns mock wellbeing data."""
-    response = client.get("/api/demo/wellbeing/London")
-    assert response.status_code == 200
-    data = response.json()
-    
-    assert "location" in data
-    assert data["location"] == "London"
-    assert "weather" in data
-    assert "mood_score" in data
-    assert "energy_level" in data
-    assert "risk_level" in data
-    assert "recommendations" in data
-    
-    # Validate ranges
-    assert 0 <= data["mood_score"] <= 100
-    assert data["energy_level"] in ["High", "Medium", "Low", "Very Low"]
-    assert data["risk_level"] in ["Minimal", "Low", "Moderate", "High"]
-    assert isinstance(data["recommendations"], list)
-    assert len(data["recommendations"]) > 0
-
-
 @pytest.mark.asyncio
 async def test_subscribe_endpoint_valid(mock_weatherai):
     """POST /api/subscribe with valid data should return 201."""
@@ -140,9 +101,9 @@ async def test_subscribe_endpoint_missing_phone(mock_weatherai):
 
 
 def test_forecast_unknown_location(mock_weatherai):
-    """GET /api/forecast with any location returns valid demo response."""
-    # Demo endpoints return valid data for any location
-    response = client.get("/api/demo/forecast/UnknownPlace123")
+    """GET /api/forecast with unknown location should handle gracefully."""
+    response = client.get("/api/forecast/UnknownPlace123")
+    # May return 422 or other error code depending on API response
     assert response.status_code == 200
     data = response.json()
     assert "location" in data

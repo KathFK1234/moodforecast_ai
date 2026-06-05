@@ -1,8 +1,5 @@
 const API_BASE = '';  // Use same domain as frontend
 
-// Check if demo mode is enabled via query parameter (?demo=true)
-const USE_DEMO = new URLSearchParams(window.location.search).get('demo') === 'true';
-
 async function handleSearch() {
     const location = document.getElementById('locationInput').value.trim();
     if (!location) {
@@ -15,14 +12,13 @@ async function handleSearch() {
     hideWellbeing();
 
     try {
-        const endpoint = USE_DEMO ? '/api/demo' : '/api';
         // Fetch forecast
-        const forecastRes = await fetch(`${API_BASE}${endpoint}/forecast/${encodeURIComponent(location)}`);
+        const forecastRes = await fetch(`${API_BASE}/api/forecast/${encodeURIComponent(location)}`);
         if (!forecastRes.ok) throw new Error('Location not found or API error');
         const forecastData = await forecastRes.json();
 
         // Fetch wellbeing
-        const wellbeingRes = await fetch(`${API_BASE}${endpoint}/wellbeing/${encodeURIComponent(location)}`);
+        const wellbeingRes = await fetch(`${API_BASE}/api/wellbeing/${encodeURIComponent(location)}`);
         if (!wellbeingRes.ok) throw new Error('Unable to calculate wellbeing');
         const wellbeingData = await wellbeingRes.json();
 

@@ -31,7 +31,7 @@ uvicorn app.main:app --reload
 
 # 4. Test
 curl http://localhost:8000/health
-curl http://localhost:8000/api/demo/forecast/Nairobi
+curl http://localhost:8000/api/forecast/Nairobi
 ```
 
 ---
@@ -189,25 +189,7 @@ pytest tests/ --cov=app --cov-report=html
 
 ## API Endpoints
 
-### Demo Endpoints (No API Key Required)
-
-Instant mock responses for testing:
-
-```bash
-# Get demo forecast
-curl http://localhost:8000/api/demo/forecast/Nairobi
-
-# Get demo wellbeing
-curl http://localhost:8000/api/demo/wellbeing/London
-
-# Returns:
-# {
-#   "location": "Nairobi",
-#   "weather": {
-#     "temp_c": 21.5,
-#     "condition": "Sunny",
-#     "humidity": 65.0,
-#     "wind_kph": 12.0
+### Production Endpoints (Requires API Key)
 #   },
 #   "mood_score": 80,
 #   "energy_level": "High",
@@ -465,7 +447,6 @@ Measured on localhost with caching enabled:
 
 | Endpoint | Uncached | Cached | Notes |
 |----------|----------|--------|-------|
-| `/api/demo/forecast/{location}` | 5ms | 5ms | Mock data, instant |
 | `/api/forecast/{location}` | 650ms | 25ms | Real API call |
 | `/api/wellbeing/{location}` | 700ms | 30ms | Real API call |
 | `/api/subscribe` | 10ms | - | Database write |

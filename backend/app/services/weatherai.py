@@ -180,9 +180,8 @@ class WeatherAIClient:
             cache.set(cache_key, result)
             return result
         except (ValueError, RuntimeError):
-            # Return error if location not found
+            # Return error if location not found (don't cache errors)
             result = {"error": f"Location '{location}' not found"}
-            cache.set(cache_key, result)
             return result
     
     async def get_ip_lookup(self, ip: str) -> dict[str, Any]:
