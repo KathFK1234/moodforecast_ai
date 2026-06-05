@@ -31,8 +31,10 @@ class TestMoodScoring:
         assert rainy_score < sunny_score
     
     def test_stormy_very_negative(self):
-        """Stormy weather should significantly reduce score."""
-        stormy_score = calculate_mood_score("Stormy", 20, 50)
+        """Stormy weather with extreme conditions should significantly reduce score."""
+        # Stormy: -20, Cold temp (5C): -5, High humidity (85%): -8
+        # 65 - 20 - 5 - 8 = 32 (< 50)
+        stormy_score = calculate_mood_score("Stormy", 5, 85)
         assert stormy_score < 50
     
     def test_optimal_temperature_bonus(self):

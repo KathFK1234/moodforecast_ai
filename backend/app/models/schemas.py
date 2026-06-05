@@ -1,6 +1,6 @@
 """Pydantic request and response models."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # Request Models
@@ -11,6 +11,14 @@ class SubscribeRequest(BaseModel):
     location: str = Field(..., description="City name or lat/lon coordinates")
     crop: str | None = Field(None, description="Crop type (optional)")
     language: str = Field("en", description="en or sw")
+    
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        """Validate E.164 format."""
+        if not v.startswith("+") or len(v) < 10:
+            raise ValueError("Phone must be in E.164 format (e.g., +254712345678)")
+        return v
 
 
 # Response Models
