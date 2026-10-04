@@ -1,6 +1,6 @@
 # MoodForecast AI - Backend
 
-FastAPI service combining WeatherAI API with a rule-based mood scoring engine.
+FastAPI service combining the Open-Meteo weather API with a rule-based mood scoring engine.
 
 ## Quick Start
 
@@ -16,8 +16,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and add your WeatherAI API key
-# WEATHERAI_API_KEY=wai_your_key_here
+# No API key needed - weather data comes from Open-Meteo
 ```
 
 ### 3. Run Development Server
@@ -46,7 +45,8 @@ app/
     subscribe.py      # POST /api/subscribe
   
   services/           # Business logic
-    weatherai.py      # WeatherAI API client with caching
+    weather.py        # Open-Meteo API client with caching
+    geocoding.py      # Location name → coordinates
     mood_engine.py    # Rule-based mood scoring
     cache.py          # In-memory TTL cache
   
@@ -58,25 +58,25 @@ app/
 
 tests/
   test_mood_engine.py    # Unit tests (no I/O)
-  test_endpoints.py      # Integration tests (mocked WeatherAI)
+  test_endpoints.py      # Integration tests (mocked weather client)
+  test_weather.py        # Open-Meteo client tests (mocked HTTP)
+  test_geocoding.py      # Geocoding tests (mocked HTTP)
 ```
 
 ## API Endpoints
 
-### Production Endpoints (Real WeatherAI API)
+### Production Endpoints (Live Open-Meteo Data)
 
 **GET /api/forecast/{location}**
 
-- Returns current weather + 7-day forecast + AI summary
+- Returns current weather + summary
 - Cached for 10 minutes
-- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/forecast/Nairobi`
 
 **GET /api/wellbeing/{location}**
 
 - Returns mood score, energy level, risk rating, recommendations
 - Cached for 10 minutes
-- Requires: Valid `WEATHERAI_API_KEY` in `.env`
 - Example: `curl http://localhost:8000/api/wellbeing/Nairobi`
 
 ### Subscriptions
@@ -115,13 +115,13 @@ pytest tests/test_mood_engine.py -v
 
 All tests are deterministic with no external I/O.
 
-### Integration Tests (Endpoints with Mocked WeatherAI)
+### Integration Tests (Endpoints with Mocked Weather Client)
 
 ```bash
 pytest tests/test_endpoints.py -v
 ```
 
-Uses FastAPI TestClient with mocked WeatherAI responses.
+Uses FastAPI TestClient with mocked weather responses.
 
 ### Run All Tests
 
@@ -133,26 +133,24 @@ pytest tests/ -v
 
 | Variable | Required | Description | Example |
 | ---------- | ---- | ------------- | --------- |
-| `WEATHERAI_API_KEY` | ✓ Yes | Your Weather-AI.co API key (for production endpoints) | `wai_fac7de...` |
-| `DATABASE_URL` | ✓ Yes | SQLite or PostgreSQL connection string | `sqlite:///./moodforecast.db` |
-| `ENVIRONMENT` | ✓ Yes | Deployment environment | `development` or `production` |
+| `WEATHER_API_URL` | No | Open-Meteo base URL (only change if self-hosting) | `https://api.open-meteo.com/v1` (default) |
+| `DATABASE_URL` | No | SQLite or PostgreSQL connection string | `sqlite:///./moodforecast.db` |
+| `ENVIRONMENT` | No | Deployment environment | `development` or `production` |
 | `REDIS_URL` | No | Redis URL for distributed caching | `redis://localhost:6379/0` |
 | `CACHE_TTL_SECONDS` | No | Cache time-to-live in seconds | `600` (default: 10 minutes) |
 
-### Getting a Weather-AI.co API Key
+### Weather Provider
 
-1. Visit [weather-ai.co](https://weather-ai.co)
-2. Sign up for an account
-3. Navigate to your dashboard
-4. Copy your API key
-5. Add to `.env` file: `WEATHERAI_API_KEY=your_key_here`
+Weather data comes from [Open-Meteo](https://open-meteo.com), an open-source weather API.
+No account or API key is needed. The free hosted API is for non-commercial use
+(about 10,000 calls/day); for commercial use, self-host it or use their paid plan and
+point `WEATHER_API_URL` at it.
 
 ## Deployment on Railway
 
 ### Prerequisites
 
 - GitHub repository connected to Railway
-- WeatherAI API key
 
 ### Steps
 
@@ -161,7 +159,7 @@ pytest tests/ -v
    - Railway will auto-detect `railway.toml`
 
 2. **Configure Environment**
-   - In Railway dashboard, set `WEATHERAI_API_KEY`
+   - In Railway dashboard, set `ENVIRONMENT=production`
    - Railway auto-provisions PostgreSQL if needed
 
 3. **Deploy**
@@ -206,19 +204,20 @@ The mood engine applies additive deltas to a baseline of 65:
 ## Performance & Caching
 
 - **TTL Cache**: 10-minute default (configurable via `CACHE_TTL_SECONDS`)
-- **Cache Key Format**: `{endpoint}:{lat}:{lon}`
+- **Cache Key Format**: `weather:{lat}:{lon}` and `geo:{location}`
 - **Swappable**: In-memory cache can be replaced with Redis (same API)
 
-## WeatherAI Integration
+## Weather Integration
 
-All calls made through `app/services/weatherai.py`:
+Weather calls are made through `app/services/weather.py`:
 
-- `GET /v1/geo/lookup` — Resolve location to coordinates
-- `GET /v1/weather` — Current conditions + forecast
-- `GET /v1/insights` — AI-generated summary
-- `GET /v1/forecast` — Hourly + daily forecast
+- `GET https://api.open-meteo.com/v1/forecast` — Current temperature, humidity, wind speed and WMO weather code
+
+Location names are resolved in `app/services/geocoding.py`:
+
+- `GET https://nominatim.openstreetmap.org/search` — Resolve location to coordinates
 
 ## Notes
 
-- SMS/USSD gateway requires WeatherAI **Scale plan** and compliance approval
+- SMS/USSD alerts need a separate SMS gateway; none is integrated yet
 - Subscriber data is stored in database but SMS dispatch is currently stubbed

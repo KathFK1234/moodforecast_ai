@@ -25,7 +25,7 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env and add WEATHERAI_API_KEY=wai_your_actual_key_here
+# No API key needed - weather data comes from Open-Meteo
 ```
 
 ### 3. Run Backend
@@ -106,7 +106,7 @@ moodforecast_ai/
 
 ## 🎯 Features
 
-✅ **Real-time Weather** - Integration with Weather-AI.co API
+✅ **Real-time Weather** - Integration with the Open-Meteo API (open source, no API key)
 ✅ **Mood Scoring** - AI-powered mood prediction engine
 ✅ **Smart Recommendations** - Context-aware wellness tips
 ✅ **Subscription Alerts** - Register for SMS/USSD notifications (backend ready)
@@ -211,16 +211,13 @@ Changes are automatically reflected when you refresh the browser.
 
 ## 🔑 Environment Variables
 
-### Required
-
-```
-WEATHERAI_API_KEY=wai_your_actual_key_here  # Get from weather-ai.co
-ENVIRONMENT=development                      # or production
-```
+None are required - weather data comes from [Open-Meteo](https://open-meteo.com), which needs no API key.
 
 ### Optional
 
 ```
+ENVIRONMENT=development                      # or production
+WEATHER_API_URL=https://api.open-meteo.com/v1  # Only if self-hosting Open-Meteo
 DATABASE_URL=sqlite:///./moodforecast.db     # Default SQLite
 CACHE_TTL_SECONDS=600                        # Cache duration (10 min)
 REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
@@ -228,7 +225,7 @@ REDIS_URL=redis://localhost:6379/0           # Optional Redis cache
 
 ## 📝 API Endpoints
 
-### Production (Requires API Key)
+### Production
 
 - `GET /api/forecast/{location}` - Real weather forecast
 - `GET /api/wellbeing/{location}` - Mood score & recommendations
@@ -258,8 +255,8 @@ cd backend && pip install -r requirements.txt
 ### API returns errors
 
 ```bash
-# Check API key in .env
-grep WEATHERAI_API_KEY backend/.env
+# Check the weather API is reachable
+curl "https://api.open-meteo.com/v1/forecast?latitude=-1.29&longitude=36.82&current=temperature_2m"
 
 # Check backend is running
 curl http://localhost:8000/health
@@ -322,7 +319,6 @@ See [frontend/GUIDE.md - Customization](frontend/GUIDE.md#frontend-customization
 - [ ] Frontend loads at `http://localhost:8000`
 - [ ] Search works for multiple locations
 - [ ] Subscription form works
-- [ ] API key configured
 - [ ] Database initialized
 - [ ] No sensitive data in code
 

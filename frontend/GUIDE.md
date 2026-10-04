@@ -23,7 +23,7 @@ The MoodForecast AI frontend is a lightweight, responsive single-page applicatio
 
 - **Responsive Design** - Works on desktop, tablet, and mobile
 - **Dark/Light Theme** - Auto-detects system preference
-- **Real-time Weather** - Fetches live data from Weather-AI.co API
+- **Real-time Weather** - Fetches live data from the Open-Meteo API
 - **Mood Scoring** - Displays AI-powered mood predictions
 - **Subscription Management** - Easy alert registration
 - **Error Handling** - Graceful error messages
@@ -36,7 +36,7 @@ The MoodForecast AI frontend is a lightweight, responsive single-page applicatio
 - **Frontend**: Vanilla JavaScript (no frameworks)
 - **Styling**: Pure CSS3 (no build tools)
 - **Backend**: FastAPI (Python)
-- **API**: Weather-AI.co REST API
+- **API**: Open-Meteo REST API (via the backend)
 - **Storage**: Browser LocalStorage for preferences
 
 ### Why Vanilla JS?
@@ -213,7 +213,7 @@ To add features:
 Test with actual weather data:
 
 ```bash
-# 1. Start backend (with valid WEATHERAI_API_KEY)
+# 1. Start backend
 cd backend
 source venv/bin/activate
 uvicorn app.main:app --reload
@@ -541,7 +541,6 @@ If needed:
 // Check in browser DevTools Network tab
 
 // CORS error? Check backend CORS config
-// 401/403? Check API key in backend .env
 // 422? Check request format
 // 500? Backend error - check backend logs
 
@@ -681,7 +680,6 @@ The backend serves the frontend directly!
 - [ ] Subscription form works
 - [ ] Mobile responsive tested
 - [ ] Errors display clearly
-- [ ] API key configured in backend
 - [ ] Backend deployed and running
 - [ ] HTTPS enabled
 - [ ] Monitoring active
