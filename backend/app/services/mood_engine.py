@@ -148,20 +148,24 @@ def generate_recommendations(
     
     condition_lower = condition.lower()
     
-    # Light-based recommendations
-    if "storm" in condition_lower or "thunder" in condition_lower or "rain" in condition_lower:
+    # Light-based recommendations (daylight advice only applies during the day)
+    if not is_day:
+        if "sunny" in condition_lower or "clear" in condition_lower:
+            recommendations.append(
+                "Clear night — a few minutes of fresh air outside can help you wind down."
+            )
+        else:
+            recommendations.append(
+                "Wind down with dim lights and a screen-free half hour before bed."
+            )
+    elif "storm" in condition_lower or "thunder" in condition_lower or "rain" in condition_lower:
         recommendations.append(
             "Schedule indoor focus work; use this weather for reflection or creative tasks."
         )
     elif "sunny" in condition_lower or "clear" in condition_lower:
-        if is_day:
-            recommendations.append(
-                "Take a 15-minute outdoor walk before 11am while light levels are highest."
-            )
-        else:
-            recommendations.append(
-                "Clear night — a few minutes of fresh air outside can help you wind down."
-            )
+        recommendations.append(
+            "Take a 15-minute outdoor walk before 11am while light levels are highest."
+        )
     elif "cloudy" in condition_lower or "overcast" in condition_lower:
         recommendations.append(
             "Consider a brief midday break by a window to maintain light exposure."
@@ -213,10 +217,11 @@ def build_summary(
     condition: str,
     temperature_c: float,
     mood_score: int,
-    factors: list[MoodFactor]
+    factors: list[MoodFactor],
+    is_day: bool = True
 ) -> str:
     """Describe the conditions and what is driving the mood score, in plain language."""
-    summary = f"{condition} and {round(temperature_c)}°C in {location}."
+    summary = f"{condition.capitalize()} and {round(temperature_c)}°C in {location}."
     
     lifts = [f["label"].lower() for f in factors if f["delta"] > 0]
     drags = [f["label"].lower() for f in factors if f["delta"] < 0]
@@ -233,8 +238,10 @@ def build_summary(
     else:
         summary += " Conditions are neutral, with little effect on mood either way."
     
-    if mood_score >= 75:
+    if mood_score >= 75 and is_day:
         summary += " A good time to take on something demanding."
+    elif mood_score >= 75:
+        summary += " A calm night to rest and recharge."
     elif mood_score < 50:
         summary += " Go easy on yourself and plan for lower energy."
     

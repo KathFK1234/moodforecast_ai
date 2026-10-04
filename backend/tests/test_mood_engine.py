@@ -223,6 +223,11 @@ class TestNightRecommendations:
         assert "11am" not in text
         assert "2pm" not in text
         assert len(recs) > 0
+    
+    def test_no_midday_advice_on_an_overcast_night(self):
+        recs = generate_recommendations(55, "Overcast", 18, 60, is_day=False)
+        assert "midday" not in " ".join(recs)
+        assert len(recs) > 0
 
 
 class TestSummary:
@@ -242,6 +247,14 @@ class TestSummary:
         assert summary == (
             "Rain and 8°C in Bergen. Rain, cold stress and high humidity are "
             "weighing on the mood. Go easy on yourself and plan for lower energy."
+        )
+    
+    def test_night_summary_does_not_suggest_demanding_work(self):
+        factors = mood_factors("Mainly Clear", 20, 50, is_day=False)
+        summary = build_summary("Nairobi", "Mainly Clear", 20, 80, factors, is_day=False)
+        assert summary == (
+            "Mainly clear and 20°C in Nairobi. Clear night and comfortable temperature are "
+            "lifting the mood. A calm night to rest and recharge."
         )
     
     def test_neutral_summary(self):

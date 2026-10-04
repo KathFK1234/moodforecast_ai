@@ -44,7 +44,8 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
                 weather.condition,
                 weather.temp_c,
                 mood_result["mood_score"],
-                mood_result["factors"]
+                mood_result["factors"],
+                weather.is_day
             ),
             recommendations=mood_result["recommendations"]
         )

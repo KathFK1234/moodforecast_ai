@@ -184,7 +184,7 @@ def test_wellbeing_endpoint(mock_weather):
         {"label": "Comfortable temperature", "delta": 10}
     ]
     assert data["ai_summary"] == (
-        "Partly Cloudy and 18°C in Nairobi, KE. Comfortable temperature helps, "
+        "Partly cloudy and 18°C in Nairobi, KE. Comfortable temperature helps, "
         "while cloud cover pulls the score down."
     )
     assert data["energy_level"] in ["High", "Medium", "Low", "Very Low"]
