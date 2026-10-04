@@ -6,6 +6,9 @@ echo "🔍 MoodForecast AI - Setup Verification"
 echo "=========================================="
 echo ""
 
+# Backend to test against (override if port 8000 is taken, e.g. BASE_URL=http://localhost:8001)
+BASE_URL="${BASE_URL:-http://localhost:8000}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,7 +33,7 @@ pass() {
 
 # 1. Check Python environment
 echo "1. Python Environment"
-cd /home/kk/Programming/moodforecast_ai/backend
+cd "$(dirname "$0")"
 if [ -d "venv" ]; then
     pass "Virtual environment exists"
 else
@@ -61,20 +64,8 @@ echo ""
 echo "3. Configuration"
 if [ -f ".env" ]; then
     pass ".env file exists"
-    if grep -q "WEATHERAI_API_KEY" .env; then
-        pass "WEATHERAI_API_KEY configured"
-        api_key=$(grep "WEATHERAI_API_KEY" .env | cut -d= -f2)
-        if [ -z "$api_key" ] || [ "$api_key" = "your_api_key_here" ]; then
-            fail "API key is still placeholder or empty"
-            echo "   Get API key from: https://weather-ai.co"
-        else
-            pass "API key configured (weather-ai.co)"
-        fi
-    else
-        fail "WEATHERAI_API_KEY not in .env"
-    fi
 else
-    fail ".env file missing"
+    pass ".env file not present - defaults will be used (Open-Meteo needs no API key)"
 fi
 echo ""
 
@@ -132,22 +123,22 @@ echo ""
 # 8. Check backend server
 echo "8. Backend Server"
 if pgrep -f "uvicorn app.main" > /dev/null; then
-    pass "Backend server running on port 8000"
+    pass "Backend server running"
     
     # Test endpoints
-    health=$(curl -s http://localhost:8000/health 2>/dev/null)
+    health=$(curl -s $BASE_URL/health 2>/dev/null)
     if echo "$health" | grep -q '"status"'; then
         pass "Health endpoint working"
     else
         fail "Health endpoint not responding"
     fi
     
-    # Test demo endpoints
-    demo=$(curl -s http://localhost:8000/api/demo/forecast/Nairobi 2>/dev/null)
-    if echo "$demo" | grep -q '"location"'; then
-        pass "Demo endpoints working"
+    # Test live weather endpoint
+    forecast=$(curl -s $BASE_URL/api/forecast/Nairobi 2>/dev/null)
+    if echo "$forecast" | grep -q '"location"'; then
+        pass "Forecast endpoint working"
     else
-        fail "Demo endpoints not responding"
+        fail "Forecast endpoint not responding"
     fi
 else
     fail "Backend server not running"
@@ -164,15 +155,13 @@ echo "1. If not already running, start backend:"
 echo "   cd backend && source venv/bin/activate && uvicorn app.main:app --reload --port 8000"
 echo ""
 echo "2. Run testing workflow:"
-echo "   - Test in browser: http://localhost:8000"
-echo "   - Or demo mode: http://localhost:8000/?demo=true"
-echo "   - Or separate page: http://localhost:8000/index-demo.html"
+echo "   - Test in browser: $BASE_URL"
 echo ""
 echo "3. Run full test suite:"
 echo "   pytest tests/ -v"
 echo ""
 echo "4. When ready to deploy:"
-echo "   - See DEPLOYMENT_READY.md for complete instructions"
+echo "   - See DEPLOYMENT_GUIDE.md for complete instructions"
 echo "   - Commit to GitHub"
 echo "   - Deploy to Railway dashboard"
 echo ""
