@@ -4,110 +4,71 @@ Single-page HTML/CSS/JS application for the MoodForecast AI service.
 
 ## Overview
 
-The frontend is intentionally minimal — **one well-crafted HTML page** with:
+The frontend is intentionally minimal:
 
 - No build step or compilation
 - Vanilla JavaScript (no frameworks)
-- Responsive design (mobile-first)
-- Real-time interaction with FastAPI backend
+- Responsive layout
+- Talks to the FastAPI backend with relative URLs
 
-## File Location
+## Files
 
-The actual frontend files are served from `/backend/app/static/`:
+| File | Purpose |
+| ---- | ------- |
+| `index.html` | Page structure |
+| `app.js` | Search, rendering and subscribe logic |
+| `styles.css` | Styling |
+| `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | Icons |
 
-- `index.html` — Complete single-page application
-- Styling: Embedded CSS
-- Logic: Embedded JavaScript
+## How It Is Served
 
-## How It Works
+The backend serves `backend/app/static/`, which is a copy of this directory. After editing files here, copy them across:
 
-1. **Search Bar** → User enters location (city name or coordinates)
-2. **API Call** → Fetches `/api/forecast/{location}` and `/api/wellbeing/{location}`
-3. **Display Weather** → Current conditions + humidity + wind
-4. **Display Wellbeing** → Mood score (0-100) + energy level + recommendations
-5. **Subscribe Form** → Optional SMS/USSD alert registration
+```bash
+cp frontend/index.html frontend/app.js frontend/styles.css backend/app/static/
+```
 
-## Features
-
-### Weather Display
-
-- Current temperature, humidity, wind speed, condition
-- Real-time data from the Open-Meteo API
-
-### Wellbeing Score
-
-- **Mood Score**: 0-100 based on weather conditions
-- **Energy Level**: High / Medium / Low / Very Low
-- **Risk Level**: Minimal / Low / Moderate / High
-- **Recommendations**: Context-aware wellness tips
-
-### AI Summary
-
-- Short natural language summary of the current conditions
-
-### SMS Subscription
-
-- E.164 phone format validation
-- Crop selection (optional)
-- Language preference (English / Swahili)
-- Confirmation with subscriber ID
-
-## Styling
-
-Uses modern CSS with:
-
-- **Color Scheme**: Purple gradient (#667eea → #764ba2)
-- **Font**: DM Sans (Google Fonts)
-- **Layout**: CSS Grid and Flexbox
-- **Responsive**: Mobile-first approach
-- **Accessibility**: Semantic HTML, good contrast ratios
-
-## API Integration
-
-All requests to the same domain (relative URLs):
-
-- `GET /api/forecast/{location}`
-- `GET /api/wellbeing/{location}`
-- `POST /api/subscribe`
-
-The frontend is served from FastAPI's static file handler, so API calls use relative paths.
+The backend test `tests/test_static_sync.py` fails if the two copies differ.
 
 ## How to Run
 
-The frontend is **automatically served** by the FastAPI backend:
+Start the backend, which serves the frontend:
 
 ```bash
 cd backend
-python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Then open: **`http://localhost:8000`**
+Then open **`http://localhost:8000`**. See [../README.md](../README.md) for first-time setup.
 
-## No Build Step
+API calls use relative paths, so the page must be opened through the backend rather than as a file.
 
-This frontend requires **zero build tools**:
+## How It Works
 
-- No npm, webpack, or bundler
-- No TypeScript or JSX compilation
-- Serve directly as static files
+1. **Search** → user enters a location, picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser.
+2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`, in parallel
+3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
+4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score
+5. **7-day mood outlook** → icon, rain chance, temperature range and expected mood per day
+6. **Recommendations** → wellbeing tips for the current conditions
+7. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
 
-This makes deployment trivial and keeps the stack simple.
+Errors show the message returned by the API.
 
-## Performance
+## Design
 
-- Page load: ~100ms (index.html is 15KB gzipped)
-- API latency: ~250ms uncached (Open-Meteo + geocoding)
-- Cache hit: Instant response (10-minute TTL)
+- **Sky background** follows the weather and time of day. `applyTheme()` in `app.js` sets `data-theme` on `<body>`; each theme's colors are at the top of `styles.css`.
+- **Mood levels** use four colors (`--level-high`, `--level-medium`, `--level-low`, `--level-verylow`), always next to a number or label so color is never the only cue.
+- **Icons** are inline SVG, defined in `ICONS` in `app.js`.
+- **Font**: DM Sans (Google Fonts)
+- **Responsive**: two columns on desktop, one below 860px, compact forecast rows below 520px
+- **Motion** is turned off when the visitor's system asks for reduced motion
+
+## Attribution
+
+The footer credits Open-Meteo and OpenStreetMap. Both licences require this, so keep it when changing the layout.
 
 ## Browser Support
 
-Modern browsers (ES2020+):
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
+Modern browsers (ES2020+): current Chrome, Firefox, Safari and Edge.

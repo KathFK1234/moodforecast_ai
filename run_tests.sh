@@ -147,7 +147,7 @@ if [ -f "backend/moodforecast.db" ]; then
     record_count=$(cd backend && sqlite3 moodforecast.db "SELECT COUNT(*) FROM subscriber;" 2>/dev/null || echo "0")
     pass "Database has $record_count subscriber record(s)"
 else
-    fail "Database not found - may initialize on first run"
+    skip "SQLite database not found - created on first run, or DATABASE_URL points elsewhere"
 fi
 
 # Configuration

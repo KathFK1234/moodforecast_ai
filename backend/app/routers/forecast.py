@@ -2,9 +2,14 @@
 
 from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
-from app.models.schemas import ForecastResponse, WeatherData
+from app.services.mood_engine import calculate_mood_score, classify_mood_label
+from app.models.schemas import DailyForecast, ForecastResponse
+from app.routers.common import build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["forecast"])
+
+# Assumed when the forecast has no humidity for a day (no effect on the score)
+DEFAULT_HUMIDITY = 50
 
 
 @router.get("/forecast/{location}")
@@ -12,40 +17,45 @@ async def get_forecast(location: str) -> ForecastResponse:
     """
     Get weather forecast for a location.
     
-    Returns current conditions + 7-day forecast + AI summary.
+    Returns current conditions + 7-day forecast with a mood outlook per day.
     Cached for 10 minutes.
     """
     try:
         client = get_weather_client()
+        lat, lon, resolved_location = await resolve_location(client, location)
         
-        # Resolve location to coordinates
-        geo_data = await client.get_location_by_name(location)
-        if "error" in geo_data:
-            raise HTTPException(status_code=422, detail=geo_data["error"])
+        # Fetch current conditions + daily forecast
+        forecast = await client.get_forecast(lat, lon)
+        weather = build_weather(forecast["current"])
         
-        lat = geo_data.get("lat")
-        lon = geo_data.get("lon")
-        resolved_location = geo_data.get("name", location)
-        
-        if lat is None or lon is None:
-            raise HTTPException(status_code=422, detail="Location not found")
-        
-        # Fetch current conditions
-        current = await client.get_current(lat, lon)
-        condition = current.get("condition")
-        
-        weather = WeatherData(
-            temp_c=float(current.get("temperature", 0)),
-            condition=condition or "Unknown",
-            humidity=float(current.get("humidity", 0)),
-            wind_kph=float(current.get("wind_speed", 0))
-        )
+        daily = []
+        for day in forecast["daily"]:
+            # Score the day on its average temperature and humidity
+            humidity = day.get("humidity")
+            mood_score = calculate_mood_score(
+                day["condition"],
+                (day["temp_max"] + day["temp_min"]) / 2,
+                DEFAULT_HUMIDITY if humidity is None else humidity
+            )
+            daily.append(DailyForecast(
+                date=day["date"],
+                condition=day["condition"],
+                temp_max_c=day["temp_max"],
+                temp_min_c=day["temp_min"],
+                precipitation_chance=day.get("precipitation_chance"),
+                uv_index=day.get("uv_index"),
+                sunrise=day.get("sunrise"),
+                sunset=day.get("sunset"),
+                mood_score=mood_score,
+                mood_label=classify_mood_label(mood_score)
+            ))
         
         return ForecastResponse(
             location=resolved_location,
             weather=weather,
-            forecast_days=7,
-            ai_summary=f"Weather in {resolved_location}: {condition}"
+            forecast_days=len(daily),
+            daily=daily,
+            ai_summary=f"Weather in {resolved_location}: {weather.condition}"
         )
     
     except HTTPException:

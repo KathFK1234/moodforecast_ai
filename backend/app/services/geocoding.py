@@ -56,7 +56,7 @@ async def get_coordinates(location: str) -> dict:
     # Try hardcoded popular locations first (no API call, instant)
     if location_lower in POPULAR_LOCATIONS:
         result = POPULAR_LOCATIONS[location_lower].copy()
-        result["name"] = location
+        result["name"] = location.title()
         cache.set(cache_key, result)
         return result
     
@@ -87,7 +87,8 @@ async def get_coordinates(location: str) -> dict:
         result = {
             "lat": float(data["lat"]),
             "lon": float(data["lon"]),
-            "name": location,
+            # Prefer the place's proper name over what the user typed
+            "name": data.get("name") or location,
             "country": data.get("address", {}).get("country_code", "").upper(),
             "timezone": "",  # Nominatim doesn't provide timezone
         }

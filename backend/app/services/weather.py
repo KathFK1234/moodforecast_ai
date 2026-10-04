@@ -39,7 +39,14 @@ CONDITION_MAP = {
 }
 
 # Current-conditions variables requested from Open-Meteo
-CURRENT_VARIABLES = "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m"
+CURRENT_VARIABLES = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m"
+
+# Daily forecast variables requested from Open-Meteo
+DAILY_VARIABLES = (
+    "weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,"
+    "precipitation_probability_max,uv_index_max,sunrise,sunset"
+)
+FORECAST_DAYS = 7
 
 
 class WeatherClient:
@@ -91,18 +98,32 @@ class WeatherClient:
         except (KeyError, TypeError, ValueError):
             return "Unknown"
     
-    async def get_current(self, lat: float, lon: float) -> dict[str, Any]:
+    async def get_forecast(self, lat: float, lon: float) -> dict[str, Any]:
         """
-        GET /forecast - Current conditions for a set of coordinates.
+        GET /forecast - Current conditions + daily forecast for a set of coordinates.
         
         Cache key: weather:{lat}:{lon}
         
         Returns: {
-            "temperature": float (°C),
-            "humidity": float (%),
-            "wind_speed": float (km/h),
-            "condition_code": int (WMO code),
-            "condition": str
+            "current": {
+                "temperature": float (°C),
+                "feels_like": float | None (°C),
+                "humidity": float (%),
+                "wind_speed": float (km/h),
+                "is_day": bool,
+                "condition_code": int (WMO code),
+                "condition": str
+            },
+            "daily": [
+                {
+                    "date": "YYYY-MM-DD", "condition": str,
+                    "temp_max": float, "temp_min": float,
+                    "humidity": float | None (%), "precipitation_chance": float | None (%),
+                    "uv_index": float | None,
+                    "sunrise": "HH:MM" | None, "sunset": "HH:MM" | None (local time)
+                },
+                ...
+            ]
         }
         """
         cache_key = f"weather:{lat}:{lon}"
@@ -114,6 +135,8 @@ class WeatherClient:
             "latitude": lat,
             "longitude": lon,
             "current": CURRENT_VARIABLES,
+            "daily": DAILY_VARIABLES,
+            "forecast_days": FORECAST_DAYS,
             "timezone": "auto",
         }
         
@@ -124,14 +147,62 @@ class WeatherClient:
         
         condition_code = current.get("weather_code")
         result = {
-            "temperature": float(current.get("temperature_2m", 0)),
-            "humidity": float(current.get("relative_humidity_2m", 0)),
-            "wind_speed": float(current.get("wind_speed_10m", 0)),
-            "condition_code": condition_code,
-            "condition": self._get_condition_text(condition_code),
+            "current": {
+                "temperature": float(current.get("temperature_2m", 0)),
+                "feels_like": current.get("apparent_temperature"),
+                "humidity": float(current.get("relative_humidity_2m", 0)),
+                "wind_speed": float(current.get("wind_speed_10m", 0)),
+                "is_day": current.get("is_day", 1) != 0,
+                "condition_code": condition_code,
+                "condition": self._get_condition_text(condition_code),
+            },
+            "daily": self._parse_daily(data.get("daily") or {}),
         }
         cache.set(cache_key, result)
         return result
+    
+    def _parse_daily(self, daily: dict[str, Any]) -> list[dict[str, Any]]:
+        """Turn Open-Meteo's column-per-variable daily block into one dict per day."""
+        dates = daily.get("time", [])
+        
+        def column(name: str) -> list[Any]:
+            values = daily.get(name) or []
+            # Pad so a missing optional variable doesn't drop every day
+            return values + [None] * (len(dates) - len(values))
+        
+        days = []
+        for date, code, temp_max, temp_min, humidity, rain_chance, uv_index, sunrise, sunset in zip(
+            dates,
+            column("weather_code"),
+            column("temperature_2m_max"),
+            column("temperature_2m_min"),
+            column("relative_humidity_2m_mean"),
+            column("precipitation_probability_max"),
+            column("uv_index_max"),
+            column("sunrise"),
+            column("sunset"),
+        ):
+            # Open-Meteo sends null when a day has no data
+            if temp_max is None or temp_min is None:
+                continue
+            days.append({
+                "date": date,
+                "condition": self._get_condition_text(code),
+                "temp_max": float(temp_max),
+                "temp_min": float(temp_min),
+                "humidity": humidity,
+                "precipitation_chance": rain_chance,
+                "uv_index": uv_index,
+                # "2026-10-05T06:17" -> "06:17"
+                "sunrise": sunrise[-5:] if sunrise else None,
+                "sunset": sunset[-5:] if sunset else None,
+            })
+        return days
+    
+    async def get_current(self, lat: float, lon: float) -> dict[str, Any]:
+        """Current conditions only - see get_forecast for the shape."""
+        forecast = await self.get_forecast(lat, lon)
+        return forecast["current"]
     
     async def get_location_by_name(self, location: str) -> dict[str, Any]:
         """
