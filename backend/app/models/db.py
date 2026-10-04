@@ -1,6 +1,7 @@
 """Database models and schema definitions."""
 
-from datetime import datetime
+from datetime import datetime, timezone
+from functools import lru_cache
 from sqlmodel import SQLModel, Field, create_engine
 from app.config import settings
 
@@ -13,11 +14,12 @@ class Subscriber(SQLModel, table=True):
     crop: str | None = None
     language: str = Field("en")
     active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+@lru_cache
 def get_engine():
-    """Create database engine from settings."""
+    """Get the shared database engine, created from settings on first use."""
     return create_engine(
         settings.database_url,
         echo=settings.environment == "development"

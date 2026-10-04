@@ -2,6 +2,7 @@
 
 import time
 from typing import Any, Optional
+from app.config import settings
 
 
 class TTLCache:
@@ -37,4 +38,4 @@ class TTLCache:
 
 
 # Global cache instance
-cache = TTLCache()
+cache = TTLCache(settings.cache_ttl_seconds)

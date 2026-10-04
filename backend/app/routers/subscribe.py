@@ -2,8 +2,7 @@
 
 import uuid
 from fastapi import APIRouter, HTTPException
-from sqlmodel import Session, create_engine, select
-from app.config import settings
+from sqlmodel import Session
 from app.models.db import Subscriber, get_engine
 from app.models.schemas import SubscribeRequest, SubscribeResponse
 
@@ -52,6 +51,8 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             status="subscribed"
         )
     
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

@@ -28,7 +28,6 @@
 #### Step 1: Push to GitHub
 
 ```bash
-cd /home/kk/Programming/moodforecast_ai
 git push origin main
 ```
 
@@ -40,10 +39,9 @@ git push origin main
 
 #### Step 3: Environment Variables
 
-Add these 3 variables in Railway dashboard:
+Add these 2 variables in Railway dashboard (no weather API key is needed - Open-Meteo is keyless):
 
 ```
-WEATHERAI_API_KEY=wai_fac7de.18c79078526275654ce9697e6f4445bbcdf395f2506af272
 ENVIRONMENT=production
 CACHE_TTL_SECONDS=600
 ```
@@ -83,13 +81,13 @@ curl https://YOUR_DOMAIN/api/forecast/Nairobi
 ├─────────────┤
 │  FastAPI    │ Routers: forecast, wellbeing, subscribe
 ├─────────────┤
-│  Services   │ WeatherAI, Geocoding, Mood Engine, Cache
+│  Services   │ Weather, Geocoding, Mood Engine, Cache
 ├─────────────┤
 │  Database   │ SQLite/PostgreSQL (Subscriber table)
 └─────────────┘
     ↕
 ┌─────────────┐
-│ Weather-AI  │ Real-time weather data + WMO conditions
+│ Open-Meteo  │ Real-time weather data + WMO conditions
 │ API (v1)    │
 └─────────────┘
 ```
@@ -103,7 +101,7 @@ User Location Name
       ↓
 Latitude/Longitude
       ↓
-Weather-AI API
+Open-Meteo API
       ↓
 Weather Data (temp, humidity, wind, condition code)
       ↓
@@ -155,7 +153,6 @@ git push origin main
 
 | Variable | Value |
 | ---------- | ------- |
-| `WEATHERAI_API_KEY` | `wai_fac7de.18c79078526275654ce9697e6f4445bbcdf395f2506af272` |
 | `ENVIRONMENT` | `production` |
 | `CACHE_TTL_SECONDS` | `600` |
 
@@ -183,7 +180,6 @@ You can:
 | Issue | Solution |
 | ------- | ---------- |
 | Build fails | Check `requirements.txt` is valid, view Railway logs |
-| API Key error | Verify `WEATHERAI_API_KEY` has no extra spaces |
 | App crashes | Check Railway logs, verify Python version 3.8+ |
 | Port binding error | Railway auto-assigns ports, shouldn't be an issue |
 | Database error | Leave `DATABASE_URL` empty for automatic SQLite setup |
@@ -334,10 +330,9 @@ curl https://YOUR_DOMAIN/api/forecast/Tokyo | jq .weather
 1. **Clear browser cache** (Ctrl+Shift+Delete)
 2. **Test in incognito window**
 3. **Check API directly with curl** (as above)
-4. **Verify API key in Railway variables**
-5. **Check Railway deployment logs**
+4. **Check Railway deployment logs**
 
-### Issue: "Weather-AI service unavailable"
+### Issue: "Weather service unavailable"
 
 **Cause**: Temporary API issue or rate limiting
 
@@ -346,7 +341,7 @@ curl https://YOUR_DOMAIN/api/forecast/Tokyo | jq .weather
 1. Wait 30 seconds
 2. Retry the request
 3. Check internet connection
-4. Verify API key is valid
+4. Check Open-Meteo status: `https://open-meteo.com`
 
 ### Issue: Frontend shows 404
 
@@ -482,7 +477,7 @@ moodforecast_ai/
 │   │   │   ├── wellbeing.py       # GET /api/wellbeing
 │   │   │   └── subscribe.py       # POST /api/subscribe
 │   │   ├── services/
-│   │   │   ├── weatherai.py       # Weather-AI API client
+│   │   │   ├── weather.py         # Open-Meteo API client
 │   │   │   ├── geocoding.py       # Location → Coordinates
 │   │   │   ├── mood_engine.py     # Mood scoring algorithm
 │   │   │   └── cache.py           # In-memory TTL cache
@@ -516,7 +511,7 @@ moodforecast_ai/
 | ------ | --------- |
 | `backend/app/main.py` | FastAPI app entry point, middleware setup |
 | `backend/app/routers/*.py` | API endpoint definitions |
-| `backend/app/services/weatherai.py` | Weather-AI API client, weather data fetching |
+| `backend/app/services/weather.py` | Open-Meteo API client, weather data fetching |
 | `backend/app/services/geocoding.py` | Convert location names to coordinates (NEW) |
 | `backend/app/services/mood_engine.py` | Calculate mood score, recommendations |
 | `backend/app/services/cache.py` | In-memory TTL cache implementation |
@@ -531,14 +526,12 @@ moodforecast_ai/
 ### Minimum Required (for Railway)
 
 ```
-WEATHERAI_API_KEY=wai_fac7de.18c79078526275654ce9697e6f4445bbcdf395f2506af272
 ENVIRONMENT=production
 ```
 
 ### Recommended (for production)
 
 ```
-WEATHERAI_API_KEY=wai_fac7de.18c79078526275654ce9697e6f4445bbcdf395f2506af272
 ENVIRONMENT=production
 CACHE_TTL_SECONDS=600
 LOG_LEVEL=info
@@ -557,7 +550,7 @@ PORT=8000                                            # Server port
 
 | Variable | Purpose | Default | Example |
 | ---------- | --------- | --------- | --------- |
-| `WEATHERAI_API_KEY` | API key for weather-ai.co | Required | `wai_fac7de...` |
+| `WEATHER_API_URL` | Open-Meteo base URL (only change if self-hosting) | `https://api.open-meteo.com/v1` | `http://localhost:8080/v1` |
 | `ENVIRONMENT` | App environment | `development` | `production` |
 | `CACHE_TTL_SECONDS` | Cache lifetime in seconds | `600` | `1800` for 30 min |
 | `DATABASE_URL` | Database connection string | Auto SQLite | `postgresql://...` |
@@ -702,12 +695,11 @@ curl https://YOUR_DOMAIN/api/forecast/Singapore
 
 ## 🔐 Security Notes
 
-### API Key Protection
+### Secrets
 
-- ✅ API key stored in Railway Variables (encrypted)
-- ✅ Never committed to git (in .env which is ignored)
-- ✅ Bearer token used for weather-ai.co authentication
-- ✅ No API key exposed in frontend
+- ✅ Weather data comes from Open-Meteo, which needs no API key
+- ✅ `.env` is ignored by git - keep `DATABASE_URL` credentials there or in Railway Variables
+- ✅ No secrets exposed in frontend
 
 ### Database Security
 
@@ -732,7 +724,7 @@ curl https://YOUR_DOMAIN/api/forecast/Singapore
 - **FastAPI Docs**: `https://fastapi.tiangolo.com`
 - **Pydantic Docs**: `https://docs.pydantic.dev`
 - **Railway Docs**: `https://docs.railway.app`
-- **Weather-AI Docs**: `https://weather-ai.co/docs`
+- **Open-Meteo Docs**: `https://open-meteo.com/en/docs`
 
 ### Getting Help
 
@@ -746,7 +738,6 @@ curl https://YOUR_DOMAIN/api/forecast/Singapore
 - Same weather for all locations → See "Troubleshooting" section
 - App crashes → Check Railway logs and `requirements.txt`
 - Frontend 404 → Verify deployment successful
-- API key error → Double-check exact key in variables
 - Response slow → Check cache status, may need restart
 
 ---
@@ -762,7 +753,7 @@ curl https://YOUR_DOMAIN/api/forecast/Singapore
 
 ✅ **Features**
 
-- Real weather data from weather-ai.co
+- Real weather data from Open-Meteo
 - Mood scoring algorithm
 - Location geocoding (Nominatim + hardcoded)
 - In-memory TTL caching

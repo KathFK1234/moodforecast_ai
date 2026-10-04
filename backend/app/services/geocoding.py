@@ -33,8 +33,10 @@ async def get_coordinates(location: str) -> dict:
     """
     Convert location name to coordinates.
     
-    Uses Nominatim (OpenStreetMap) for online lookup, falls back to hardcoded list.
+    Checks the hardcoded popular locations first, then Nominatim (OpenStreetMap).
     Cache key: geo:{location_name}
+    
+    Raises TimeoutError / RuntimeError if the online lookup fails.
     
     Returns: {
         "lat": float,
@@ -44,13 +46,14 @@ async def get_coordinates(location: str) -> dict:
         "timezone": str
     }
     """
-    cache_key = f"geo:{location.lower()}"
+    location = location.strip()
+    location_lower = location.lower()
+    cache_key = f"geo:{location_lower}"
     cached = cache.get(cache_key)
     if cached:
         return cached
     
     # Try hardcoded popular locations first (no API call, instant)
-    location_lower = location.lower()
     if location_lower in POPULAR_LOCATIONS:
         result = POPULAR_LOCATIONS[location_lower].copy()
         result["name"] = location
@@ -66,33 +69,30 @@ async def get_coordinates(location: str) -> dict:
                     "q": location,
                     "format": "json",
                     "limit": 1,
+                    "addressdetails": 1,
                 },
                 headers={"User-Agent": "MoodForecastAI/1.0"},
                 timeout=5.0
             )
-            
-            if response.status_code == 200 and response.json():
-                data = response.json()[0]
-                result = {
-                    "lat": float(data["lat"]),
-                    "lon": float(data["lon"]),
-                    "name": location,
-                    "country": data.get("address", {}).get("country", ""),
-                    "timezone": "",  # Nominatim doesn't provide timezone
-                }
-                cache.set(cache_key, result)
-                return result
-    except Exception:
-        pass  # Fall through to error response
+            response.raise_for_status()
+            matches = response.json()
+    except httpx.TimeoutException:
+        raise TimeoutError("Geocoding request timed out")
+    except (httpx.HTTPError, ValueError) as e:
+        # Don't report "not found" (or guess a city) when the lookup itself failed
+        raise RuntimeError(f"Geocoding service unavailable: {e}")
     
-    # If online lookup fails, check if it's close to a known location
-    # (typo tolerance)
-    for known_loc, coords in POPULAR_LOCATIONS.items():
-        if location_lower.startswith(known_loc[:3]):  # Match first 3 chars
-            result = coords.copy()
-            result["name"] = location
-            cache.set(cache_key, result)
-            return result
+    if matches:
+        data = matches[0]
+        result = {
+            "lat": float(data["lat"]),
+            "lon": float(data["lon"]),
+            "name": location,
+            "country": data.get("address", {}).get("country_code", "").upper(),
+            "timezone": "",  # Nominatim doesn't provide timezone
+        }
+        cache.set(cache_key, result)
+        return result
     
     # Location not found
     return {

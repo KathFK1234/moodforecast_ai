@@ -22,9 +22,8 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# 2. Configure API key
+# 2. Configure environment (no API key needed - weather comes from Open-Meteo)
 cp .env.example .env
-# Edit .env and add WEATHERAI_API_KEY=wai_your_actual_key_here
 
 # 3. Run backend
 uvicorn app.main:app --reload
@@ -42,13 +41,11 @@ curl http://localhost:8000/api/forecast/Nairobi
 
 - Python 3.11+ (tested on 3.12.3, 3.13+)
 - Git
-- Weather-AI.co API key (get free at [weather-ai.co](https://weather-ai.co))
 
-### Step 1: Get Weather-AI.co API Key
+### Step 1: Weather Provider
 
-1. Visit [weather-ai.co](https://weather-ai.co)
-2. Create free account
-3. Copy your API key (format: `wai_...`)
+Nothing to set up. Weather data comes from [Open-Meteo](https://open-meteo.com),
+an open-source API that needs no account or API key.
 
 ### Step 2: Create Virtual Environment
 
@@ -86,8 +83,7 @@ cp .env.example .env
 # Edit .env with your settings
 nano .env  # or use your editor
 
-# Required settings:
-WEATHERAI_API_KEY=wai_your_actual_key_here
+# Settings (all optional, these are sensible defaults):
 DATABASE_URL=sqlite:///./moodforecast.db
 ENVIRONMENT=development
 CACHE_TTL_SECONDS=600
@@ -189,7 +185,7 @@ pytest tests/ --cov=app --cov-report=html
 
 ## API Endpoints
 
-### Production Endpoints (Requires API Key)
+### Production Endpoints
 #   },
 #   "mood_score": 80,
 #   "energy_level": "High",
@@ -198,7 +194,7 @@ pytest tests/ --cov=app --cov-report=html
 # }
 ```
 
-### Real Endpoints (Requires Valid API Key)
+### Real Endpoints
 
 Fetches real weather data:
 
@@ -329,7 +325,6 @@ git push origin main
 # - Create new project
 # - Select your repository
 # - Add environment variables:
-#   WEATHERAI_API_KEY=wai_xxx...
 #   ENVIRONMENT=production
 #   DATABASE_URL=postgresql://... (use Railway's free PostgreSQL)
 
@@ -344,7 +339,6 @@ docker build -t moodforecast-backend:latest .
 
 # Run container
 docker run -p 8000:8000 \
-  -e WEATHERAI_API_KEY=wai_your_key \
   -e ENVIRONMENT=production \
   moodforecast-backend:latest
 ```
@@ -381,7 +375,6 @@ heroku create moodforecast-ai
 heroku addons:create heroku-postgresql:standard-0
 
 # Set environment variables
-heroku config:set WEATHERAI_API_KEY=wai_your_key
 heroku config:set ENVIRONMENT=production
 
 # Deploy
@@ -399,7 +392,7 @@ heroku logs --tail
 
 | Variable | Value | Example |
 |----------|-------|---------|
-| WEATHERAI_API_KEY | Your API key | `wai_fac7de...` |
+| WEATHER_API_URL | Open-Meteo base URL (optional) | `https://api.open-meteo.com/v1` |
 | DATABASE_URL | Database connection | `sqlite:///./moodforecast.db` |
 | ENVIRONMENT | Environment name | `development` or `production` |
 
@@ -458,7 +451,6 @@ Measured on localhost with caching enabled:
 
 Before deploying to production:
 
-- [ ] WEATHERAI_API_KEY in environment variables, not in code
 - [ ] DATABASE_URL with strong credentials
 - [ ] HTTPS/SSL enabled on deployment platform
 - [ ] CORS configured for specific frontend domain
@@ -546,12 +538,11 @@ pip install -r requirements.txt
 ### API returns 422 errors
 
 ```bash
-# Check WEATHERAI_API_KEY is correct
-grep WEATHERAI_API_KEY .env
+# 422 means the location could not be found - check the spelling
+curl http://localhost:8000/api/forecast/Nairobi
 
-# Test API key
-curl -H "Authorization: Bearer wai_your_key" \
-  https://api.weather-ai.co/v1/current?location=Nairobi
+# Check the weather API directly
+curl "https://api.open-meteo.com/v1/forecast?latitude=-1.29&longitude=36.82&current=temperature_2m"
 ```
 
 ### Database errors
@@ -598,7 +589,6 @@ redis-cli FLUSHALL
 - [ ] All tests passing (31/31)
 - [ ] Database initialized with production URL
 - [ ] Environment set to "production"
-- [ ] WEATHERAI_API_KEY configured
 - [ ] HTTPS enabled
 - [ ] Health check working at `/health`
 - [ ] API endpoints responding correctly

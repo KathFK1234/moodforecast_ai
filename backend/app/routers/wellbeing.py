@@ -1,7 +1,7 @@
 """Wellbeing router - GET /api/wellbeing/{location}"""
 
 from fastapi import APIRouter, HTTPException
-from app.services.weatherai import get_weatherai_client
+from app.services.weather import get_weather_client
 from app.services.mood_engine import score_mood
 from app.models.schemas import WellbeingResponse, WeatherData
 
@@ -17,7 +17,7 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
     Cached for 10 minutes.
     """
     try:
-        client = get_weatherai_client()
+        client = get_weather_client()
         
         # Resolve location to coordinates
         geo_data = await client.get_location_by_name(location)
@@ -32,14 +32,10 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
             raise HTTPException(status_code=422, detail="Location not found")
         
         # Fetch weather
-        weather_data = await client.get_weather(lat, lon, ai=False)
-        current = weather_data.get("current", {})
+        current = await client.get_current(lat, lon)
         
         temp_c = float(current.get("temperature", 0))
-        
-        # Extract condition text using condition code
-        condition_code = current.get("condition_code")
-        condition = client._get_condition_text(condition_code)
+        condition = current.get("condition")
         
         humidity = float(current.get("humidity", 0))
         wind_kph = float(current.get("wind_speed", 0))
@@ -64,11 +60,13 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
             recommendations=mood_result["recommendations"]
         )
     
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather-AI API timeout")
+        raise HTTPException(status_code=504, detail="Weather API timeout")
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="WeatherAI service unavailable")
+        raise HTTPException(status_code=503, detail="Weather service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

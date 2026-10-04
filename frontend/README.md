@@ -32,7 +32,7 @@ The actual frontend files are served from `/backend/app/static/`:
 ### Weather Display
 
 - Current temperature, humidity, wind speed, condition
-- Real-time data from WeatherAI API
+- Real-time data from the Open-Meteo API
 
 ### Wellbeing Score
 
@@ -43,7 +43,7 @@ The actual frontend files are served from `/backend/app/static/`:
 
 ### AI Summary
 
-- Natural language forecast summary from WeatherAI's Gemini AI
+- Short natural language summary of the current conditions
 
 ### SMS Subscription
 
@@ -82,7 +82,6 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Add your WeatherAI API key to .env
 uvicorn app.main:app --reload
 ```
 
@@ -101,7 +100,7 @@ This makes deployment trivial and keeps the stack simple.
 ## Performance
 
 - Page load: ~100ms (index.html is 15KB gzipped)
-- API latency: ~200ms p95 (WeatherAI SLA)
+- API latency: ~250ms uncached (Open-Meteo + geocoding)
 - Cache hit: Instant response (10-minute TTL)
 
 ## Browser Support

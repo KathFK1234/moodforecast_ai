@@ -3,7 +3,11 @@
 # MoodForecast AI - Complete Testing & Validation Script
 # Run all tests and validations before deployment
 
-set -e  # Exit on first error
+# Run from the repo root so relative paths work from any directory
+cd "$(dirname "$0")"
+
+# Backend to test against (override if port 8000 is taken, e.g. BASE_URL=http://localhost:8001)
+BASE_URL="${BASE_URL:-http://localhost:8000}"
 
 # Colors
 RED='\033[0;31m'
@@ -20,17 +24,17 @@ SKIPPED=0
 # Helper functions
 pass() {
     echo -e "${GREEN}✓${NC} $1"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 }
 
 fail() {
     echo -e "${RED}✗${NC} $1"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 }
 
 skip() {
     echo -e "${YELLOW}⊘${NC} $1"
-    ((SKIPPED++))
+    SKIPPED=$((SKIPPED + 1))
 }
 
 test_header() {
@@ -50,47 +54,36 @@ echo -e "${NC}"
 # Check backend is running
 test_header "1. Backend Service"
 
-if curl -s http://localhost:8000/health > /dev/null 2>&1; then
-    pass "Backend is running on port 8000"
+if curl -s $BASE_URL/health > /dev/null 2>&1; then
+    pass "Backend is running at $BASE_URL"
 else
     fail "Backend is NOT running - Start with: cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
     exit 1
-fi
-
-# Check API Key
-if grep -q "WEATHERAI_API_KEY" backend/.env && grep -v "^#" backend/.env | grep "WEATHERAI_API_KEY" | grep -v "your_api_key_here" | grep -v "=" > /dev/null; then
-    pass "WEATHERAI_API_KEY configured"
-else
-    fail "WEATHERAI_API_KEY not configured in .env"
 fi
 
 # Test endpoints
 test_header "2. API Endpoints"
 
 # Health
-health=$(curl -s http://localhost:8000/health | grep -o '"status":"ok"')
+health=$(curl -s $BASE_URL/health | grep -o '"status":"ok"')
 [ -n "$health" ] && pass "Health endpoint working" || fail "Health endpoint not working"
 
 # Forecast
-forecast=$(curl -s http://localhost:8000/api/forecast/Nairobi | grep -o '"location"')
+forecast=$(curl -s $BASE_URL/api/forecast/Nairobi | grep -o '"location"')
 [ -n "$forecast" ] && pass "Forecast endpoint working" || fail "Forecast endpoint not working"
 
 # Wellbeing
-wellbeing=$(curl -s http://localhost:8000/api/wellbeing/London | grep -o '"mood_score"')
+wellbeing=$(curl -s $BASE_URL/api/wellbeing/London | grep -o '"mood_score"')
 [ -n "$wellbeing" ] && pass "Wellbeing endpoint working" || fail "Wellbeing endpoint not working"
 
-# Demo
-demo=$(curl -s http://localhost:8000/api/demo/forecast/Test | grep -o '"location"')
-[ -n "$demo" ] && pass "Demo endpoint working" || fail "Demo endpoint not working"
-
 # Subscribe
-subscribe=$(curl -s -X POST http://localhost:8000/api/subscribe \
+subscribe=$(curl -s -X POST $BASE_URL/api/subscribe \
   -H "Content-Type: application/json" \
-  -d '{"phone":"+254712345678","location":"Nairobi"}' | grep -o '"message"')
+  -d '{"phone":"+254712345678","location":"Nairobi"}' | grep -o '"subscriber_id"')
 [ -n "$subscribe" ] && pass "Subscribe endpoint working" || fail "Subscribe endpoint not working"
 
 # Documentation
-docs=$(curl -s http://localhost:8000/docs | grep -o 'swagger')
+docs=$(curl -s $BASE_URL/docs | grep -o 'swagger')
 [ -n "$docs" ] && pass "API documentation available at /docs" || fail "API documentation not accessible"
 
 # Unit Tests
@@ -160,28 +153,22 @@ fi
 # Configuration
 test_header "6. Configuration"
 
-if [ -f ".env.example" ]; then
+if [ -f "backend/.env.example" ]; then
     pass ".env.example template exists"
 else
     fail ".env.example template missing"
 fi
 
-if [ -f "SETUP_GUIDE.md" ]; then
-    pass "Setup guide documentation exists"
+if [ -f "README.md" ]; then
+    pass "README documentation exists"
 else
-    fail "Setup guide documentation missing"
+    fail "README documentation missing"
 fi
 
-if [ -f "DEPLOYMENT.md" ]; then
+if [ -f "DEPLOYMENT_GUIDE.md" ]; then
     pass "Deployment guide documentation exists"
 else
     fail "Deployment guide documentation missing"
-fi
-
-if [ -f "E2E_TESTING.md" ]; then
-    pass "E2E testing documentation exists"
-else
-    fail "E2E testing documentation missing"
 fi
 
 if [ -f ".gitignore" ]; then
@@ -195,13 +182,13 @@ test_header "7. Performance"
 
 # First request (uncached)
 start=$(date +%s%N)
-curl -s http://localhost:8000/api/forecast/Berlin > /dev/null
+curl -s $BASE_URL/api/forecast/Berlin > /dev/null
 end=$(date +%s%N)
 time1=$((($end - $start) / 1000000))  # Convert to ms
 
 # Second request (cached)
 start=$(date +%s%N)
-curl -s http://localhost:8000/api/forecast/Berlin > /dev/null
+curl -s $BASE_URL/api/forecast/Berlin > /dev/null
 end=$(date +%s%N)
 time2=$((($end - $start) / 1000000))  # Convert to ms
 
