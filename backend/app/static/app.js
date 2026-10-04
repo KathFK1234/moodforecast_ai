@@ -45,7 +45,32 @@ function displayWeather(data) {
     document.getElementById('humidityValue').textContent = data.weather.humidity + '%';
     document.getElementById('conditionValue').textContent = data.weather.condition;
     document.getElementById('windValue').textContent = data.weather.wind_kph + ' kph';
+    displayForecast(data.daily || []);
     document.getElementById('weatherCard').classList.remove('hidden');
+}
+
+function displayForecast(days) {
+    const list = document.getElementById('forecastList');
+    list.innerHTML = '';
+    days.forEach((day, index) => {
+        // Parse as local midnight so the weekday doesn't shift with the browser's timezone
+        const date = new Date(day.date + 'T00:00:00');
+        const label = index === 0 ? 'Today' : date.toLocaleDateString('en', { weekday: 'short' });
+
+        const li = document.createElement('li');
+        const dayEl = document.createElement('span');
+        dayEl.className = 'forecast-day';
+        dayEl.textContent = label;
+        const conditionEl = document.createElement('span');
+        conditionEl.className = 'forecast-condition';
+        conditionEl.textContent = day.condition;
+        const tempEl = document.createElement('span');
+        tempEl.className = 'forecast-temp';
+        tempEl.textContent = `${Math.round(day.temp_max_c)}° / ${Math.round(day.temp_min_c)}°`;
+        li.append(dayEl, conditionEl, tempEl);
+        list.appendChild(li);
+    });
+    document.getElementById('forecastSection').classList.toggle('hidden', days.length === 0);
 }
 
 function displayWellbeing(data) {

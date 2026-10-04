@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
-from app.models.schemas import ForecastResponse, WeatherData
+from app.models.schemas import DailyForecast, ForecastResponse, WeatherData
 
 router = APIRouter(prefix="/api", tags=["forecast"])
 
@@ -12,7 +12,7 @@ async def get_forecast(location: str) -> ForecastResponse:
     """
     Get weather forecast for a location.
     
-    Returns current conditions + 7-day forecast + AI summary.
+    Returns current conditions + 7-day forecast + summary.
     Cached for 10 minutes.
     """
     try:
@@ -30,8 +30,9 @@ async def get_forecast(location: str) -> ForecastResponse:
         if lat is None or lon is None:
             raise HTTPException(status_code=422, detail="Location not found")
         
-        # Fetch current conditions
-        current = await client.get_current(lat, lon)
+        # Fetch current conditions + daily forecast
+        forecast = await client.get_forecast(lat, lon)
+        current = forecast["current"]
         condition = current.get("condition")
         
         weather = WeatherData(
@@ -41,10 +42,21 @@ async def get_forecast(location: str) -> ForecastResponse:
             wind_kph=float(current.get("wind_speed", 0))
         )
         
+        daily = [
+            DailyForecast(
+                date=day["date"],
+                condition=day["condition"],
+                temp_max_c=day["temp_max"],
+                temp_min_c=day["temp_min"]
+            )
+            for day in forecast["daily"]
+        ]
+        
         return ForecastResponse(
             location=resolved_location,
             weather=weather,
-            forecast_days=7,
+            forecast_days=len(daily),
+            daily=daily,
             ai_summary=f"Weather in {resolved_location}: {condition}"
         )
     

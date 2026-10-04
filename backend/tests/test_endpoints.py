@@ -30,13 +30,21 @@ def mock_weather():
             "country": "KE"
         })
         
-        # Mock current conditions in the weather client's normalised format
-        mock_client.get_current = AsyncMock(return_value={
+        # Mock weather in the weather client's normalised format
+        current = {
             "temperature": 18,
             "humidity": 74,
             "wind_speed": 12,
             "condition_code": 2,
             "condition": "Partly Cloudy"
+        }
+        mock_client.get_current = AsyncMock(return_value=current)
+        mock_client.get_forecast = AsyncMock(return_value={
+            "current": current,
+            "daily": [
+                {"date": "2026-10-05", "condition": "Drizzle", "temp_max": 28.3, "temp_min": 16.0},
+                {"date": "2026-10-06", "condition": "Overcast", "temp_max": 25.4, "temp_min": 15.6},
+            ]
         })
         
         mock_forecast.return_value = mock_client
@@ -129,6 +137,11 @@ def test_forecast_endpoint(mock_weather):
         "humidity": 74,
         "wind_kph": 12
     }
+    assert data["forecast_days"] == 2
+    assert data["daily"] == [
+        {"date": "2026-10-05", "condition": "Drizzle", "temp_max_c": 28.3, "temp_min_c": 16.0},
+        {"date": "2026-10-06", "condition": "Overcast", "temp_max_c": 25.4, "temp_min_c": 15.6},
+    ]
 
 
 def test_wellbeing_endpoint(mock_weather):
@@ -170,7 +183,7 @@ def test_wellbeing_unknown_location(mock_weather):
 
 def test_forecast_weather_service_down(mock_weather):
     """GET /api/forecast should return 503 when the weather API fails."""
-    mock_weather.get_current.side_effect = RuntimeError("Server error")
+    mock_weather.get_forecast.side_effect = RuntimeError("Server error")
     response = client.get("/api/forecast/Nairobi")
     assert response.status_code == 503
 

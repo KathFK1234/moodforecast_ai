@@ -17,6 +17,12 @@ OPEN_METEO_RESPONSE = {
         "weather_code": 2,
         "wind_speed_10m": 12.0,
     },
+    "daily": {
+        "time": ["2026-10-05", "2026-10-06", "2026-10-07"],
+        "weather_code": [53, 80, 3],
+        "temperature_2m_max": [28.3, 27.6, 25.4],
+        "temperature_2m_min": [16.0, 16.1, 15.6],
+    },
 }
 
 
@@ -78,6 +84,58 @@ class TestGetCurrent:
         assert requests[0].url.path == "/v1/forecast"
         assert requests[0].url.params["latitude"] == "-1.2921"
         assert requests[0].url.params["longitude"] == "36.8219"
+    
+    @pytest.mark.asyncio
+    async def test_forecast_includes_daily(self):
+        requests = []
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(200, json=OPEN_METEO_RESPONSE)
+        
+        client = make_client(handler)
+        result = await client.get_forecast(-1.2921, 36.8219)
+        
+        assert result["current"]["condition"] == "Partly Cloudy"
+        assert result["daily"] == [
+            {"date": "2026-10-05", "condition": "Drizzle", "temp_max": 28.3, "temp_min": 16.0},
+            {"date": "2026-10-06", "condition": "Light Rain Showers", "temp_max": 27.6, "temp_min": 16.1},
+            {"date": "2026-10-07", "condition": "Overcast", "temp_max": 25.4, "temp_min": 15.6},
+        ]
+        assert requests[0].url.params["forecast_days"] == "7"
+    
+    @pytest.mark.asyncio
+    async def test_forecast_skips_days_without_data(self):
+        response = {
+            **OPEN_METEO_RESPONSE,
+            "daily": {
+                "time": ["2026-10-05", "2026-10-06"],
+                "weather_code": [53, None],
+                "temperature_2m_max": [28.3, None],
+                "temperature_2m_min": [16.0, None],
+            },
+        }
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=response)
+        
+        client = make_client(handler)
+        result = await client.get_forecast(-1.2921, 36.8219)
+        assert [day["date"] for day in result["daily"]] == ["2026-10-05"]
+    
+    @pytest.mark.asyncio
+    async def test_current_and_forecast_share_one_request(self):
+        calls = 0
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            return httpx.Response(200, json=OPEN_METEO_RESPONSE)
+        
+        client = make_client(handler)
+        await client.get_forecast(-1.2921, 36.8219)
+        await client.get_current(-1.2921, 36.8219)
+        assert calls == 1
     
     @pytest.mark.asyncio
     async def test_second_call_is_cached(self):

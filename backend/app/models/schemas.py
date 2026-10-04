@@ -31,11 +31,20 @@ class WeatherData(BaseModel):
     wind_kph: float
 
 
+class DailyForecast(BaseModel):
+    """Forecast for a single day."""
+    date: str = Field(..., description="Local date, YYYY-MM-DD")
+    condition: str
+    temp_max_c: float
+    temp_min_c: float
+
+
 class ForecastResponse(BaseModel):
     """Forecast endpoint response."""
     location: str
     weather: WeatherData
     forecast_days: int
+    daily: list[DailyForecast]
     ai_summary: str | None = None
 
 

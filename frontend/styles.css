@@ -163,6 +163,46 @@ body {
     color: #667eea;
 }
 
+.forecast-section .weather-label {
+    margin-bottom: 8px;
+}
+
+.forecast-list {
+    list-style: none;
+    background: white;
+    border-radius: 8px;
+    padding: 4px 15px;
+}
+
+.forecast-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    font-size: 14px;
+    color: #555;
+    border-bottom: 1px solid #eee;
+}
+
+.forecast-list li:last-child {
+    border-bottom: none;
+}
+
+.forecast-day {
+    width: 50px;
+    font-weight: 700;
+    color: #1b5e8a;
+}
+
+.forecast-condition {
+    flex: 1;
+}
+
+.forecast-temp {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .wellbeing-section {
     background: white;
     border-radius: 12px;
