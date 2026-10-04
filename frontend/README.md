@@ -46,40 +46,28 @@ API calls use relative paths, so the page must be opened through the backend rat
 
 ## How It Works
 
-1. **Search** → user enters a location (the page searches for Nairobi on load)
-2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`
-3. **Weather card** → temperature, humidity, condition, wind and a 7-day forecast
-4. **Wellbeing section** → mood score (0-100), energy and risk badges, summary, recommendations
-5. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
+1. **Search** → user enters a location, picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser.
+2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`, in parallel
+3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
+4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score
+5. **7-day mood outlook** → icon, rain chance, temperature range and expected mood per day
+6. **Recommendations** → wellbeing tips for the current conditions
+7. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
 
-## Features
+Errors show the message returned by the API.
 
-### Weather Display
+## Design
 
-- Current temperature, humidity, wind speed and condition
-- 7-day forecast with condition and max/min temperature
-- Live data from the Open-Meteo API (via the backend)
-
-### Wellbeing Score
-
-- **Mood Score**: 0-100 based on weather conditions
-- **Energy Level**: High / Medium / Low / Very Low
-- **Risk Level**: Minimal / Low / Moderate / High
-- **Recommendations**: wellbeing tips for the current conditions
-
-### Subscription Form
-
-- Phone number in E.164 format (validated by the backend)
-- Crop (optional)
-- Language preference (English / Swahili)
-- Confirmation with subscriber ID
-
-## Styling
-
-- **Color Scheme**: Purple gradient (#667eea → #764ba2)
+- **Sky background** follows the weather and time of day. `applyTheme()` in `app.js` sets `data-theme` on `<body>`; each theme's colors are at the top of `styles.css`.
+- **Mood levels** use four colors (`--level-high`, `--level-medium`, `--level-low`, `--level-verylow`), always next to a number or label so color is never the only cue.
+- **Icons** are inline SVG, defined in `ICONS` in `app.js`.
 - **Font**: DM Sans (Google Fonts)
-- **Layout**: CSS Grid and Flexbox
-- **Responsive**: single-column layout below 480px
+- **Responsive**: two columns on desktop, one below 860px, compact forecast rows below 520px
+- **Motion** is turned off when the visitor's system asks for reduced motion
+
+## Attribution
+
+The footer credits Open-Meteo and OpenStreetMap. Both licences require this, so keep it when changing the layout.
 
 ## Browser Support
 

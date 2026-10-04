@@ -32,9 +32,12 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 
 ## Features
 
-- **Live weather** - current conditions and a 7-day forecast from Open-Meteo
-- **Mood scoring** - rule-based score (0-100) with energy and risk levels
-- **Recommendations** - wellbeing tips based on condition, temperature and humidity
+- **Live weather** - current conditions, feels-like, rain chance, UV, sunrise and sunset from Open-Meteo
+- **Mood scoring** - rule-based score (0-100) with a mood label, energy and risk levels
+- **Why this score** - the factors that raised or lowered the score, and by how much
+- **7-day mood outlook** - expected mood for each day of the forecast
+- **Recommendations** - wellbeing tips based on condition, temperature, humidity and time of day
+- **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim
 - **Subscriptions** - stores phone, location, crop and language for future SMS alerts (sending is not implemented yet)
 - **Caching** - repeat requests are answered from an in-memory cache
@@ -69,8 +72,8 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| GET | `/api/forecast/{location}` | Current weather and 7-day forecast |
-| GET | `/api/wellbeing/{location}` | Current weather, mood score, energy, risk, recommendations |
+| GET | `/api/forecast/{location}` | Current weather and 7-day forecast with a mood outlook per day |
+| GET | `/api/wellbeing/{location}` | Current weather, mood score and the factors behind it, energy, risk, recommendations |
 | POST | `/api/subscribe` | Register a subscriber |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger UI |
@@ -79,6 +82,8 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 curl http://localhost:8000/api/forecast/Nairobi
 curl http://localhost:8000/api/wellbeing/Kisumu
 ```
+
+The page also accepts a location in the link, e.g. `http://localhost:8000/?q=Kisumu`.
 
 Errors: `422` location not found, `503` weather or geocoding service unavailable, `504` upstream timeout.
 
