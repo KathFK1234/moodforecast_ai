@@ -26,9 +26,11 @@ class SubscribeRequest(BaseModel):
 class WeatherData(BaseModel):
     """Current weather conditions."""
     temp_c: float
+    feels_like_c: float | None = None
     condition: str
     humidity: float
     wind_kph: float
+    is_day: bool = True
 
 
 class DailyForecast(BaseModel):
@@ -37,6 +39,12 @@ class DailyForecast(BaseModel):
     condition: str
     temp_max_c: float
     temp_min_c: float
+    precipitation_chance: float | None = Field(None, description="Highest chance of precipitation, %")
+    uv_index: float | None = None
+    sunrise: str | None = Field(None, description="Local time, HH:MM")
+    sunset: str | None = Field(None, description="Local time, HH:MM")
+    mood_score: int = Field(..., description="Expected mood score for the day, 0-100")
+    mood_label: str
 
 
 class ForecastResponse(BaseModel):
@@ -48,11 +56,20 @@ class ForecastResponse(BaseModel):
     ai_summary: str | None = None
 
 
+class MoodFactor(BaseModel):
+    """One contribution to the mood score."""
+    label: str
+    delta: int
+
+
 class WellbeingResponse(BaseModel):
     """Wellbeing endpoint response."""
     location: str
     weather: WeatherData
     mood_score: int
+    mood_label: str
+    baseline_score: int
+    factors: list[MoodFactor]
     energy_level: str
     risk_level: str
     ai_summary: str | None = None

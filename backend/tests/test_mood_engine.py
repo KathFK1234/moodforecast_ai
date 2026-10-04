@@ -2,7 +2,11 @@
 
 import pytest
 from app.services.mood_engine import (
+    BASELINE_SCORE,
+    build_summary,
     calculate_mood_score,
+    classify_mood_label,
+    mood_factors,
     classify_energy_level,
     classify_risk_level,
     generate_recommendations,
@@ -161,3 +165,85 @@ class TestFullMoodEngine:
         result2 = score_mood("Cloudy", 20, 70)
         assert result1["mood_score"] == result2["mood_score"]
         assert result1["energy_level"] == result2["energy_level"]
+
+
+class TestMoodFactors:
+    """Test the breakdown behind the score."""
+    
+    def test_factors_add_up_to_score(self):
+        """Baseline plus factor deltas should equal the score."""
+        factors = mood_factors("Rain", 15, 85)
+        score = calculate_mood_score("Rain", 15, 85)
+        assert score == BASELINE_SCORE + sum(f["delta"] for f in factors)
+        assert [f["label"] for f in factors] == ["Rain", "Cool air", "High humidity"]
+    
+    def test_neutral_conditions_have_no_factors(self):
+        """Unknown condition in a neutral temperature gap should not move the score."""
+        assert mood_factors("Unknown", 17.99, 50) == [{"label": "Cool air", "delta": -5}]
+        assert mood_factors("Unknown", 20, 50) == [{"label": "Comfortable temperature", "delta": 10}]
+    
+    def test_clear_night_scores_lower_than_clear_day(self):
+        """There is no sunlight boost at night."""
+        day_score = calculate_mood_score("Clear", 20, 50, is_day=True)
+        night_score = calculate_mood_score("Clear", 20, 50, is_day=False)
+        assert night_score < day_score
+    
+    def test_thunderstorm_counts_as_storm_not_rain(self):
+        """A thunderstorm takes the storm penalty only."""
+        factors = mood_factors("Thunderstorm with Hail", 20, 50)
+        assert {"label": "Stormy weather", "delta": -20} in factors
+        assert all(f["label"] != "Rain" for f in factors)
+    
+    def test_drizzle_snow_and_fog_reduce_score(self):
+        """Conditions the weather provider reports should all affect the score."""
+        neutral = calculate_mood_score("Unknown", 20, 50)
+        for condition in ["Light Drizzle", "Snow Showers", "Foggy"]:
+            assert calculate_mood_score(condition, 20, 50) < neutral
+
+
+class TestMoodLabel:
+    """Test mood label classification."""
+    
+    def test_labels_cover_the_scale(self):
+        assert classify_mood_label(95) == "Radiant"
+        assert classify_mood_label(80) == "Upbeat"
+        assert classify_mood_label(65) == "Steady"
+        assert classify_mood_label(55) == "Mellow"
+        assert classify_mood_label(40) == "Subdued"
+        assert classify_mood_label(30) == "Drained"
+        assert classify_mood_label(10) == "Heavy"
+
+
+class TestNightRecommendations:
+    """Test recommendations after dark."""
+    
+    def test_no_morning_walk_advice_at_night(self):
+        recs = generate_recommendations(80, "Clear", 20, 50, is_day=False)
+        text = " ".join(recs)
+        assert "11am" not in text
+        assert "2pm" not in text
+        assert len(recs) > 0
+
+
+class TestSummary:
+    """Test the plain-language summary."""
+    
+    def test_positive_summary(self):
+        factors = mood_factors("Clear", 21, 50)
+        summary = build_summary("Nairobi", "Clear", 21, 90, factors)
+        assert summary == (
+            "Clear and 21°C in Nairobi. Clear skies and comfortable temperature are "
+            "lifting the mood. A good time to take on something demanding."
+        )
+    
+    def test_negative_summary(self):
+        factors = mood_factors("Rain", 8, 90)
+        summary = build_summary("Bergen", "Rain", 8, 32, factors)
+        assert summary == (
+            "Rain and 8°C in Bergen. Rain, cold stress and high humidity are "
+            "weighing on the mood. Go easy on yourself and plan for lower energy."
+        )
+    
+    def test_neutral_summary(self):
+        summary = build_summary("Lima", "Unknown", 20, 65, [])
+        assert "neutral" in summary

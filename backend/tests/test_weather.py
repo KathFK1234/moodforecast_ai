@@ -14,6 +14,8 @@ OPEN_METEO_RESPONSE = {
         "time": "2026-10-05T00:00",
         "temperature_2m": 18.8,
         "relative_humidity_2m": 61,
+        "apparent_temperature": 17.3,
+        "is_day": 0,
         "weather_code": 2,
         "wind_speed_10m": 12.0,
     },
@@ -22,6 +24,11 @@ OPEN_METEO_RESPONSE = {
         "weather_code": [53, 80, 3],
         "temperature_2m_max": [28.3, 27.6, 25.4],
         "temperature_2m_min": [16.0, 16.1, 15.6],
+        "relative_humidity_2m_mean": [61, 72, 83],
+        "precipitation_probability_max": [45, 97, 100],
+        "uv_index_max": [9.8, 9.4, 8.9],
+        "sunrise": ["2026-10-05T06:17", "2026-10-06T06:17", "2026-10-07T06:16"],
+        "sunset": ["2026-10-05T18:24", "2026-10-06T18:24", "2026-10-07T18:24"],
     },
 }
 
@@ -76,8 +83,10 @@ class TestGetCurrent:
         
         assert result == {
             "temperature": 18.8,
+            "feels_like": 17.3,
             "humidity": 61.0,
             "wind_speed": 12.0,
+            "is_day": False,
             "condition_code": 2,
             "condition": "Partly Cloudy",
         }
@@ -97,12 +106,43 @@ class TestGetCurrent:
         result = await client.get_forecast(-1.2921, 36.8219)
         
         assert result["current"]["condition"] == "Partly Cloudy"
-        assert result["daily"] == [
-            {"date": "2026-10-05", "condition": "Drizzle", "temp_max": 28.3, "temp_min": 16.0},
-            {"date": "2026-10-06", "condition": "Light Rain Showers", "temp_max": 27.6, "temp_min": 16.1},
-            {"date": "2026-10-07", "condition": "Overcast", "temp_max": 25.4, "temp_min": 15.6},
+        assert len(result["daily"]) == 3
+        assert result["daily"][0] == {
+            "date": "2026-10-05",
+            "condition": "Drizzle",
+            "temp_max": 28.3,
+            "temp_min": 16.0,
+            "humidity": 61,
+            "precipitation_chance": 45,
+            "uv_index": 9.8,
+            "sunrise": "06:17",
+            "sunset": "18:24",
+        }
+        assert [day["condition"] for day in result["daily"]] == [
+            "Drizzle", "Light Rain Showers", "Overcast"
         ]
         assert requests[0].url.params["forecast_days"] == "7"
+    
+    @pytest.mark.asyncio
+    async def test_forecast_tolerates_missing_optional_variables(self):
+        response = {
+            **OPEN_METEO_RESPONSE,
+            "daily": {
+                "time": ["2026-10-05"],
+                "weather_code": [53],
+                "temperature_2m_max": [28.3],
+                "temperature_2m_min": [16.0],
+            },
+        }
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=response)
+        
+        client = make_client(handler)
+        result = await client.get_forecast(-1.2921, 36.8219)
+        assert len(result["daily"]) == 1
+        assert result["daily"][0]["uv_index"] is None
+        assert result["daily"][0]["sunrise"] is None
     
     @pytest.mark.asyncio
     async def test_forecast_skips_days_without_data(self):

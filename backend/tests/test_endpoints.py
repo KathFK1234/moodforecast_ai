@@ -33,8 +33,10 @@ def mock_weather():
         # Mock weather in the weather client's normalised format
         current = {
             "temperature": 18,
+            "feels_like": 16.5,
             "humidity": 74,
             "wind_speed": 12,
+            "is_day": True,
             "condition_code": 2,
             "condition": "Partly Cloudy"
         }
@@ -42,8 +44,16 @@ def mock_weather():
         mock_client.get_forecast = AsyncMock(return_value={
             "current": current,
             "daily": [
-                {"date": "2026-10-05", "condition": "Drizzle", "temp_max": 28.3, "temp_min": 16.0},
-                {"date": "2026-10-06", "condition": "Overcast", "temp_max": 25.4, "temp_min": 15.6},
+                {
+                    "date": "2026-10-05", "condition": "Clear", "temp_max": 26.0, "temp_min": 16.0,
+                    "humidity": 60, "precipitation_chance": 5, "uv_index": 9.8,
+                    "sunrise": "06:17", "sunset": "18:24"
+                },
+                {
+                    "date": "2026-10-06", "condition": "Thunderstorm", "temp_max": 12.0, "temp_min": 6.0,
+                    "humidity": 90, "precipitation_chance": 100, "uv_index": 2.0,
+                    "sunrise": "06:17", "sunset": "18:24"
+                },
             ]
         })
         
@@ -130,18 +140,32 @@ def test_forecast_endpoint(mock_weather):
     response = client.get("/api/forecast/Nairobi")
     assert response.status_code == 200
     data = response.json()
-    assert data["location"] == "Nairobi"
+    assert data["location"] == "Nairobi, KE"
     assert data["weather"] == {
         "temp_c": 18,
+        "feels_like_c": 16.5,
         "condition": "Partly Cloudy",
         "humidity": 74,
-        "wind_kph": 12
+        "wind_kph": 12,
+        "is_day": True
     }
     assert data["forecast_days"] == 2
-    assert data["daily"] == [
-        {"date": "2026-10-05", "condition": "Drizzle", "temp_max_c": 28.3, "temp_min_c": 16.0},
-        {"date": "2026-10-06", "condition": "Overcast", "temp_max_c": 25.4, "temp_min_c": 15.6},
-    ]
+    assert data["daily"][0] == {
+        "date": "2026-10-05",
+        "condition": "Clear",
+        "temp_max_c": 26.0,
+        "temp_min_c": 16.0,
+        "precipitation_chance": 5,
+        "uv_index": 9.8,
+        "sunrise": "06:17",
+        "sunset": "18:24",
+        # 65 baseline + 15 clear + 10 comfortable (21°C average)
+        "mood_score": 90,
+        "mood_label": "Radiant"
+    }
+    # 65 baseline - 20 storm - 15 cold (9°C average) - 8 humid
+    assert data["daily"][1]["mood_score"] == 22
+    assert data["daily"][1]["mood_label"] == "Heavy"
 
 
 def test_wellbeing_endpoint(mock_weather):
@@ -149,9 +173,20 @@ def test_wellbeing_endpoint(mock_weather):
     response = client.get("/api/wellbeing/Nairobi")
     assert response.status_code == 200
     data = response.json()
-    assert data["location"] == "Nairobi"
+    assert data["location"] == "Nairobi, KE"
     assert data["weather"]["condition"] == "Partly Cloudy"
-    assert 0 <= data["mood_score"] <= 100
+    # 65 baseline - 5 cloud cover + 10 comfortable temperature
+    assert data["mood_score"] == 70
+    assert data["mood_label"] == "Steady"
+    assert data["baseline_score"] == 65
+    assert data["factors"] == [
+        {"label": "Cloud cover", "delta": -5},
+        {"label": "Comfortable temperature", "delta": 10}
+    ]
+    assert data["ai_summary"] == (
+        "Partly Cloudy and 18°C in Nairobi, KE. Comfortable temperature helps, "
+        "while cloud cover pulls the score down."
+    )
     assert data["energy_level"] in ["High", "Medium", "Low", "Very Low"]
     assert data["risk_level"] in ["Minimal", "Low", "Moderate", "High"]
     assert len(data["recommendations"]) > 0

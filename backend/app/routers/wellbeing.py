@@ -2,8 +2,9 @@
 
 from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
-from app.services.mood_engine import score_mood
-from app.models.schemas import WellbeingResponse, WeatherData
+from app.services.mood_engine import BASELINE_SCORE, build_summary, score_mood
+from app.models.schemas import WellbeingResponse
+from app.routers.common import build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["wellbeing"])
 
@@ -13,50 +14,38 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
     """
     Get mood and wellbeing score for a location.
     
-    Returns mood score, energy level, risk rating, recommendations, and AI summary.
+    Returns mood score with the factors behind it, energy level, risk rating,
+    recommendations, and a summary.
     Cached for 10 minutes.
     """
     try:
         client = get_weather_client()
-        
-        # Resolve location to coordinates
-        geo_data = await client.get_location_by_name(location)
-        if "error" in geo_data:
-            raise HTTPException(status_code=422, detail=geo_data["error"])
-        
-        lat = geo_data.get("lat")
-        lon = geo_data.get("lon")
-        resolved_location = geo_data.get("name", location)
-        
-        if lat is None or lon is None:
-            raise HTTPException(status_code=422, detail="Location not found")
+        lat, lon, resolved_location = await resolve_location(client, location)
         
         # Fetch weather
-        current = await client.get_current(lat, lon)
-        
-        temp_c = float(current.get("temperature", 0))
-        condition = current.get("condition")
-        
-        humidity = float(current.get("humidity", 0))
-        wind_kph = float(current.get("wind_speed", 0))
+        weather = build_weather(await client.get_current(lat, lon))
         
         # Calculate mood
-        mood_result = score_mood(condition, temp_c, humidity)
-        
-        weather = WeatherData(
-            temp_c=temp_c,
-            condition=condition or "Unknown",
-            humidity=humidity,
-            wind_kph=wind_kph
+        mood_result = score_mood(
+            weather.condition, weather.temp_c, weather.humidity, weather.is_day
         )
         
         return WellbeingResponse(
             location=resolved_location,
             weather=weather,
             mood_score=mood_result["mood_score"],
+            mood_label=mood_result["mood_label"],
+            baseline_score=BASELINE_SCORE,
+            factors=mood_result["factors"],
             energy_level=mood_result["energy_level"],
             risk_level=mood_result["risk_level"],
-            ai_summary=f"Weather analysis for {resolved_location}: {condition}. Your mood is affected by these conditions.",
+            ai_summary=build_summary(
+                resolved_location,
+                weather.condition,
+                weather.temp_c,
+                mood_result["mood_score"],
+                mood_result["factors"]
+            ),
             recommendations=mood_result["recommendations"]
         )
     
