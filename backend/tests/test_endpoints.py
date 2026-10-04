@@ -180,3 +180,13 @@ def test_docs_available():
     response = client.get("/openapi.json")
     assert response.status_code == 200
     assert "openapi" in response.json()
+
+
+def test_frontend_served():
+    """GET / should serve the frontend and the assets it links to."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "MoodForecast AI" in response.text
+    for asset in ["app.js", "styles.css", "favicon.ico"]:
+        assert f'"{asset}"' in response.text
+        assert client.get(f"/{asset}").status_code == 200
