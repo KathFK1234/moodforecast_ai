@@ -126,6 +126,26 @@ async def test_subscribe_endpoint_invalid_phone(mock_weather):
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize("phone", ["+abcdefghijk", "+0712345678", "+2547", "+2547123456789012345", "254712345678"])
+def test_subscribe_rejects_malformed_phone(mock_weather, phone):
+    """Phone numbers must be '+' followed by 8-15 digits."""
+    response = client.post("/api/subscribe", json={"phone": phone, "location": "Nairobi"})
+    assert response.status_code == 422
+
+
+def test_subscribe_accepts_spaces_in_phone(mock_weather):
+    """Spaces are stripped before the number is stored."""
+    response = client.post("/api/subscribe", json={"phone": "+254 712 345 678", "location": "Nairobi"})
+    assert response.status_code == 201
+    assert response.json()["phone"] == "+254712345678"
+
+
+def test_subscribe_rejects_blank_location(mock_weather):
+    """A location of only spaces is not a location."""
+    response = client.post("/api/subscribe", json={"phone": "+254712345678", "location": "   "})
+    assert response.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_subscribe_endpoint_missing_phone(mock_weather):
     """POST /api/subscribe without phone should return 422."""

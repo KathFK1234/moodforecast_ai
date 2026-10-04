@@ -1,6 +1,10 @@
 """Pydantic request and response models."""
 
+import re
 from pydantic import BaseModel, Field, field_validator
+
+
+E164_PATTERN = re.compile(r"\+[1-9]\d{7,14}")
 
 
 # Request Models
@@ -15,9 +19,19 @@ class SubscribeRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        """Validate E.164 format."""
-        if not v.startswith("+") or len(v) < 10:
+        """Validate E.164 format: '+', then 8-15 digits, not starting with 0."""
+        v = v.strip().replace(" ", "")
+        if not E164_PATTERN.fullmatch(v):
             raise ValueError("Phone must be in E.164 format (e.g., +254712345678)")
+        return v
+    
+    @field_validator("location")
+    @classmethod
+    def validate_location(cls, v: str) -> str:
+        """Location must not be blank."""
+        v = v.strip()
+        if not v:
+            raise ValueError("Location is required")
         return v
 
 
