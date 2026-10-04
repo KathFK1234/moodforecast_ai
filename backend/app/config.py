@@ -1,20 +1,23 @@
 """Application configuration from environment variables."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """App settings loaded from .env file."""
     
-    weatherai_api_key: str
+    # extra="ignore" so leftover keys (e.g. the old WEATHERAI_API_KEY) don't break startup
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+    )
+    
+    weather_api_url: str = "https://api.open-meteo.com/v1"
     database_url: str = "sqlite:///./test.db"
     redis_url: str | None = None
     cache_ttl_seconds: int = 600
     environment: str = "development"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 
 settings = Settings()

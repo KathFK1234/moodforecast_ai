@@ -9,7 +9,7 @@ from app.config import settings
 from app.models.db import create_tables
 from app.routers import forecast, wellbeing, subscribe
 from app.models.schemas import HealthResponse
-from app.services.weatherai import get_weatherai_client
+from app.services.weather import get_weather_client
 
 
 @asynccontextmanager
@@ -18,12 +18,12 @@ async def lifespan(app: FastAPI):
     # Startup
     create_tables()
     print("✓ Database tables initialized")
-    print(f"✓ WeatherAI client ready")
+    print("✓ Weather client ready (Open-Meteo)")
     
     yield
     
     # Shutdown
-    client = get_weatherai_client()
+    client = get_weather_client()
     await client.close()
     print("✓ Shutdown complete")
 

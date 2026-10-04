@@ -1,4 +1,4 @@
-"""Integration tests for API endpoints with mocked WeatherAI client."""
+"""Integration tests for API endpoints with mocked weather client."""
 
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -10,10 +10,10 @@ client = TestClient(app)
 
 
 @pytest.fixture
-def mock_weatherai():
-    """Mock WeatherAI client for all tests."""
-    with patch('app.routers.forecast.get_weatherai_client') as mock_forecast, \
-         patch('app.routers.wellbeing.get_weatherai_client') as mock_wellbeing, \
+def mock_weather():
+    """Mock weather client for all tests."""
+    with patch('app.routers.forecast.get_weather_client') as mock_forecast, \
+         patch('app.routers.wellbeing.get_weather_client') as mock_wellbeing, \
          patch('app.routers.subscribe.get_engine'):
         
         mock_client = AsyncMock()
@@ -27,28 +27,14 @@ def mock_weatherai():
             "country": "KE"
         })
         
-        # Mock weather response with weather-ai.co format
-        mock_client.get_weather = AsyncMock(return_value={
-            "current": {
-                "temperature": 18,
-                "condition_code": "2",
-                "humidity": 74,
-                "wind_speed": 12
-            }
+        # Mock current conditions in the weather client's normalised format
+        mock_client.get_current = AsyncMock(return_value={
+            "temperature": 18,
+            "humidity": 74,
+            "wind_speed": 12,
+            "condition_code": 2,
+            "condition": "Partly Cloudy"
         })
-        
-        # Mock forecast response
-        mock_client.get_forecast = AsyncMock(return_value={
-            "current": {
-                "temperature": 18,
-                "condition_code": "2",
-                "humidity": 74,
-                "wind_speed": 12
-            }
-        })
-        
-        # Mock condition text conversion
-        mock_client._get_condition_text = lambda code: "Cloudy"
         
         mock_forecast.return_value = mock_client
         mock_wellbeing.return_value = mock_client
@@ -64,7 +50,7 @@ def test_health_check():
 
 
 @pytest.mark.asyncio
-async def test_subscribe_endpoint_valid(mock_weatherai):
+async def test_subscribe_endpoint_valid(mock_weather):
     """POST /api/subscribe with valid data should return 201."""
     response = client.post("/api/subscribe", json={
         "phone": "+254712345678",
@@ -82,7 +68,7 @@ async def test_subscribe_endpoint_valid(mock_weatherai):
 
 
 @pytest.mark.asyncio
-async def test_subscribe_endpoint_invalid_phone(mock_weatherai):
+async def test_subscribe_endpoint_invalid_phone(mock_weather):
     """POST /api/subscribe with invalid phone format should return 422."""
     response = client.post("/api/subscribe", json={
         "phone": "invalid",
@@ -92,7 +78,7 @@ async def test_subscribe_endpoint_invalid_phone(mock_weatherai):
 
 
 @pytest.mark.asyncio
-async def test_subscribe_endpoint_missing_phone(mock_weatherai):
+async def test_subscribe_endpoint_missing_phone(mock_weather):
     """POST /api/subscribe without phone should return 422."""
     response = client.post("/api/subscribe", json={
         "location": "Nairobi"
@@ -100,7 +86,7 @@ async def test_subscribe_endpoint_missing_phone(mock_weatherai):
     assert response.status_code == 422
 
 
-def test_forecast_unknown_location(mock_weatherai):
+def test_forecast_unknown_location(mock_weather):
     """GET /api/forecast with unknown location should handle gracefully."""
     response = client.get("/api/forecast/UnknownPlace123")
     # May return 422 or other error code depending on API response

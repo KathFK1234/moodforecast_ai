@@ -1,7 +1,7 @@
 """Forecast router - GET /api/forecast/{location}"""
 
 from fastapi import APIRouter, HTTPException
-from app.services.weatherai import get_weatherai_client
+from app.services.weather import get_weather_client
 from app.models.schemas import ForecastResponse, WeatherData
 
 router = APIRouter(prefix="/api", tags=["forecast"])
@@ -16,7 +16,7 @@ async def get_forecast(location: str) -> ForecastResponse:
     Cached for 10 minutes.
     """
     try:
-        client = get_weatherai_client()
+        client = get_weather_client()
         
         # Resolve location to coordinates
         geo_data = await client.get_location_by_name(location)
@@ -30,13 +30,9 @@ async def get_forecast(location: str) -> ForecastResponse:
         if lat is None or lon is None:
             raise HTTPException(status_code=422, detail="Location not found")
         
-        # Fetch forecast
-        forecast_data = await client.get_forecast(lat, lon, days=7)
-        current = forecast_data.get("current", {})
-        
-        # Extract weather data from weather-ai.co format
-        condition_code = current.get("condition_code")
-        condition = client._get_condition_text(condition_code)
+        # Fetch current conditions
+        current = await client.get_current(lat, lon)
+        condition = current.get("condition")
         
         weather = WeatherData(
             temp_c=float(current.get("temperature", 0)),
@@ -55,8 +51,8 @@ async def get_forecast(location: str) -> ForecastResponse:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather-AI API timeout")
+        raise HTTPException(status_code=504, detail="Weather API timeout")
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather-AI service unavailable")
+        raise HTTPException(status_code=503, detail="Weather service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
