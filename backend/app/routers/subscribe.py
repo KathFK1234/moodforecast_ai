@@ -20,13 +20,6 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     Returns subscriber ID and confirmation.
     """
     try:
-        # Validate phone format (basic E.164 check)
-        if not request.phone.startswith("+") or len(request.phone) < 10:
-            raise HTTPException(
-                status_code=422,
-                detail="Phone must be in E.164 format (e.g., +254712345678)"
-            )
-        
         # Create subscriber
         subscriber_id = str(uuid.uuid4())
         subscriber = Subscriber(
