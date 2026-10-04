@@ -137,7 +137,7 @@ class WeatherClient:
         """
         Resolve location name to lat/lon using geocoding service.
         
-        Uses Nominatim (OpenStreetMap) for online lookup, falls back to hardcoded list.
+        Checks the hardcoded popular locations first, then Nominatim (OpenStreetMap).
         Cache key: geo:{location}
         """
         from app.services.geocoding import get_coordinates
