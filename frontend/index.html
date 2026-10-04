@@ -3,135 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Live weather, scored for how it is likely to affect your mood and energy.">
+    <meta name="theme-color" content="#0b1430">
     <title>MoodForecast AI</title>
     <link rel="icon" href="favicon.ico" sizes="32x32">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🌤️ MoodForecast AI</h1>
-            <p>Where environmental intelligence meets psychological wellbeing</p>
+<body data-theme="clear-night">
+    <div class="sky" aria-hidden="true">
+        <span class="orb orb-a"></span>
+        <span class="orb orb-b"></span>
+    </div>
+
+    <div class="page">
+        <header class="masthead">
+            <div class="brand">
+                <span class="brand-mark" id="brandMark" aria-hidden="true"></span>
+                <span class="brand-name">MoodForecast <span class="brand-ai">AI</span></span>
+            </div>
+            <p class="tagline">Where environmental intelligence meets psychological wellbeing</p>
+        </header>
+
+        <!-- Search -->
+        <form class="search" id="searchForm" role="search">
+            <label class="visually-hidden" for="locationInput">Location</label>
+            <span class="search-icon" id="searchIcon" aria-hidden="true"></span>
+            <input
+                type="text"
+                id="locationInput"
+                placeholder="Search a city or town…"
+                autocomplete="off"
+                value="Nairobi"
+            >
+            <button type="submit" id="searchButton">Search</button>
+        </form>
+        <div class="chips" id="cityChips" aria-label="Popular locations"></div>
+
+        <!-- Error State -->
+        <div id="errorState" class="notice notice-error hidden" role="alert"></div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="skeleton-grid hidden" aria-live="polite" aria-label="Loading forecast">
+            <div class="card skeleton"></div>
+            <div class="card skeleton"></div>
+            <div class="card skeleton skeleton-wide"></div>
         </div>
 
-        <div class="content">
-            <!-- Search Section -->
-            <div class="search-section">
-                <div class="search-box">
-                    <input 
-                        type="text" 
-                        id="locationInput" 
-                        placeholder="Enter city name or coordinates..." 
-                        value="Nairobi"
-                    >
-                    <button id="searchButton" onclick="handleSearch()">Search</button>
-                </div>
-            </div>
-
-            <!-- Loading State -->
-            <div id="loadingState" class="loading hidden">
-                <div class="spinner"></div>
-                <p style="margin-top: 10px;">Loading forecast...</p>
-            </div>
-
-            <!-- Error State -->
-            <div id="errorState" class="error hidden"></div>
-
-            <!-- Weather Card -->
-            <div id="weatherCard" class="weather-card hidden">
-                <div class="location-header" id="locationName">Nairobi, KE</div>
-                <div class="weather-grid">
-                    <div class="weather-item">
-                        <div class="weather-label">Temperature</div>
-                        <div class="weather-value" id="tempValue">18°C</div>
-                    </div>
-                    <div class="weather-item">
-                        <div class="weather-label">Humidity</div>
-                        <div class="weather-value" id="humidityValue">74%</div>
-                    </div>
-                    <div class="weather-item">
-                        <div class="weather-label">Condition</div>
-                        <div class="weather-value" id="conditionValue" style="font-size: 18px;">Cloudy</div>
-                    </div>
-                    <div class="weather-item">
-                        <div class="weather-label">Wind</div>
-                        <div class="weather-value" id="windValue" style="font-size: 18px;">12 kph</div>
-                    </div>
-                </div>
-                <div id="forecastSection" class="forecast-section hidden">
-                    <div class="weather-label">7-Day Forecast</div>
-                    <ul class="forecast-list" id="forecastList"></ul>
-                </div>
-            </div>
-
-            <!-- Wellbeing Section -->
-            <div id="wellbeingSection" class="wellbeing-section hidden">
-                <div class="mood-score">
-                    <div class="score-left">
-                        <h3>Mood Score</h3>
-                        <div class="score-value" id="moodScore">65</div>
-                    </div>
-                    <div class="score-right">
+        <main id="results" class="results hidden">
+            <div class="top-grid">
+                <div class="stack">
+                <!-- Current weather -->
+                <section class="card now-card reveal" aria-labelledby="locationName">
+                    <div class="now-head">
                         <div>
-                            <span class="level-badge level-medium" id="energyBadge">Medium Energy</span>
-                            <span class="level-badge level-low" id="riskBadge">Low Risk</span>
+                            <h2 class="location" id="locationName">Nairobi, KE</h2>
+                            <p class="now-meta" id="nowMeta">Now</p>
+                        </div>
+                        <span class="now-icon" id="nowIcon" aria-hidden="true"></span>
+                    </div>
+                    <div class="now-main">
+                        <div class="now-temp"><span id="tempValue">18</span><span class="unit">°C</span></div>
+                        <div class="now-desc">
+                            <div class="condition" id="conditionValue">Cloudy</div>
+                            <div class="feels" id="feelsValue">Feels like 17°</div>
                         </div>
                     </div>
+                    <dl class="stats">
+                        <div class="stat">
+                            <dt>Humidity</dt>
+                            <dd id="humidityValue">74%</dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Wind</dt>
+                            <dd id="windValue">12 km/h</dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Rain today</dt>
+                            <dd id="rainValue">–</dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Peak UV</dt>
+                            <dd id="uvValue">–</dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Sunrise</dt>
+                            <dd id="sunriseValue">–</dd>
+                        </div>
+                        <div class="stat">
+                            <dt>Sunset</dt>
+                            <dd id="sunsetValue">–</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <!-- Recommendations -->
+                <section class="card rec-card reveal" aria-labelledby="recHeading">
+                    <h2 class="card-title" id="recHeading">Wellbeing recommendations</h2>
+                    <ol id="recommendationsList" class="rec-list"></ol>
+                </section>
                 </div>
 
-                <div id="aiSummaryDiv" class="ai-summary hidden"></div>
+                <!-- Mood -->
+                <section class="card mood-card reveal" aria-labelledby="moodHeading">
+                    <h2 class="card-title" id="moodHeading">Mood score</h2>
+                    <div class="mood-top">
+                        <div class="gauge" id="gauge" data-level="medium">
+                            <svg viewBox="0 0 120 120" role="img" aria-labelledby="gaugeLabel">
+                                <title id="gaugeLabel">Mood score</title>
+                                <circle class="gauge-track" cx="60" cy="60" r="52"></circle>
+                                <circle class="gauge-fill" id="gaugeFill" cx="60" cy="60" r="52"></circle>
+                            </svg>
+                            <div class="gauge-center">
+                                <div class="gauge-score" id="moodScore">65</div>
+                                <div class="gauge-max">out of 100</div>
+                            </div>
+                        </div>
+                        <div class="mood-side">
+                            <div class="mood-label" id="moodLabel">Steady</div>
+                            <div class="badges">
+                                <span class="badge" id="energyBadge">Medium energy</span>
+                                <span class="badge" id="riskBadge">Low risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="aiSummaryDiv" class="summary hidden"></p>
+                    <div class="factors">
+                        <h3 class="sub-title">Why this score</h3>
+                        <ul id="factorsList" class="factor-list"></ul>
+                    </div>
+                </section>
+            </div>
 
-                <div class="recommendations">
-                    <h4>Wellbeing Recommendations</h4>
-                    <ul id="recommendationsList"></ul>
+            <!-- Forecast -->
+            <section id="forecastSection" class="card forecast-card reveal hidden" aria-labelledby="forecastHeading">
+                <div class="card-head">
+                    <h2 class="card-title" id="forecastHeading">7-day mood outlook</h2>
+                    <p class="card-note">Expected mood from each day's forecast</p>
                 </div>
-            </div>
+                <ul class="forecast-list" id="forecastList"></ul>
+            </section>
 
-            <!-- Subscribe Section -->
-            <div id="subscribeSection" class="subscribe-section hidden">
-                <h3>📱 Subscribe to Daily Alerts</h3>
-                <form onsubmit="handleSubscribe(event)">
-                    <div class="form-group">
-                        <label>Phone Number (E.164)</label>
-                        <input 
-                            type="tel" 
-                            id="phoneInput" 
-                            placeholder="+254712345678" 
-                            required
-                        >
-                    </div>
-                    <div class="form-group">
-                        <label>Location</label>
-                        <input 
-                            type="text" 
-                            id="cropLocationInput" 
-                            placeholder="Your location" 
-                            required
-                        >
-                    </div>
-                    <div class="form-group">
-                        <label>Crop (Optional)</label>
-                        <input 
-                            type="text" 
-                            id="cropInput" 
-                            placeholder="e.g., Maize, Tea, Wheat"
-                        >
-                    </div>
-                    <div class="form-group">
-                        <label>Language</label>
-                        <select id="languageSelect">
-                            <option value="en">English</option>
-                            <option value="sw">Swahili</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
-                    <div id="subscribeMessage"></div>
-                </form>
-            </div>
-        </div>
+            <!-- Subscribe -->
+            <section class="card subscribe-card reveal" aria-labelledby="subHeading">
+                    <h2 class="card-title" id="subHeading">Subscribe to daily alerts</h2>
+                    <p class="card-note">Register your number and location for mood and weather alerts.</p>
+                    <form id="subscribeForm" class="subscribe-form" novalidate>
+                        <div class="form-group">
+                            <label for="phoneInput">Phone number</label>
+                            <input type="tel" id="phoneInput" placeholder="+254712345678" autocomplete="tel" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cropLocationInput">Location</label>
+                            <input type="text" id="cropLocationInput" placeholder="Your location" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cropInput">Crop <span class="optional">optional</span></label>
+                            <input type="text" id="cropInput" placeholder="e.g. Maize, Tea, Wheat">
+                        </div>
+                        <div class="form-group">
+                            <label for="languageSelect">Language</label>
+                            <select id="languageSelect">
+                                <option value="en">English</option>
+                                <option value="sw">Swahili</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
+                        <div id="subscribeMessage" class="notice hidden" role="status"></div>
+                    </form>
+            </section>
+        </main>
+
+        <footer class="footer">
+            Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>
+            · Place search © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
+        </footer>
     </div>
 
     <script src="app.js"></script>
