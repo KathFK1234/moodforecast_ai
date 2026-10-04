@@ -3,7 +3,10 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
+from app.models.db import Subscriber
 
 
 client = TestClient(app)
@@ -65,6 +68,34 @@ async def test_subscribe_endpoint_valid(mock_weather):
     assert data["phone"] == "+254712345678"
     assert data["location"] == "Nairobi"
     assert data["status"] == "subscribed"
+
+
+def test_subscribe_persists_subscriber():
+    """POST /api/subscribe should store the subscriber in the database."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+    SQLModel.metadata.create_all(engine)
+    
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        response = client.post("/api/subscribe", json={
+            "phone": "+254712345678",
+            "location": "Nairobi",
+            "crop": "maize",
+            "language": "sw"
+        })
+    assert response.status_code == 201
+    
+    with Session(engine) as session:
+        subscribers = session.exec(select(Subscriber)).all()
+    assert len(subscribers) == 1
+    assert subscribers[0].id == response.json()["subscriber_id"]
+    assert subscribers[0].phone == "+254712345678"
+    assert subscribers[0].language == "sw"
+    assert subscribers[0].active is True
+    assert subscribers[0].created_at is not None
 
 
 @pytest.mark.asyncio
