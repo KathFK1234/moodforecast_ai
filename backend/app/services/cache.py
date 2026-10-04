@@ -1,4 +1,4 @@
-"""In-memory TTL cache implementation. Swappable with Redis."""
+"""In-memory TTL cache implementation."""
 
 import time
 from typing import Any, Optional
