@@ -86,14 +86,62 @@ async def test_subscribe_endpoint_missing_phone(mock_weather):
     assert response.status_code == 422
 
 
-def test_forecast_unknown_location(mock_weather):
-    """GET /api/forecast with unknown location should handle gracefully."""
-    response = client.get("/api/forecast/UnknownPlace123")
-    # May return 422 or other error code depending on API response
+def test_forecast_endpoint(mock_weather):
+    """GET /api/forecast should return current weather for the location."""
+    response = client.get("/api/forecast/Nairobi")
     assert response.status_code == 200
     data = response.json()
-    assert "location" in data
-    assert "weather" in data
+    assert data["location"] == "Nairobi"
+    assert data["weather"] == {
+        "temp_c": 18,
+        "condition": "Partly Cloudy",
+        "humidity": 74,
+        "wind_kph": 12
+    }
+
+
+def test_wellbeing_endpoint(mock_weather):
+    """GET /api/wellbeing should return weather plus mood scoring."""
+    response = client.get("/api/wellbeing/Nairobi")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["location"] == "Nairobi"
+    assert data["weather"]["condition"] == "Partly Cloudy"
+    assert 0 <= data["mood_score"] <= 100
+    assert data["energy_level"] in ["High", "Medium", "Low", "Very Low"]
+    assert data["risk_level"] in ["Minimal", "Low", "Moderate", "High"]
+    assert len(data["recommendations"]) > 0
+
+
+def test_forecast_unknown_location(mock_weather):
+    """GET /api/forecast with unknown location should return 422."""
+    mock_weather.get_location_by_name.return_value = {
+        "error": "Location 'UnknownPlace123' not found",
+        "lat": None,
+        "lon": None
+    }
+    response = client.get("/api/forecast/UnknownPlace123")
+    assert response.status_code == 422
+    assert "not found" in response.json()["detail"]
+
+
+def test_wellbeing_unknown_location(mock_weather):
+    """GET /api/wellbeing with unknown location should return 422."""
+    mock_weather.get_location_by_name.return_value = {
+        "error": "Location 'UnknownPlace123' not found",
+        "lat": None,
+        "lon": None
+    }
+    response = client.get("/api/wellbeing/UnknownPlace123")
+    assert response.status_code == 422
+    assert "not found" in response.json()["detail"]
+
+
+def test_forecast_weather_service_down(mock_weather):
+    """GET /api/forecast should return 503 when the weather API fails."""
+    mock_weather.get_current.side_effect = RuntimeError("Server error")
+    response = client.get("/api/forecast/Nairobi")
+    assert response.status_code == 503
 
 
 def test_docs_available():

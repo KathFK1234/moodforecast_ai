@@ -52,6 +52,8 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             status="subscribed"
         )
     
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

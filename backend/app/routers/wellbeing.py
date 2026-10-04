@@ -60,6 +60,8 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
             recommendations=mood_result["recommendations"]
         )
     
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:

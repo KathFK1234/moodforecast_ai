@@ -48,6 +48,8 @@ async def get_forecast(location: str) -> ForecastResponse:
             ai_summary=f"Weather in {resolved_location}: {condition}"
         )
     
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
