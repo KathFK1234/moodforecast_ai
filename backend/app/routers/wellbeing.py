@@ -1,13 +1,15 @@
 """Wellbeing router - GET /api/wellbeing/{location}"""
 
+import logging
 from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
 from app.services.mood_engine import BASELINE_SCORE, build_summary, score_mood
 from app.services.curiosity import curiosity_prompts
 from app.models.schemas import WellbeingResponse
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, build_weather, resolve_location
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["wellbeing"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/wellbeing/{location}")
@@ -63,5 +65,6 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
         raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    except Exception:
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)

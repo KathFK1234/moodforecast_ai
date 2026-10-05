@@ -1,12 +1,14 @@
 """Activity router - GET /api/activity, /api/random-activity and /api/activities"""
 
+import logging
 from fastapi import APIRouter, HTTPException, Query
 from app.services.weather import get_weather_client
 from app.services.activity_advisor import ACTIVITIES, check_activity, local_activities, random_activity
 from app.models.schemas import ActivityChoice, ActivityResponse
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, local_weather
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, local_weather
 
 router = APIRouter(prefix="/api", tags=["activity"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/activities")
@@ -39,8 +41,9 @@ async def list_local_activities(location: str) -> list[ActivityChoice]:
         raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    except Exception:
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
 
 
 @router.get("/activity/{location}")
@@ -87,8 +90,9 @@ async def get_activity_advice(
         raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    except Exception:
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
 
 
 @router.get("/random-activity/{location}")
@@ -130,5 +134,6 @@ async def get_random_activity(
         raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    except Exception:
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)

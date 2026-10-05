@@ -542,6 +542,14 @@ def test_forecast_weather_service_down(mock_weather):
     )
 
 
+def test_unexpected_errors_do_not_leak_details(mock_weather):
+    mock_weather.get_forecast.side_effect = KeyError("secret_internal_name")
+    response = client.get("/api/forecast/Nairobi")
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Something went wrong on our side. Please try again."
+    assert "secret_internal_name" not in response.text
+
+
 def test_slow_weather_service_says_to_try_again(mock_weather):
     mock_weather.get_forecast.side_effect = TimeoutError("slow")
     mock_weather.get_current.side_effect = TimeoutError("slow")

@@ -10,6 +10,8 @@ from app.services.weather import WeatherClient
 # Shown to visitors when the weather or place lookup fails, so they say what to do next
 TIMEOUT_MESSAGE = "The weather service is taking too long to answer. Please try again in a moment."
 UNAVAILABLE_MESSAGE = "The weather service can't be reached right now. Please try again in a moment."
+# The details of an unexpected error go to the log, not to the visitor
+UNEXPECTED_MESSAGE = "Something went wrong on our side. Please try again."
 
 
 async def resolve_location(client: WeatherClient, location: str) -> tuple[float, float, str]:

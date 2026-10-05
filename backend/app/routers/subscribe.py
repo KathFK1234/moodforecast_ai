@@ -1,5 +1,6 @@
 """Subscribe router - POST /api/subscribe, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
+import logging
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -13,13 +14,14 @@ from app.models.schemas import (
     UnsubscribeLinkResponse,
     UnsubscribeResponse,
 )
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, resolve_location
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, resolve_location
 from app.services import alerts, mailer
 from app.services.activity_advisor import find_activity
 from app.services.locality import build_place, local_issue
 from app.services.weather import get_weather_client
 
 router = APIRouter(prefix="/api", tags=["subscribe"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/subscribe", status_code=201)
@@ -104,8 +106,9 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
         raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Subscription failed: {str(e)}")
+    except Exception:
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
 
 
 @router.post("/unsubscribe/{token}")
