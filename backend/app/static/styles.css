@@ -857,6 +857,16 @@ body {
     min-width: 0;
 }
 
+.activity-form .button-ghost {
+    background: transparent;
+    border: 1px solid var(--field-line);
+    color: var(--ink);
+}
+
+.activity-form .button-ghost:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
 .activity-card .chips {
     justify-content: flex-start;
     margin: 12px 0 0;
@@ -1161,6 +1171,18 @@ body {
 
     .subscribe-button {
         justify-self: stretch;
+    }
+
+    .activity-form {
+        flex-wrap: wrap;
+    }
+
+    .activity-form input {
+        flex-basis: 100%;
+    }
+
+    .activity-form button {
+        flex: 1;
     }
 }
 

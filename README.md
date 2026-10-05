@@ -38,7 +38,9 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **7-day mood outlook** - expected mood for each day of the forecast
 - **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
 - **Activity check** - ask whether the weather somewhere suits a run, a picnic, a swim, stargazing and more, and get a go, maybe or skip with the reasons
+- **Surprise me** - a random activity the current weather suits, different on every visit and every tap
 - **Stay curious** - questions about the weather in other places, one tap away
+- **Location suggestions** - matching places appear as you type in either location field
 - **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim
 - **Subscriptions** - stores phone, location, crop and language for future SMS alerts (sending is not implemented yet)
@@ -77,6 +79,8 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/forecast/{location}` | Current weather and 7-day forecast with a mood outlook per day |
 | GET | `/api/wellbeing/{location}` | Current weather, mood score and the factors behind it, energy, risk, recommendations |
 | GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
+| GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
+| GET | `/api/locations?q=...` | Places matching what has been typed so far |
 | POST | `/api/subscribe` | Register a subscriber |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger UI |

@@ -249,6 +249,20 @@ def test_activity_endpoint_requires_an_activity(mock_weather):
     assert client.get("/api/activity/Nairobi", params={"activity": ""}).status_code == 422
 
 
+def test_random_activity_endpoint(mock_weather):
+    """GET /api/random-activity should pick something the weather suits."""
+    response = client.get("/api/random-activity/Nairobi")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["location"] == "Nairobi, KE"
+    assert data["verdict"] == "go"
+    assert data["activity"] in data["headline"]
+    assert len(data["reasons"]) == 2
+    
+    again = client.get("/api/random-activity/Nairobi", params={"exclude": data["activity"]})
+    assert again.json()["activity"] != data["activity"]
+
+
 def test_locations_endpoint():
     """GET /api/locations should return suggestions for what has been typed."""
     suggestion = {

@@ -143,7 +143,7 @@
             <section class="card activity-card reveal" aria-labelledby="activityHeading">
                 <div class="card-head">
                     <h2 class="card-title" id="activityHeading">Thinking of doing something?</h2>
-                    <p class="card-note">Ask whether the weather in <span id="activityPlace">this place</span> suits it.</p>
+                    <p class="card-note">Ask whether the weather in <span id="activityPlace">this place</span> suits it, or let us pick something for you.</p>
                 </div>
                 <form class="activity-form" id="activityForm">
                     <label class="visually-hidden" for="activityInput">Activity</label>
@@ -155,6 +155,7 @@
                         autocomplete="off"
                     >
                     <button type="submit" id="activityButton">Ask</button>
+                    <button type="button" class="button-ghost" id="surpriseButton">Surprise me</button>
                 </form>
                 <div class="chips" id="activityChips" aria-label="Popular activities"></div>
                 <div id="activityError" class="notice notice-error hidden" role="alert"></div>

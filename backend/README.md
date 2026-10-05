@@ -159,6 +159,30 @@ curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
 
 `verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight. A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
 
+### GET /api/random-activity/{location}
+
+A random activity that the current weather suits, in the same shape as the activity check. Only activities with nothing in their way are picked, so `verdict` is always `go`; outdoor ones are preferred when any qualify, and indoor ones always do. Pass `exclude=<activity>` (the `activity` from the previous pick) to get a different one.
+
+```bash
+curl "http://localhost:8000/api/random-activity/Nairobi?exclude=camping"
+```
+
+### GET /api/locations?q=...
+
+Up to five places matching what has been typed so far, for search-as-you-type. Uses Open-Meteo's geocoding API. Returns an empty list for fewer than two characters or if the lookup fails.
+
+```bash
+curl "http://localhost:8000/api/locations?q=kis"
+```
+
+```json
+[
+  {"name": "Kisumu", "region": "Kisumu County", "country": "Kenya", "label": "Kisumu, Kisumu County, Kenya"}
+]
+```
+
+`label` is the text to search for. A label that came from this endpoint resolves to exactly that place.
+
 ### POST /api/subscribe
 
 Stores a subscriber. Requires `phone` (E.164: `+` then 8-15 digits) and `location`; `crop` and `language` (`en` or `sw`) are optional.

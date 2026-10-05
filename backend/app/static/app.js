@@ -73,7 +73,8 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 let searchToken = 0;  // Guards against a slow earlier search overwriting a newer one
 let hasResults = false;
 let currentLocation = '';  // The place the results on screen are for
-let lastActivity = '';     // Re-asked when the place changes
+let lastActivity = '';     // Re-asked when the place changes; empty means a random pick
+let shownActivity = '';    // Left out of the next random pick
 let activityToken = 0;
 
 // Read the API's error message, whatever shape it comes in
@@ -130,6 +131,7 @@ async function handleSearch(location) {
         currentLocation = location;
         el('activityPlace').textContent = wellbeingData.location;
         if (lastActivity) askActivity(lastActivity);
+        else surpriseMe();
         el('results').classList.remove('hidden');
         hasResults = true;
         replayReveal();
@@ -456,33 +458,51 @@ function attachSuggestions(input, onPick) {
 }
 
 // Ask whether the weather at the current place suits an activity
-async function askActivity(question) {
+function askActivity(question) {
     question = (question || '').trim();
-    const error = el('activityError');
     if (!question) {
-        showNotice(error, 'Type something you would like to do.', true);
+        showNotice(el('activityError'), 'Type something you would like to do.', true);
         return;
     }
     if (!currentLocation) return;
 
     lastActivity = question;
+    loadActivity(
+        `/api/activity/${encodeURIComponent(currentLocation)}?activity=${encodeURIComponent(question)}`,
+        'Could not check that activity.'
+    );
+}
+
+// Pick something at random that the weather at the current place suits
+function surpriseMe() {
+    if (!currentLocation) return;
+
+    lastActivity = '';
+    el('activityInput').value = '';
+    loadActivity(
+        `/api/random-activity/${encodeURIComponent(currentLocation)}?exclude=${encodeURIComponent(shownActivity)}`,
+        'Could not pick an activity.'
+    );
+}
+
+async function loadActivity(path, fallback) {
+    const error = el('activityError');
+    const buttons = [el('activityButton'), el('surpriseButton')];
     const token = ++activityToken;
     error.classList.add('hidden');
-    el('activityButton').disabled = true;
+    buttons.forEach((button) => { button.disabled = true; });
 
     try {
-        const data = await fetchJson(
-            `/api/activity/${encodeURIComponent(currentLocation)}?activity=${encodeURIComponent(question)}`,
-            'Could not check that activity.'
-        );
+        const data = await fetchJson(path, fallback);
         if (token !== activityToken) return;
+        shownActivity = data.activity;
         displayActivity(data);
     } catch (e) {
         if (token !== activityToken) return;
         el('activityResult').classList.add('hidden');
         showNotice(error, e.message, true);
     } finally {
-        if (token === activityToken) el('activityButton').disabled = false;
+        if (token === activityToken) buttons.forEach((button) => { button.disabled = false; });
     }
 }
 
@@ -691,6 +711,7 @@ function init() {
         event.preventDefault();
         askActivity(el('activityInput').value);
     });
+    el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
 
     // Start from ?q= in the link, then the last place searched, then the default

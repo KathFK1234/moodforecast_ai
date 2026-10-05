@@ -4,7 +4,7 @@ import random
 
 import pytest
 from app.services import activity_advisor
-from app.services.activity_advisor import ACTIVITIES, check_activity, find_activity
+from app.services.activity_advisor import ACTIVITIES, check_activity, find_activity, random_activity
 
 
 def advise(question, condition="Clear", temp=22, humidity=50, wind=10, is_day=True, location="Nairobi, KE"):
@@ -151,3 +151,51 @@ class TestAdvice:
         first = check_activity("run", "Nairobi, KE", "Rain", 15, 85, 10, rng=random.Random(5))
         second = check_activity("run", "Nairobi, KE", "Rain", 15, 85, 10, rng=random.Random(5))
         assert first == second
+
+
+class TestRandomActivity:
+    """Test the random pick."""
+    
+    def pick(self, seed, condition="Clear", temp=22, wind=10, is_day=True, exclude=""):
+        return random_activity(
+            "Nairobi, KE", condition, temp, 50, wind, is_day,
+            rng=random.Random(seed), exclude=exclude
+        )
+    
+    def test_pick_always_suits_the_weather(self):
+        for condition, temp, wind, is_day in [
+            ("Clear", 22, 10, True), ("Thunderstorm", 15, 50, True), ("Snow", -4, 5, True),
+            ("Clear", 38, 5, True), ("Overcast", 12, 70, False), ("Clear", 18, 20, False),
+        ]:
+            for seed in range(40):
+                advice = self.pick(seed, condition, temp, wind, is_day)
+                assert advice["verdict"] == "go"
+                assert advice["recognised"] is True
+                assert advice["suggestion"] is None
+    
+    def test_storm_only_offers_indoor_activities(self):
+        indoor = {a.name for a in ACTIVITIES if a.category == "indoor"}
+        assert {self.pick(seed, "Thunderstorm")["activity"] for seed in range(60)} <= indoor
+    
+    def test_good_weather_mostly_offers_outdoor_activities(self):
+        indoor = {a.name for a in ACTIVITIES if a.category == "indoor"}
+        picks = [self.pick(seed)["activity"] for seed in range(200)]
+        assert sum(pick not in indoor for pick in picks) > 120
+        assert len(set(picks)) > 8
+    
+    def test_snow_and_clear_nights_bring_out_their_specials(self):
+        assert "snow sports" in {self.pick(seed, "Snow", -3)["activity"] for seed in range(100)}
+        assert "stargazing" in {self.pick(seed, is_day=False)["activity"] for seed in range(100)}
+    
+    def test_exclude_gives_a_different_pick(self):
+        for seed in range(40):
+            first = self.pick(seed)["activity"]
+            assert self.pick(seed, exclude=first)["activity"] != first
+    
+    def test_pick_comes_with_a_pitch(self):
+        advice = self.pick(1)
+        assert advice["reasons"][-1] == activity_advisor.PITCHES[advice["activity"]]
+        assert advice["activity"] in advice["headline"]
+    
+    def test_every_activity_has_a_pitch(self):
+        assert set(activity_advisor.PITCHES) == {a.name for a in ACTIVITIES}

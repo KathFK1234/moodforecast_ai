@@ -100,6 +100,43 @@ SKIP_HEADLINES = (
 )
 HEADLINES = {"go": GO_HEADLINES, "maybe": MAYBE_HEADLINES, "skip": SKIP_HEADLINES}
 
+RANDOM_HEADLINES = (
+    "Today's pick for {place}: {name}.",
+    "The dice have spoken: {name}!",
+    "Why not {name}?",
+    "{place} has the weather for {name} right now.",
+)
+
+# A nudge to go with each activity when it comes up as a random pick
+PITCHES = {
+    "running": "Lace up — even ten minutes counts.",
+    "a walk": "No destination needed. Just pick a direction.",
+    "cycling": "Pump up the tyres and find a road you haven't ridden.",
+    "hiking": "Find a hill, bring water, earn the view.",
+    "football": "Round up whoever's around for a kickabout.",
+    "basketball": "First to eleven. Loser buys the drinks.",
+    "tennis": "Grab a racket and a partner — rallying counts.",
+    "golf": "A few holes, or a bucket of balls at the range.",
+    "a picnic": "A blanket, some snacks and somewhere green.",
+    "a barbecue": "Fire it up — nyama choma tastes better with company.",
+    "gardening": "Repot, weed or plant something you can eat later.",
+    "photography": "Give yourself a theme — doors, shadows, reflections — and find ten.",
+    "fishing": "Patience, a line and a flask of something warm.",
+    "camping": "Even one night under canvas resets the week.",
+    "swimming": "A few lengths, or just float and look at the sky.",
+    "snow sports": "Skis, a sled or a snowball — your call.",
+    "stargazing": "Find a dark spot and see what you can name.",
+    "kite flying": "Find an open field and let the wind do the work.",
+    "sailing": "Catch the breeze while it's blowing.",
+    "reading": "That book you've been meaning to start? Today.",
+    "a movie": "Pick something you've never heard of.",
+    "cooking": "Try a dish from a country you've never visited.",
+    "games": "Dust off a board game or start a puzzle.",
+    "an indoor workout": "Twenty minutes, your favourite playlist, done.",
+    "an indoor outing": "A museum, a café or a library corner you haven't tried.",
+    "a nap": "Twenty minutes. Set an alarm. No guilt.",
+}
+
 # Offered when the answer is no. All indoors, so they hold in any weather.
 INDOOR_SWAPS = (
     "Swap it for a new recipe, a board game or a film marathon.",
@@ -292,9 +329,68 @@ def check_activity(
     Returns: activity, recognised, verdict (go, maybe or skip), headline, reasons,
     suggestion, curiosity.
     """
-    rng = rng or random
     found = find_activity(question)
     activity = found or Activity("time outdoors", "leisure", ())
+    return _advise(
+        activity, found is not None, location,
+        condition, temperature_c, humidity, wind_kph, is_day, rng or random, searched_as
+    )
+
+
+def random_activity(
+    location: str,
+    condition: str,
+    temperature_c: float,
+    humidity: float,
+    wind_kph: float,
+    is_day: bool = True,
+    rng: random.Random | None = None,
+    searched_as: str = "",
+    exclude: str = ""
+) -> ActivityAdvice:
+    """
+    Pick something to try that the current weather suits.
+
+    Only activities with nothing standing in their way are picked, leaning
+    towards outdoor ones when any qualify. Indoor activities always do, so
+    there is always a pick. `exclude` is an activity name to leave out, so
+    asking again gives something different.
+
+    Returns the same shape as check_activity, with the verdict always "go".
+    """
+    rng = rng or random
+    suited = [
+        activity for activity in ACTIVITIES
+        if activity.name != exclude
+        and not _issues(activity, condition, temperature_c, humidity, wind_kph, is_day)
+    ]
+    outdoor = [activity for activity in suited if activity.category != "indoor"]
+    activity = rng.choice(outdoor if outdoor and rng.random() < 0.75 else suited)
+
+    advice = _advise(
+        activity, True, location,
+        condition, temperature_c, humidity, wind_kph, is_day, rng, searched_as
+    )
+    advice["headline"] = rng.choice(RANDOM_HEADLINES).format(
+        name=activity.name, place=location.split(",")[0]
+    )
+    advice["reasons"].append(PITCHES[activity.name])
+    return advice
+
+
+def _advise(
+    activity: Activity,
+    recognised: bool,
+    location: str,
+    condition: str,
+    temperature_c: float,
+    humidity: float,
+    wind_kph: float,
+    is_day: bool,
+    rng: random.Random,
+    searched_as: str
+) -> ActivityAdvice:
+    """Build the advice for one activity."""
     place = location.split(",")[0]
 
     issues = _issues(activity, condition, temperature_c, humidity, wind_kph, is_day)
@@ -304,7 +400,7 @@ def check_activity(
     reasons = [reason for _, reason in issues]
     if not reasons:
         reasons.append(_good_news(activity, condition, temperature_c, wind_kph, is_day))
-    if not found:
+    if not recognised:
         reasons.insert(0, "I don't know that one yet, so this is for being outdoors in general.")
 
     if activity.category == "indoor":
@@ -316,7 +412,7 @@ def check_activity(
 
     return {
         "activity": activity.name,
-        "recognised": found is not None,
+        "recognised": recognised,
         "verdict": verdict,
         "headline": rng.choice(HEADLINES[verdict]).format(name=activity.name, place=place),
         "reasons": reasons,
