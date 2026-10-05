@@ -51,8 +51,10 @@ API calls use relative paths, so the page must be opened through the backend rat
 3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
 4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score
 5. **7-day mood outlook** → icon, rain chance, temperature range and expected mood per day
-6. **Recommendations** → wellbeing tips for the current conditions
-7. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
+6. **Recommendations** → activity ideas and wellbeing tips for the current conditions, different on each visit
+7. **Activity check** → type a question or pick an activity; `GET /api/activity/{location}?activity=...` returns a verdict, the reasons, something to do instead, and other places to try. Picking one of those places searches it and asks the same question there.
+8. **Stay curious** → three questions about other places from the wellbeing response; tapping one searches that place
+9. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
 
 Errors show the message returned by the API.
 

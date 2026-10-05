@@ -36,7 +36,9 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Mood scoring** - rule-based score (0-100) with a mood label, energy and risk levels
 - **Why this score** - the factors that raised or lowered the score, and by how much
 - **7-day mood outlook** - expected mood for each day of the forecast
-- **Recommendations** - wellbeing tips based on condition, temperature, humidity and time of day
+- **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
+- **Activity check** - ask whether the weather somewhere suits a run, a picnic, a swim, stargazing and more, and get a go, maybe or skip with the reasons
+- **Stay curious** - questions about the weather in other places, one tap away
 - **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim
 - **Subscriptions** - stores phone, location, crop and language for future SMS alerts (sending is not implemented yet)
