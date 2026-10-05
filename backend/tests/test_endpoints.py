@@ -210,6 +210,10 @@ def test_wellbeing_endpoint(mock_weather):
     assert data["energy_level"] in ["High", "Medium", "Low", "Very Low"]
     assert data["risk_level"] in ["Minimal", "Low", "Moderate", "High"]
     assert len(data["recommendations"]) > 0
+    assert len(data["curiosity"]) == 3
+    for prompt in data["curiosity"]:
+        assert prompt["location"] in prompt["question"]
+        assert prompt["location"] != "Nairobi"
 
 
 def test_forecast_unknown_location(mock_weather):

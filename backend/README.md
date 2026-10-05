@@ -114,13 +114,20 @@ curl http://localhost:8000/api/wellbeing/Nairobi
   "energy_level": "High",
   "risk_level": "Minimal",
   "ai_summary": "Mainly clear and 18°C in Nairobi, KE. Clear night and comfortable temperature are lifting the mood. A calm night to rest and recharge.",
-  "recommendations": ["Clear night — a few minutes of fresh air outside can help you wind down."]
+  "recommendations": ["Clear night — a few minutes of fresh air outside can help you wind down."],
+  "curiosity": [
+    {"question": "It's night here — is the sun up in Tokyo?", "location": "Tokyo"},
+    {"question": "Take a guess: is it warmer in Lisbon than here? Tap to find out.", "location": "Lisbon"},
+    {"question": "What's the mood like in Cape Town today?", "location": "Cape Town"}
+  ]
 }
 ```
 
 `mood_score` is `baseline_score` plus the `delta` of every factor, clamped to 0-100. `ai_summary` is written from those factors by rules in `mood_engine.py`; no language model is involved.
 
 Each recommendation is picked at random from a pool of ideas that fit the conditions (a picnic or a bike ride on a clear day, a board game or a new recipe in the rain, stargazing on a clear night), so repeated requests for the same weather return different suggestions.
+
+`curiosity` holds three questions about other places, each with the `location` to search to answer it. They lean towards contrast (somewhere cold when it is hot here, somewhere dry when it is raining) and never claim to know the weather there.
 
 ### POST /api/subscribe
 

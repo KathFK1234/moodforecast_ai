@@ -302,6 +302,37 @@ function displayWellbeing(data) {
         li.textContent = rec;
         recList.appendChild(li);
     });
+
+    displayCuriosity(data.curiosity || []);
+}
+
+// Questions about other places; tapping one searches that place
+function displayCuriosity(prompts) {
+    const list = el('curiosityList');
+    list.innerHTML = '';
+    prompts.forEach((prompt) => {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'curiosity-prompt';
+        const question = document.createElement('span');
+        question.textContent = prompt.question;
+        const place = document.createElement('span');
+        place.className = 'curiosity-place';
+        place.textContent = `${prompt.location} →`;
+        button.append(question, place);
+        button.addEventListener('click', () => searchPlace(prompt.location));
+        li.appendChild(button);
+        list.appendChild(li);
+    });
+    el('curiositySection').classList.toggle('hidden', prompts.length === 0);
+}
+
+// Search a suggested place and bring the results back into view
+function searchPlace(place) {
+    el('locationInput').value = place;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+    return handleSearch(place);
 }
 
 function factorRow(label, value, isBaseline) {

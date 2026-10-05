@@ -76,6 +76,12 @@ class MoodFactor(BaseModel):
     delta: int
 
 
+class CuriosityPrompt(BaseModel):
+    """A question about another place, and the place to search for the answer."""
+    question: str
+    location: str
+
+
 class WellbeingResponse(BaseModel):
     """Wellbeing endpoint response."""
     location: str
@@ -88,6 +94,9 @@ class WellbeingResponse(BaseModel):
     risk_level: str
     ai_summary: str | None = None
     recommendations: list[str]
+    curiosity: list[CuriosityPrompt] = Field(
+        default_factory=list, description="Other places worth looking up"
+    )
 
 
 class SubscribeResponse(BaseModel):

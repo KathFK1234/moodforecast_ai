@@ -795,6 +795,45 @@ body {
     color: var(--ink);
 }
 
+/* Curiosity */
+.curiosity-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.curiosity-prompt {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius-sm);
+    background: var(--field);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.curiosity-prompt:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.curiosity-place {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-ink);
+}
+
 /* Subscribe */
 .subscribe-form {
     display: grid;
@@ -947,6 +986,10 @@ body {
 
     .subscribe-form {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .curiosity-list {
+        grid-template-columns: 1fr;
     }
 
     .day {
