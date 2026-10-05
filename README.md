@@ -74,6 +74,7 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | ------ | ---- | ----------- |
 | GET | `/api/forecast/{location}` | Current weather and 7-day forecast with a mood outlook per day |
 | GET | `/api/wellbeing/{location}` | Current weather, mood score and the factors behind it, energy, risk, recommendations |
+| GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
 | POST | `/api/subscribe` | Register a subscriber |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger UI |

@@ -17,6 +17,7 @@ def mock_weather():
     """Mock weather client for all tests."""
     with patch('app.routers.forecast.get_weather_client') as mock_forecast, \
          patch('app.routers.wellbeing.get_weather_client') as mock_wellbeing, \
+         patch('app.routers.activity.get_weather_client') as mock_activity, \
          patch('app.routers.subscribe.get_engine'):
         
         mock_client = AsyncMock()
@@ -59,6 +60,7 @@ def mock_weather():
         
         mock_forecast.return_value = mock_client
         mock_wellbeing.return_value = mock_client
+        mock_activity.return_value = mock_client
         
         yield mock_client
 
@@ -214,6 +216,37 @@ def test_wellbeing_endpoint(mock_weather):
     for prompt in data["curiosity"]:
         assert prompt["location"] in prompt["question"]
         assert prompt["location"] != "Nairobi"
+
+
+def test_activity_endpoint(mock_weather):
+    """GET /api/activity should judge an activity against the current weather."""
+    response = client.get("/api/activity/Nairobi", params={"activity": "Can I go for a run?"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["location"] == "Nairobi, KE"
+    assert data["weather"]["condition"] == "Partly Cloudy"
+    assert data["activity"] == "running"
+    assert data["recognised"] is True
+    # Partly cloudy, 18°C, 12 km/h wind, daytime: nothing in the way
+    assert data["verdict"] == "go"
+    assert data["reasons"] == ["Partly cloudy and 18°C with 12 km/h of wind — hard to ask for more."]
+    assert data["suggestion"] is None
+    assert len(data["curiosity"]["places"]) == 3
+
+
+def test_activity_endpoint_says_no_when_the_weather_rules_it_out(mock_weather):
+    """18°C is too cold for skiing and there is no snow."""
+    response = client.get("/api/activity/Nairobi", params={"activity": "skiing"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["activity"] == "snow sports"
+    assert data["verdict"] == "skip"
+    assert data["suggestion"]
+
+
+def test_activity_endpoint_requires_an_activity(mock_weather):
+    assert client.get("/api/activity/Nairobi").status_code == 422
+    assert client.get("/api/activity/Nairobi", params={"activity": ""}).status_code == 422
 
 
 def test_forecast_unknown_location(mock_weather):

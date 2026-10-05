@@ -99,6 +99,25 @@ class WellbeingResponse(BaseModel):
     )
 
 
+class ActivityCuriosity(BaseModel):
+    """Other places to check the same activity."""
+    question: str
+    places: list[str]
+
+
+class ActivityResponse(BaseModel):
+    """Activity endpoint response."""
+    location: str
+    weather: WeatherData
+    activity: str = Field(..., description="The activity the question was understood to be about")
+    recognised: bool = Field(..., description="False if the answer is for general time outdoors")
+    verdict: str = Field(..., description="go, maybe or skip")
+    headline: str
+    reasons: list[str]
+    suggestion: str | None = Field(None, description="Something to do instead, when the verdict is skip")
+    curiosity: ActivityCuriosity
+
+
 class SubscribeResponse(BaseModel):
     """Subscription response."""
     subscriber_id: str

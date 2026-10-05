@@ -129,6 +129,36 @@ Each recommendation is picked at random from a pool of ideas that fit the condit
 
 `curiosity` holds three questions about other places, each with the `location` to search to answer it. They lean towards contrast (somewhere cold when it is hot here, somewhere dry when it is raining) and never claim to know the weather there.
 
+### GET /api/activity/{location}?activity=...
+
+Whether the current weather at a location suits something you want to do. `activity` is free text, a single word or a whole question.
+
+```bash
+curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
+```
+
+```json
+{
+  "location": "Nairobi, KE",
+  "weather": {
+    "temp_c": 19.0, "feels_like_c": 18.2, "condition": "Light Rain",
+    "humidity": 82.0, "wind_kph": 9.0, "is_day": true
+  },
+  "activity": "a picnic",
+  "recognised": true,
+  "verdict": "skip",
+  "headline": "I'd hold off on a picnic for now.",
+  "reasons": ["It's raining, which rather spoils it."],
+  "suggestion": "Swap it for a new recipe, a board game or a film marathon.",
+  "curiosity": {
+    "question": "Wonder where it's better for a picnic right now? Check:",
+    "places": ["Lisbon", "Cape Town", "Sydney"]
+  }
+}
+```
+
+`verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight. A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
+
 ### POST /api/subscribe
 
 Stores a subscriber. Requires `phone` (E.164: `+` then 8-15 digits) and `location`; `crop` and `language` (`en` or `sw`) are optional.
