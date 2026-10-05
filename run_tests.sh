@@ -76,11 +76,31 @@ forecast=$(curl -s $BASE_URL/api/forecast/Nairobi | grep -o '"location"')
 wellbeing=$(curl -s $BASE_URL/api/wellbeing/London | grep -o '"mood_score"')
 [ -n "$wellbeing" ] && pass "Wellbeing endpoint working" || fail "Wellbeing endpoint not working"
 
-# Subscribe
-subscribe=$(curl -s -X POST $BASE_URL/api/subscribe \
+# Activity check
+activity=$(curl -s "$BASE_URL/api/activity/Nairobi?activity=run" | grep -o '"verdict"')
+[ -n "$activity" ] && pass "Activity endpoint working" || fail "Activity endpoint not working"
+
+# Random activity
+random_pick=$(curl -s $BASE_URL/api/random-activity/Nairobi | grep -o '"verdict":"go"')
+[ -n "$random_pick" ] && pass "Random activity endpoint working" || fail "Random activity endpoint not working"
+
+# Activities that fit a place
+local_activities=$(curl -s $BASE_URL/api/activities/Nairobi | grep -o '"prompt"' | head -1)
+[ -n "$local_activities" ] && pass "Local activities endpoint working" || fail "Local activities endpoint not working"
+
+# Location suggestions
+suggestions=$(curl -s "$BASE_URL/api/locations?q=nai" | grep -o '"label"' | head -1)
+[ -n "$suggestions" ] && pass "Location suggestions working" || fail "Location suggestions not working"
+
+# Subscribe, then unsubscribe so the test address is not left on the alert list
+subscription=$(curl -s -X POST $BASE_URL/api/subscribe \
   -H "Content-Type: application/json" \
-  -d '{"email":"smoke-test@example.com","location":"Nairobi"}' | grep -o '"subscriber_id"')
-[ -n "$subscribe" ] && pass "Subscribe endpoint working" || fail "Subscribe endpoint not working"
+  -d '{"email":"smoke-test@example.com","location":"Nairobi"}')
+[ -n "$(echo "$subscription" | grep -o '"subscriber_id"')" ] && pass "Subscribe endpoint working" || fail "Subscribe endpoint not working"
+
+token=$(echo "$subscription" | grep -oP '"unsubscribe_token":"\K[^"]+')
+unsubscribed=$([ -n "$token" ] && curl -s -X POST "$BASE_URL/api/unsubscribe/$token" | grep -o '"unsubscribed"')
+[ -n "$unsubscribed" ] && pass "Unsubscribe endpoint working" || fail "Unsubscribe endpoint not working"
 
 # Documentation
 docs=$(curl -s $BASE_URL/docs | grep -o 'swagger')
@@ -91,21 +111,29 @@ test_header "3. Unit Tests"
 
 cd backend
 
-if [ -f "tests/test_mood_engine.py" ]; then
-    test_count=$(pytest tests/test_mood_engine.py --collect-only -q 2>/dev/null | tail -1 | grep -oP '\d+(?= test)' || echo "0")
-    if pytest tests/test_mood_engine.py -q > /dev/null 2>&1; then
+# Use the project's virtual environment when it isn't activated
+if [ -x "venv/bin/python" ]; then
+    PYTEST="venv/bin/python -m pytest"
+else
+    PYTEST="pytest"
+fi
+
+# Everything except the endpoint tests: the services, with no server involved
+if [ -d "tests" ]; then
+    test_count=$($PYTEST tests --ignore=tests/test_endpoints.py --collect-only -q 2>/dev/null | tail -1 | grep -oP '\d+(?= test)' || echo "0")
+    if $PYTEST tests --ignore=tests/test_endpoints.py -q > /dev/null 2>&1; then
         pass "Unit tests ($test_count tests) - ALL PASSING"
     else
         fail "Unit tests - SOME FAILING"
     fi
 else
-    skip "Unit tests - test file not found"
+    skip "Unit tests - tests directory not found"
 fi
 
 # Integration Tests
 if [ -f "tests/test_endpoints.py" ]; then
-    int_test_count=$(pytest tests/test_endpoints.py --collect-only -q 2>/dev/null | tail -1 | grep -oP '\d+(?= test)' || echo "0")
-    if pytest tests/test_endpoints.py -q > /dev/null 2>&1; then
+    int_test_count=$($PYTEST tests/test_endpoints.py --collect-only -q 2>/dev/null | tail -1 | grep -oP '\d+(?= test)' || echo "0")
+    if $PYTEST tests/test_endpoints.py -q > /dev/null 2>&1; then
         pass "Integration tests ($int_test_count tests) - ALL PASSING"
     else
         fail "Integration tests - SOME FAILING"
