@@ -234,7 +234,7 @@ HOT_IDEAS = (
     "Prioritize hydration and breaks indoors or in the shade. Heat stress reduces mental clarity.",
     "Keep a water bottle within reach — add ice, lemon or mint to make it interesting.",
     "Slow the pace: do demanding things early or late and rest through the hottest hours.",
-    "Cool down with a cold shower, a swim or some frozen fruit.",
+    "Cool down with a cold shower, an iced drink or some frozen fruit.",
     "Wear light, loose clothing and keep your space shaded and breezy.",
 )
 
