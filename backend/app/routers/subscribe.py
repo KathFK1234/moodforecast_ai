@@ -15,6 +15,8 @@ from app.models.schemas import (
 )
 from app.routers.common import resolve_location
 from app.services import alerts, mailer
+from app.services.activity_advisor import find_activity
+from app.services.locality import build_place, local_issue
 from app.services.weather import get_weather_client
 
 router = APIRouter(prefix="/api", tags=["subscribe"])
@@ -26,7 +28,7 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     Register an email address for daily alerts about a location.
     
     Stores: email, location, activity, language. The location must be one the
-    geocoder can find. Subscribing again with the same email updates the
+    geocoder can find, and the activity one that can be done there. Subscribing again with the same email updates the
     existing subscription instead of adding another.
     
     Sends a confirmation email if email is configured; the subscription is
@@ -38,6 +40,13 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
         client = get_weather_client()
         lat, lon, place = await resolve_location(client, request.location)
         forecast = await client.get_forecast(lat, lon)
+        
+        # A daily report on something the place can't offer would only ever say no
+        if request.activity:
+            local_place = build_place(place, lat, forecast, await client.get_sea(lat, lon))
+            issue = local_issue(find_activity(request.activity).needs, request.activity, local_place)
+            if issue and issue[0] == 2:
+                raise HTTPException(status_code=422, detail=f"{issue[1]} Pick another activity.")
         
         # Save to database
         engine = get_engine()

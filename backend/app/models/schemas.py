@@ -124,6 +124,12 @@ class WellbeingResponse(BaseModel):
     )
 
 
+class ActivityChoice(BaseModel):
+    """An activity that is practical at a location."""
+    name: str
+    prompt: str = Field(..., description="How someone would ask about it, e.g. 'Go for a run'")
+
+
 class ActivityCuriosity(BaseModel):
     """Other places to check the same activity."""
     question: str

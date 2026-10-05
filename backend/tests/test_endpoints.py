@@ -438,6 +438,62 @@ def test_random_activity_endpoint(mock_weather):
     assert again.json()["activity"] != data["activity"]
 
 
+def test_activity_endpoint_rules_out_what_the_place_cannot_offer(mock_weather):
+    """The mocked Nairobi is inland, so the sea is out whatever the weather."""
+    response = client.get("/api/activity/Nairobi", params={"activity": "Go surfing"})
+    data = response.json()
+    assert data["verdict"] == "skip"
+    assert data["reasons"] == ["Nairobi isn't on the coast, so surfing would mean a trip to the sea first."]
+    assert data["suggestion"].startswith("Something that does work in Nairobi right now: ")
+
+
+def test_random_activity_fits_the_place(mock_weather):
+    not_in_nairobi = {"a beach day", "surfing", "snorkelling", "sailing", "snow sports", "cricket", "baseball", "golf"}
+    for _ in range(40):
+        assert client.get("/api/random-activity/Nairobi").json()["activity"] not in not_in_nairobi
+
+
+def test_local_activities_endpoint(mock_weather):
+    """GET /api/activities/{location} should list what is practical there."""
+    response = client.get("/api/activities/Nairobi")
+    assert response.status_code == 200
+    choices = response.json()
+    assert choices[0] == {"name": "running", "prompt": "Go for a run"}
+    names = [choice["name"] for choice in choices]
+    assert "surfing" not in names
+    assert "snow sports" not in names
+    
+    mock_weather.get_sea.return_value = {"coastal": True, "sea_temp_c": 27.6}
+    names = [choice["name"] for choice in client.get("/api/activities/Mombasa").json()]
+    assert "a beach day" in names
+
+
+def test_local_checks_survive_a_failed_sea_lookup(mock_weather):
+    """Without the sea lookup, asking is given the benefit of the doubt and picks stay cautious."""
+    mock_weather.get_sea.return_value = None
+    asked = client.get("/api/activity/Nairobi", params={"activity": "beach"}).json()
+    # 18°C is brisk for the beach, but nothing claims Nairobi is inland
+    assert asked["verdict"] == "maybe"
+    assert not any("coast" in reason for reason in asked["reasons"])
+    names = [choice["name"] for choice in client.get("/api/activities/Nairobi").json()]
+    assert "a beach day" not in names
+
+
+def test_subscribe_rejects_an_activity_the_place_cannot_offer(mock_weather):
+    response = client.post("/api/subscribe", json={
+        "email": "amina@example.com", "location": "Nairobi", "activity": "surfing"
+    })
+    assert response.status_code == 422
+    assert response.json()["detail"] == (
+        "Nairobi isn't on the coast, so surfing would mean a trip to the sea first. Pick another activity."
+    )
+    # Uncommon is allowed - it's still possible
+    response = client.post("/api/subscribe", json={
+        "email": "amina@example.com", "location": "Nairobi", "activity": "cricket"
+    })
+    assert response.status_code == 201
+
+
 def test_locations_endpoint():
     """GET /api/locations should return suggestions for what has been typed."""
     suggestion = {

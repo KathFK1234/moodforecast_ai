@@ -1,10 +1,11 @@
-"""Rule-based answers to "is the weather right for this activity?"."""
+"""Rule-based answers to "is this activity right for the weather, here?"."""
 
 import random
 import re
 from typing import NamedTuple, TypedDict
 
 from app.services import curiosity
+from app.services.locality import LOCAL_FAVOURITES, Place, is_local, local_issue
 
 
 class Activity(NamedTuple):
@@ -13,6 +14,8 @@ class Activity(NamedTuple):
     category: str           # active, leisure, water, snow, sky, wind or indoor
     aliases: tuple[str, ...]
     night_ok: bool = False  # Just as good after dark
+    needs: str = ""         # What the place must offer: coast, warm_coast, surf, snow, or a sport (see locality)
+    prompt: str = ""        # How someone would ask about it, e.g. "Go for a run"
 
 
 class ActivityCuriosity(TypedDict):
@@ -33,47 +36,77 @@ class ActivityAdvice(TypedDict):
 
 
 ACTIVITIES = (
-    Activity("running", "active", ("run", "running", "jog", "jogging")),
-    Activity("a walk", "active", ("walk", "walking", "stroll")),
-    Activity("cycling", "active", ("cycle", "cycling", "bike", "biking")),
-    Activity("hiking", "active", ("hike", "hiking", "trek", "trekking")),
-    Activity("football", "active", ("football", "soccer")),
-    Activity("basketball", "active", ("basketball", "hoops")),
-    Activity("tennis", "active", ("tennis", "padel")),
-    Activity("golf", "leisure", ("golf",)),
-    Activity("a picnic", "leisure", ("picnic",)),
+    Activity("running", "active", ("run", "running", "jog", "jogging"), prompt="Go for a run"),
+    Activity("a walk", "active", ("walk", "walking", "stroll"), prompt="Take a walk"),
+    Activity("cycling", "active", ("cycle", "cycling", "bike", "biking"), prompt="Ride a bike"),
+    Activity("hiking", "active", ("hike", "hiking", "trek", "trekking"), prompt="Go hiking"),
+    Activity("football", "active", ("football", "soccer"), prompt="Play football"),
+    Activity("basketball", "active", ("basketball", "hoops"), prompt="Shoot some hoops"),
+    Activity("tennis", "active", ("tennis", "padel"), prompt="Play tennis"),
+    Activity("cricket", "active", ("cricket",), needs="cricket", prompt="Play cricket"),
+    Activity("baseball", "active", ("baseball", "softball"), needs="baseball", prompt="Play baseball"),
+    Activity("rugby", "active", ("rugby",), needs="rugby", prompt="Play rugby"),
+    Activity("golf", "leisure", ("golf",), needs="golf", prompt="Play golf"),
+    Activity("a picnic", "leisure", ("picnic",), prompt="Have a picnic"),
     Activity(
         "a barbecue", "leisure",
-        ("barbecue", "bbq", "braai", "nyama choma", "cookout", "grill"), night_ok=True,
+        ("barbecue", "bbq", "braai", "nyama choma", "asado", "cookout", "grill"),
+        night_ok=True, prompt="Have a barbecue",
     ),
-    Activity("gardening", "leisure", ("garden", "gardening", "planting")),
-    Activity("photography", "leisure", ("photo", "photos", "photography", "photograph")),
-    Activity("fishing", "leisure", ("fish", "fishing"), night_ok=True),
-    Activity("camping", "leisure", ("camp", "camping"), night_ok=True),
+    Activity("gardening", "leisure", ("garden", "gardening", "planting"), prompt="Do some gardening"),
     Activity(
-        "swimming", "water",
-        ("swim", "swimming", "beach", "surf", "surfing", "snorkel", "snorkelling", "snorkeling"),
+        "photography", "leisure",
+        ("photo", "photos", "photography", "photograph"), prompt="Take photos",
+    ),
+    Activity("fishing", "leisure", ("fish", "fishing"), night_ok=True, prompt="Go fishing"),
+    Activity("camping", "leisure", ("camp", "camping"), night_ok=True, prompt="Go camping"),
+    Activity("swimming", "water", ("swim", "swimming", "pool"), prompt="Go swimming"),
+    Activity(
+        "a beach day", "water",
+        ("beach", "seaside", "sunbathe", "sunbathing"), needs="coast", prompt="Go to the beach",
+    ),
+    Activity(
+        "surfing", "water",
+        ("surf", "surfing", "bodyboard", "bodyboarding"), needs="surf", prompt="Go surfing",
+    ),
+    Activity(
+        "snorkelling", "water",
+        ("snorkel", "snorkelling", "snorkeling", "scuba", "diving"),
+        needs="warm_coast", prompt="Go snorkelling",
     ),
     Activity(
         "snow sports", "snow",
         ("ski", "skiing", "snowboard", "snowboarding", "sled", "sledding", "snowman", "snowball"),
+        needs="snow", prompt="Go skiing",
     ),
     Activity(
         "stargazing", "sky",
-        ("stargaze", "stargazing", "stars", "astronomy", "telescope", "moon"), night_ok=True,
+        ("stargaze", "stargazing", "stars", "astronomy", "telescope", "moon"),
+        night_ok=True, prompt="Stargaze",
     ),
-    Activity("kite flying", "wind", ("kite", "kites")),
-    Activity("sailing", "wind", ("sail", "sailing", "windsurf", "windsurfing", "kitesurf", "kitesurfing")),
-    Activity("reading", "indoor", ("read", "reading", "book")),
-    Activity("a movie", "indoor", ("movie", "movies", "film", "cinema", "series")),
-    Activity("cooking", "indoor", ("cook", "cooking", "bake", "baking")),
-    Activity("games", "indoor", ("board game", "board games", "puzzle", "cards", "video game", "gaming")),
-    Activity("an indoor workout", "indoor", ("yoga", "gym", "workout", "dance", "dancing", "pilates")),
+    Activity("kite flying", "wind", ("kite", "kites"), prompt="Fly a kite"),
+    Activity(
+        "sailing", "wind",
+        ("sail", "sailing", "windsurf", "windsurfing", "kitesurf", "kitesurfing"),
+        needs="coast", prompt="Go sailing",
+    ),
+    Activity("reading", "indoor", ("read", "reading", "book"), prompt="Read a book"),
+    Activity("a movie", "indoor", ("movie", "movies", "film", "cinema", "series"), prompt="Watch a movie"),
+    Activity("cooking", "indoor", ("cook", "cooking", "bake", "baking"), prompt="Cook something new"),
+    Activity(
+        "games", "indoor",
+        ("board game", "board games", "puzzle", "cards", "video game", "gaming"), prompt="Play a game",
+    ),
+    Activity(
+        "an indoor workout", "indoor",
+        ("yoga", "gym", "workout", "dance", "dancing", "pilates"), prompt="Work out indoors",
+    ),
     Activity(
         "an indoor outing", "indoor",
         ("museum", "gallery", "library", "shopping", "mall", "cafe", "café", "coffee"),
+        prompt="Visit a museum or café",
     ),
-    Activity("a nap", "indoor", ("nap", "sleep")),
+    Activity("a nap", "indoor", ("nap", "sleep"), prompt="Take a nap"),
 )
 
 # Longest alias first, so "board game" wins over a shorter word inside it
@@ -116,14 +149,20 @@ PITCHES = {
     "football": "Round up whoever's around for a kickabout.",
     "basketball": "First to eleven. Loser buys the drinks.",
     "tennis": "Grab a racket and a partner — rallying counts.",
+    "cricket": "A bat, a ball and a few friends is a match.",
+    "baseball": "Play catch, or find a diamond and a few innings.",
+    "rugby": "Touch rugby counts — grab a ball and some space.",
     "golf": "A few holes, or a bucket of balls at the range.",
     "a picnic": "A blanket, some snacks and somewhere green.",
-    "a barbecue": "Fire it up — nyama choma tastes better with company.",
+    "a barbecue": "Fire up the grill — it tastes better with company.",
     "gardening": "Repot, weed or plant something you can eat later.",
     "photography": "Give yourself a theme — doors, shadows, reflections — and find ten.",
     "fishing": "Patience, a line and a flask of something warm.",
     "camping": "Even one night under canvas resets the week.",
     "swimming": "A few lengths, or just float and look at the sky.",
+    "a beach day": "Towel, sunscreen, something to read — the sea does the rest.",
+    "surfing": "Check the break, wax the board and paddle out.",
+    "snorkelling": "Mask on, face down — there's a whole world under there.",
     "snow sports": "Skis, a sled or a snowball — your call.",
     "stargazing": "Find a dark spot and see what you can name.",
     "kite flying": "Find an open field and let the wind do the work.",
@@ -135,6 +174,24 @@ PITCHES = {
     "an indoor workout": "Twenty minutes, your favourite playlist, done.",
     "an indoor outing": "A museum, a café or a library corner you haven't tried.",
     "a nap": "Twenty minutes. Set an alarm. No guilt.",
+}
+
+# Pitches in the local idiom, by (activity, country)
+LOCAL_PITCHES = {
+    ("a barbecue", "KE"): "Fire it up — nyama choma tastes better with company.",
+    ("a barbecue", "TZ"): "Fire it up — nyama choma tastes better with company.",
+    ("a barbecue", "UG"): "Get the muchomo going and call some friends.",
+    ("a barbecue", "ZA"): "Light the braai and call the neighbours.",
+    ("a barbecue", "NA"): "Light the braai and call the neighbours.",
+    ("a barbecue", "AR"): "Time for an asado — low heat, no rush.",
+    ("a barbecue", "UY"): "Time for an asado — low heat, no rush.",
+    ("a barbecue", "AU"): "Throw something on the barbie.",
+    ("a barbecue", "US"): "Fire up the grill for a cookout.",
+    ("running", "KE"): "You're in the home of distance running — go and see why.",
+    ("running", "ET"): "You're in the home of distance running — go and see why.",
+    ("cricket", "IN"): "A bat, a tennis ball and a quiet street is all gully cricket needs.",
+    ("cricket", "PK"): "A bat, a taped tennis ball and a quiet street is all you need.",
+    ("cycling", "NL"): "You're in the right country for it — just follow the bike paths.",
 }
 
 # Offered when the answer is no. All indoors, so they hold in any weather.
@@ -174,16 +231,42 @@ def _issues(
     temperature_c: float,
     humidity: float,
     wind_kph: float,
-    is_day: bool
+    is_day: bool,
+    place: Place | None = None
 ) -> list[tuple[int, str]]:
     """
     List what stands in the way, as (severity, reason).
 
-    Severity 1 is a caveat, 2 rules the activity out.
+    Severity 1 is a caveat, 2 rules the activity out. With a `place`, an
+    activity that can't be done there is ruled out before the weather is
+    looked at, and one that is uncommon there gets a caveat.
     """
     category = activity.category
     if category == "indoor":
         return []
+
+    local = None
+    if place is not None and activity.needs:
+        local = local_issue(activity.needs, activity.name, place, "snow" in condition.lower())
+        if local and local[0] == 2:
+            return [local]
+
+    return ([local] if local else []) + _weather_issues(
+        activity, condition, temperature_c, humidity, wind_kph, is_day, place
+    )
+
+
+def _weather_issues(
+    activity: Activity,
+    condition: str,
+    temperature_c: float,
+    humidity: float,
+    wind_kph: float,
+    is_day: bool,
+    place: Place | None
+) -> list[tuple[int, str]]:
+    """What the weather puts in the way of an outdoor activity, as (severity, reason)."""
+    category = activity.category
 
     issues: list[tuple[int, str]] = []
     condition_lower = condition.lower()
@@ -237,6 +320,10 @@ def _issues(
             issues.append((1, f"At {temp}°C it will feel bracing — keep it short."))
         elif temperature_c > 35:
             issues.append((1, f"It's {temp}°C — the water will be lovely, but cover up and find shade between dips."))
+        # In the sea rather than a pool, the water has its own temperature
+        sea = place.sea_temp_c if place is not None and activity.needs else None
+        if sea is not None and sea < 17:
+            issues.append((1, f"The sea is {round(sea)}°C — a wetsuit will make all the difference."))
     elif category == "active":
         if temperature_c > 35:
             issues.append((2, f"{temp}°C is heat-stress territory for anything energetic."))
@@ -286,7 +373,8 @@ def _good_news(
     condition: str,
     temperature_c: float,
     wind_kph: float,
-    is_day: bool
+    is_day: bool,
+    place: Place | None = None
 ) -> str:
     """Say why the conditions suit the activity."""
     temp = round(temperature_c)
@@ -307,6 +395,8 @@ def _good_news(
     if category == "wind":
         return f"A steady {wind} km/h breeze — just right."
     if category == "water":
+        if place is not None and activity.needs and place.sea_temp_c is not None:
+            return f"{condition.capitalize()} and {temp}°C, with the sea at {round(place.sea_temp_c)}°C — good conditions for it."
         return f"{condition.capitalize()} and {temp}°C — good conditions for getting in the water."
     return f"{condition.capitalize()} and {temp}°C with {wind} km/h of wind — hard to ask for more."
 
@@ -320,14 +410,17 @@ def check_activity(
     wind_kph: float,
     is_day: bool = True,
     rng: random.Random | None = None,
-    searched_as: str = ""
+    searched_as: str = "",
+    place: Place | None = None
 ) -> ActivityAdvice:
     """
-    Main entry point: judge whether the weather suits what the user wants to do.
+    Main entry point: judge whether what the user wants to do suits the weather and the place.
 
     `question` is free text ("Can I go for a run?"). An activity that isn't
     recognised is judged as general time outdoors. `searched_as` is what the
     user typed for the location; it is left out of the places to compare.
+    `place` holds the local facts (coast, height, country); without it only
+    the weather is judged.
 
     Returns: activity, recognised, verdict (go, maybe or skip), headline, reasons,
     suggestion, curiosity.
@@ -336,8 +429,23 @@ def check_activity(
     activity = found or Activity("time outdoors", "leisure", ())
     return _advise(
         activity, found is not None, location,
-        condition, temperature_c, humidity, wind_kph, is_day, rng or random, searched_as
+        condition, temperature_c, humidity, wind_kph, is_day, rng or random, searched_as, place
     )
+
+
+def local_activities(place: Place | None, condition: str = "") -> list[Activity]:
+    """
+    The activities that are practical at a place, local favourites first.
+
+    Leaves out anything the place can't offer or where it isn't commonly done.
+    Without a `place`, every activity is returned.
+    """
+    if place is None:
+        return list(ACTIVITIES)
+    snowing = "snow" in condition.lower()
+    favourites = LOCAL_FAVOURITES.get(place.country, ())
+    practical = [a for a in ACTIVITIES if is_local(a.needs, place, snowing)]
+    return sorted(practical, key=lambda a: a.name not in favourites)
 
 
 def random_activity(
@@ -349,36 +457,63 @@ def random_activity(
     is_day: bool = True,
     rng: random.Random | None = None,
     searched_as: str = "",
-    exclude: str = ""
+    exclude: str = "",
+    place: Place | None = None
 ) -> ActivityAdvice:
     """
-    Pick something to try that the current weather suits.
+    Pick something to try that suits the current weather and the place.
 
     Only activities with nothing standing in their way are picked, leaning
     towards outdoor ones when any qualify. Indoor activities always do, so
     there is always a pick. `exclude` is an activity name to leave out, so
     asking again gives something different.
 
+    With a `place`, activities it can't offer or where they aren't commonly
+    done are never picked, and local favourites come up more often.
+
     Returns the same shape as check_activity, with the verdict always "go".
     """
     rng = rng or random
-    suited = [
-        activity for activity in ACTIVITIES
-        if activity.name != exclude
-        and not _issues(activity, condition, temperature_c, humidity, wind_kph, is_day)
-    ]
-    outdoor = [activity for activity in suited if activity.category != "indoor"]
-    activity = rng.choice(outdoor if outdoor and rng.random() < 0.75 else suited)
+    activity = _pick(condition, temperature_c, humidity, wind_kph, is_day, rng, exclude, place)
 
     advice = _advise(
         activity, True, location,
-        condition, temperature_c, humidity, wind_kph, is_day, rng, searched_as
+        condition, temperature_c, humidity, wind_kph, is_day, rng, searched_as, place
     )
     advice["headline"] = rng.choice(RANDOM_HEADLINES).format(
         name=activity.name, place=location.split(",")[0]
     )
-    advice["reasons"].append(PITCHES[activity.name])
+    advice["reasons"].append(_pitch(activity, place))
     return advice
+
+
+def _pitch(activity: Activity, place: Place | None) -> str:
+    """The nudge for an activity, in the local idiom where there is one."""
+    country = place.country if place is not None else ""
+    return LOCAL_PITCHES.get((activity.name, country), PITCHES[activity.name])
+
+
+def _pick(
+    condition: str,
+    temperature_c: float,
+    humidity: float,
+    wind_kph: float,
+    is_day: bool,
+    rng: random.Random,
+    exclude: str,
+    place: Place | None
+) -> Activity:
+    """Choose an activity with nothing in its way, favouring the outdoors and local favourites."""
+    suited = [
+        activity for activity in local_activities(place, condition)
+        if activity.name != exclude
+        and not _issues(activity, condition, temperature_c, humidity, wind_kph, is_day, place)
+    ]
+    outdoor = [activity for activity in suited if activity.category != "indoor"]
+    pool = outdoor if outdoor and rng.random() < 0.75 else suited
+    favourites = LOCAL_FAVOURITES.get(place.country, ()) if place is not None else ()
+    weights = [3 if activity.name in favourites else 1 for activity in pool]
+    return rng.choices(pool, weights)[0]
 
 
 def _advise(
@@ -391,18 +526,27 @@ def _advise(
     wind_kph: float,
     is_day: bool,
     rng: random.Random,
-    searched_as: str
+    searched_as: str,
+    place: Place | None = None
 ) -> ActivityAdvice:
     """Build the advice for one activity."""
-    place = location.split(",")[0]
+    place_name = location.split(",")[0]
 
-    issues = _issues(activity, condition, temperature_c, humidity, wind_kph, is_day)
+    issues = _issues(activity, condition, temperature_c, humidity, wind_kph, is_day, place)
     severity = max((level for level, _ in issues), default=0)
     verdict = ("go", "maybe", "skip")[severity]
 
     reasons = [reason for _, reason in issues]
     if not reasons:
-        reasons.append(_good_news(activity, condition, temperature_c, wind_kph, is_day))
+        reasons.append(_good_news(activity, condition, temperature_c, wind_kph, is_day, place))
+
+    suggestion = None
+    if verdict == "skip" and place is not None and not is_local(activity.needs, place, "snow" in condition.lower()):
+        # The place rules it out, not the weather: offer something that works here
+        instead = _pick(condition, temperature_c, humidity, wind_kph, is_day, rng, activity.name, place)
+        suggestion = f"Something that does work in {place_name} right now: {instead.name}. {_pitch(instead, place)}"
+    elif verdict == "skip":
+        suggestion = rng.choice(INDOOR_SWAPS)
     if not recognised:
         reasons.insert(0, "I don't know that one yet, so this is for being outdoors in general.")
 
@@ -417,9 +561,9 @@ def _advise(
         "activity": activity.name,
         "recognised": recognised,
         "verdict": verdict,
-        "headline": rng.choice(HEADLINES[verdict]).format(name=activity.name, place=place),
+        "headline": rng.choice(HEADLINES[verdict]).format(name=activity.name, place=place_name),
         "reasons": reasons,
-        "suggestion": rng.choice(INDOOR_SWAPS) if verdict == "skip" else None,
+        "suggestion": suggestion,
         "curiosity": {
             "question": curiosity_question,
             "places": curiosity.pick_places(

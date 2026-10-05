@@ -14,6 +14,7 @@ from app.models.db import Subscriber, create_tables, get_engine
 from app.services import mailer
 from app.services.activity_advisor import check_activity, random_activity
 from app.services.curiosity import curiosity_prompts
+from app.services.locality import build_place
 from app.services.mood_engine import build_summary, score_mood
 from app.services.weather import get_weather_client
 
@@ -134,13 +135,15 @@ async def send(subscriber: Subscriber, email: Email) -> bool:
 def daily_email(
     subscriber: Subscriber,
     forecast: dict[str, Any],
-    rng: random.Random | None = None
+    rng: random.Random | None = None,
+    sea: dict[str, Any] | None = None
 ) -> Email:
     """
     The daily alert: weather, mood, and an activity.
     
     The activity is the one the subscriber chose, judged against the weather,
-    or a random pick that suits it. `forecast` is WeatherClient.get_forecast's result.
+    or a random pick that suits it and the place. `forecast` is
+    WeatherClient.get_forecast's result and `sea` is get_sea's.
     """
     place = subscriber.place
     site = settings.public_url.rstrip("/")
@@ -170,10 +173,15 @@ def daily_email(
         paragraphs.append(outlook + ".")
     
     weather = (place, condition, temperature, humidity, wind, is_day)
+    local = {
+        "rng": rng,
+        "searched_as": subscriber.location,
+        "place": build_place(place, subscriber.lat, forecast, sea),
+    }
     if subscriber.activity:
-        advice = check_activity(subscriber.activity, *weather, rng=rng, searched_as=subscriber.location)
+        advice = check_activity(subscriber.activity, *weather, **local)
     else:
-        advice = random_activity(*weather, rng=rng, searched_as=subscriber.location)
+        advice = random_activity(*weather, **local)
     activity = " ".join([advice["headline"], *advice["reasons"]])
     if advice["suggestion"]:
         activity += f" {advice['suggestion']}"
@@ -243,7 +251,8 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
             
             # Follow daylight saving changes
             subscriber.utc_offset_seconds = forecast.get("utc_offset_seconds", subscriber.utc_offset_seconds)
-            if await send(subscriber, daily_email(subscriber, forecast)):
+            sea = await client.get_sea(subscriber.lat, subscriber.lon)
+            if await send(subscriber, daily_email(subscriber, forecast, sea=sea)):
                 subscriber.last_sent_on = local_date(subscriber.utc_offset_seconds, now_utc)
                 sent += 1
             session.add(subscriber)

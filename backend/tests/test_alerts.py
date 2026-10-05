@@ -57,6 +57,7 @@ def weather():
     """Fake weather client answering every forecast request with FORECAST."""
     client = AsyncMock()
     client.get_forecast = AsyncMock(return_value=FORECAST)
+    client.get_sea = AsyncMock(return_value={"coastal": False, "sea_temp_c": None})
     with patch("app.services.alerts.get_weather_client", return_value=client):
         yield client
 
@@ -88,9 +89,17 @@ class TestDailyEmail:
         assert "Today: light rain showers, 16 to 26°C, 40% chance of rain." in email.text
     
     def test_chosen_activity_is_judged_against_the_weather(self):
-        email = alerts.daily_email(make_subscriber(activity="snow sports"), FORECAST)
-        assert "snow sports" in email.text
-        assert "There's no snow falling and it's 22°C." in email.text
+        email = alerts.daily_email(make_subscriber(activity="stargazing"), FORECAST)
+        assert "stargazing" in email.text
+        assert "It's still daytime — but skies are clear, so tonight could be a good one." in email.text
+    
+    def test_random_pick_fits_the_place(self):
+        """Nairobi is inland and far from snow, whatever the forecast says."""
+        inland = {"coastal": False, "sea_temp_c": None}
+        for seed in range(60):
+            text = alerts.daily_email(make_subscriber(), FORECAST, rng=random.Random(seed), sea=inland).text
+            for absent in ["a beach day", "surfing", "snorkelling", "sailing", "snow sports", "cricket"]:
+                assert absent not in text
     
     def test_without_a_chosen_activity_one_is_picked(self):
         picks = {

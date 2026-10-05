@@ -4,7 +4,10 @@ import random
 
 import pytest
 from app.services import activity_advisor
-from app.services.activity_advisor import ACTIVITIES, check_activity, find_activity, random_activity
+from app.services.activity_advisor import (
+    ACTIVITIES, check_activity, find_activity, local_activities, random_activity
+)
+from app.services.locality import Place
 
 
 def advise(question, condition="Clear", temp=22, humidity=50, wind=10, is_day=True, location="Nairobi, KE"):
@@ -20,7 +23,9 @@ class TestFindActivity:
         ("Is it a good day for a PICNIC", "a picnic"),
         ("nyama choma with friends", "a barbecue"),
         ("should we play a board game", "games"),
-        ("go to the beach", "swimming"),
+        ("go to the beach", "a beach day"),
+        ("a dip in the pool", "swimming"),
+        ("catch some waves and surf", "surfing"),
         ("look at the stars", "stargazing"),
         ("fly a kite", "kite flying"),
     ])
@@ -199,3 +204,165 @@ class TestRandomActivity:
     
     def test_every_activity_has_a_pitch(self):
         assert set(activity_advisor.PITCHES) == {a.name for a in ACTIVITIES}
+    
+    def test_every_activity_has_a_prompt(self):
+        assert all(a.prompt for a in ACTIVITIES)
+    
+    def test_local_pitches_and_favourites_name_real_activities(self):
+        names = {a.name for a in ACTIVITIES}
+        assert {activity for activity, _ in activity_advisor.LOCAL_PITCHES} <= names
+        for favourites in activity_advisor.LOCAL_FAVOURITES.values():
+            assert set(favourites) <= names
+
+
+NAIROBI = Place(name="Nairobi", country="KE", lat=-1.29, elevation=1668, coastal=False)
+MOMBASA = Place(name="Mombasa", country="KE", lat=-4.05, elevation=19, coastal=True, sea_temp_c=27.6)
+CAPE_TOWN = Place(name="Cape Town", country="ZA", lat=-33.92, elevation=24, coastal=True, sea_temp_c=14.4)
+INNSBRUCK = Place(name="Innsbruck", country="AT", lat=47.27, elevation=574, coastal=False)
+MUMBAI = Place(name="Mumbai", country="IN", lat=19.08, elevation=8, coastal=True, sea_temp_c=28.5)
+UNKNOWN = Place(name="Somewhere")
+
+
+def advise_at(place, question, condition="Clear", temp=24, wind=15, is_day=True, seed=1):
+    return check_activity(
+        question, f"{place.name}, {place.country}", condition, temp, 50, wind, is_day,
+        rng=random.Random(seed), place=place
+    )
+
+
+class TestLocalFit:
+    """Test that advice fits the place, not just the weather."""
+    
+    def test_sea_activities_are_ruled_out_inland(self):
+        for question in ["beach", "surf", "snorkel", "sailing"]:
+            advice = advise_at(NAIROBI, question)
+            assert advice["verdict"] == "skip"
+            assert advice["reasons"] == [
+                f"Nairobi isn't on the coast, so {advice['activity']} would mean a trip to the sea first."
+            ]
+    
+    def test_sea_activities_work_on_the_coast(self):
+        assert advise_at(MOMBASA, "beach")["verdict"] == "go"
+        assert "with the sea at 28°C" in advise_at(MOMBASA, "beach")["reasons"][0]
+        assert advise_at(MOMBASA, "snorkel")["verdict"] == "go"
+    
+    def test_swimming_is_fine_anywhere(self):
+        """A pool doesn't need a coast."""
+        assert advise_at(NAIROBI, "swim")["verdict"] == "go"
+    
+    def test_cold_sea_rules_out_snorkelling_and_needs_a_wetsuit_otherwise(self):
+        assert advise_at(CAPE_TOWN, "snorkel")["verdict"] == "skip"
+        surf = advise_at(CAPE_TOWN, "surf")
+        assert surf["verdict"] == "maybe"
+        assert surf["reasons"] == ["The sea is 14°C — a wetsuit will make all the difference."]
+    
+    def test_snow_sports_need_snow_country(self):
+        advice = advise_at(NAIROBI, "ski", temp=-2)
+        assert advice["verdict"] == "skip"
+        assert "aren't something people do around Nairobi" in advice["reasons"][0]
+        # In the Alps the answer depends on the weather again
+        assert advise_at(INNSBRUCK, "ski", condition="Snow", temp=-2)["verdict"] == "go"
+        assert advise_at(INNSBRUCK, "ski", temp=-2)["verdict"] == "maybe"
+    
+    def test_snow_falling_makes_snow_play_possible_anywhere(self):
+        assert advise_at(NAIROBI, "build a snowman", condition="Snow", temp=-1)["verdict"] == "go"
+    
+    def test_low_warm_parts_of_a_skiing_country_do_not_count(self):
+        sydney = Place(name="Sydney", country="AU", lat=-33.87, elevation=40, coastal=True)
+        assert advise_at(sydney, "ski")["verdict"] == "skip"
+    
+    def test_uncommon_sports_get_a_caveat_not_a_refusal(self):
+        advice = advise_at(NAIROBI, "cricket")
+        assert advice["verdict"] == "maybe"
+        assert "isn't widely played around Nairobi" in advice["reasons"][0]
+        assert advise_at(MUMBAI, "cricket")["verdict"] == "go"
+    
+    def test_place_refusal_suggests_something_that_works_there(self):
+        practical = {a.name for a in local_activities(NAIROBI)}
+        for seed in range(30):
+            suggestion = advise_at(NAIROBI, "surf", seed=seed)["suggestion"]
+            assert suggestion.startswith("Something that does work in Nairobi right now: ")
+            assert any(f": {name}. " in suggestion for name in practical)
+    
+    def test_unknown_facts_get_the_benefit_of_the_doubt_when_asked(self):
+        assert advise_at(UNKNOWN, "beach")["verdict"] == "go"
+        assert advise_at(UNKNOWN, "cricket")["verdict"] == "go"
+
+
+class TestLocalActivities:
+    """Test which activities are offered for a place."""
+    
+    def test_inland_kenya(self):
+        names = [a.name for a in local_activities(NAIROBI)]
+        for absent in ["a beach day", "surfing", "snorkelling", "sailing", "snow sports", "cricket", "baseball", "golf"]:
+            assert absent not in names
+        for present in ["running", "football", "a barbecue", "hiking", "rugby", "swimming", "reading"]:
+            assert present in names
+    
+    def test_local_favourites_come_first(self):
+        names = [a.name for a in local_activities(NAIROBI)]
+        assert set(names[:5]) == {"running", "football", "a barbecue", "hiking", "rugby"}
+    
+    def test_coast_adds_sea_activities(self):
+        names = {a.name for a in local_activities(MOMBASA)}
+        assert {"a beach day", "snorkelling", "sailing"} <= names
+    
+    def test_surfing_needs_a_surfing_country_as_well_as_a_coast(self):
+        assert "surfing" not in {a.name for a in local_activities(MOMBASA)}
+        assert "surfing" in {a.name for a in local_activities(CAPE_TOWN)}
+        asked = advise_at(MOMBASA, "surf")
+        assert asked["verdict"] == "maybe"
+        assert "isn't a big thing around Mombasa" in asked["reasons"][0]
+    
+    def test_cold_sea_leaves_out_snorkelling(self):
+        names = {a.name for a in local_activities(CAPE_TOWN)}
+        assert "surfing" in names
+        assert "snorkelling" not in names
+    
+    def test_alps_offer_snow_sports(self):
+        assert "snow sports" in {a.name for a in local_activities(INNSBRUCK)}
+    
+    def test_unknown_place_offers_nothing_that_needs_confirming(self):
+        assert all(not a.needs for a in local_activities(UNKNOWN))
+    
+    def test_no_place_means_everything(self):
+        assert local_activities(None) == list(ACTIVITIES)
+
+
+class TestLocalRandomActivity:
+    """Test that random picks fit the place."""
+    
+    def picks(self, place, condition="Clear", temp=24, wind=15, is_day=True, count=300):
+        return [
+            random_activity(
+                f"{place.name}, {place.country}", condition, temp, 50, wind, is_day,
+                rng=random.Random(seed), place=place
+            )
+            for seed in range(count)
+        ]
+    
+    def test_never_picks_what_the_place_cannot_offer(self):
+        practical = {a.name for a in local_activities(NAIROBI)}
+        assert {advice["activity"] for advice in self.picks(NAIROBI)} <= practical
+        # Even with snow-sport temperatures and kite-surfing wind
+        cold = {advice["activity"] for advice in self.picks(NAIROBI, temp=-3, wind=25)}
+        assert not cold & {"snow sports", "sailing", "surfing", "a beach day"}
+    
+    def test_coast_brings_out_the_sea(self):
+        picked = {advice["activity"] for advice in self.picks(MOMBASA, temp=29)}
+        assert picked & {"a beach day", "surfing", "snorkelling", "sailing"}
+    
+    def test_local_favourites_come_up_more_often(self):
+        names = [advice["activity"] for advice in self.picks(NAIROBI, count=600)]
+        assert names.count("running") > names.count("tennis") * 1.5
+    
+    def test_pitch_uses_the_local_idiom(self):
+        def barbecue_pitch(place):
+            return next(
+                advice["reasons"][-1] for advice in self.picks(place, count=600)
+                if advice["activity"] == "a barbecue"
+            )
+        
+        london = Place(name="London", country="GB", lat=51.5, elevation=16, coastal=False)
+        assert "nyama choma" in barbecue_pitch(NAIROBI)
+        assert "nyama choma" not in barbecue_pitch(london)
