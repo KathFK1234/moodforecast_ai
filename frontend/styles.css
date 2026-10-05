@@ -246,6 +246,7 @@ body {
 
 .search button,
 .activity-form button,
+.opt-out-form button,
 .subscribe-button {
     padding: 11px 22px;
     border: none;
@@ -261,18 +262,21 @@ body {
 
 .search button:hover,
 .activity-form button:hover,
+.opt-out-form button:hover,
 .subscribe-button:hover {
     transform: translateY(-1px);
 }
 
 .search button:active,
 .activity-form button:active,
+.opt-out-form button:active,
 .subscribe-button:active {
     transform: translateY(0);
 }
 
 .search button:disabled,
 .activity-form button:disabled,
+.opt-out-form button:disabled,
 .subscribe-button:disabled {
     opacity: 0.55;
     cursor: progress;
@@ -857,13 +861,15 @@ body {
     min-width: 0;
 }
 
-.activity-form .button-ghost {
+.activity-form .button-ghost,
+.opt-out-form button {
     background: transparent;
     border: 1px solid var(--field-line);
     color: var(--ink);
 }
 
-.activity-form .button-ghost:hover {
+.activity-form .button-ghost:hover,
+.opt-out-form button:hover {
     background: rgba(255, 255, 255, 0.12);
 }
 
@@ -1067,14 +1073,43 @@ body {
     cursor: progress;
 }
 
+/* Opting out, under the subscribe form */
+.opt-out {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--card-line);
+}
+
 .subscription-status {
-    grid-column: 1 / -1;
     font-size: 13px;
-    color: var(--ink-3);
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+
+.subscription-status + .subscription-status {
+    margin-top: 4px;
+}
+
+.opt-out-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    max-width: 460px;
+    margin-top: 12px;
+}
+
+.opt-out-form .form-group {
+    flex: 1;
+    min-width: 0;
+}
+
+.opt-out .notice {
+    margin-top: 12px;
 }
 
 .link-button {
-    padding: 0;
+    /* Padding makes a comfortable tap target without moving the text */
+    padding: 6px 0;
     border: none;
     background: none;
     color: var(--accent-ink);
@@ -1229,6 +1264,11 @@ body {
 
     .activity-form {
         flex-wrap: wrap;
+    }
+
+    .opt-out-form {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .activity-form input {

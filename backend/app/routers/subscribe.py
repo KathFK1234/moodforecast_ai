@@ -140,7 +140,10 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeL
     out who is. Returns 503 if email is not configured.
     """
     if not mailer.is_configured():
-        raise HTTPException(status_code=503, detail="Email is not set up on this server")
+        raise HTTPException(
+            status_code=503,
+            detail="Unsubscribing here isn't available right now. Use the Unsubscribe link in any alert email instead."
+        )
     
     engine = get_engine()
     with Session(engine) as session:

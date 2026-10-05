@@ -687,53 +687,63 @@ function rememberSubscription(subscription) {
 }
 
 function showSubscription(subscription) {
-    el('subscriptionStatus').classList.toggle('hidden', !subscription);
+    const status = el('subscriptionStatus');
+    status.classList.toggle('hidden', !subscription);
     if (subscription) {
-        el('subscriptionText').textContent = `Daily alerts for ${subscription.location} go to ${subscription.email}.`;
+        status.textContent = `You're subscribed: daily alerts for ${subscription.location} go to ${subscription.email}.`;
     }
 }
 
-async function handleUnsubscribe() {
-    const subscription = savedSubscription();
-    if (!subscription) return;
-
-    const btn = el('unsubscribeBtn');
-    btn.disabled = true;
-    try {
-        const data = await postUnsubscribe(subscription.token);
-        rememberSubscription(null);
-        showNotice(el('subscribeMessage'), `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
-    } catch (error) {
-        showNotice(el('subscribeMessage'), error.message, true);
-    } finally {
-        btn.disabled = false;
+// Open or close the opt-out form, starting from the address this browser subscribed with
+function toggleOptOut() {
+    const form = el('optOutForm');
+    const opening = form.classList.contains('hidden');
+    form.classList.toggle('hidden', !opening);
+    el('optOutToggle').setAttribute('aria-expanded', opening ? 'true' : 'false');
+    el('optOutMessage').classList.add('hidden');
+    if (opening) {
+        const saved = savedSubscription();
+        el('optOutEmail').value = (saved && saved.email) || el('emailInput').value.trim();
+        el('optOutEmail').focus();
     }
 }
 
-// For a subscription this browser doesn't remember: email the unsubscribe link
-async function handleUnsubscribeLink() {
-    const email = el('emailInput').value.trim();
-    const msg = el('subscribeMessage');
+// Unsubscribe straight away if this browser made the subscription; otherwise
+// email a link, so nobody can unsubscribe an address that isn't theirs
+async function handleOptOut(event) {
+    event.preventDefault();
+    const email = el('optOutEmail').value.trim();
+    const msg = el('optOutMessage');
     if (!email) {
         showNotice(msg, 'Enter the email address you subscribed with.', true);
         return;
     }
 
-    const btn = el('unsubscribeLinkBtn');
+    const btn = el('optOutBtn');
     btn.disabled = true;
     try {
-        let res;
-        try {
-            res = await fetch(`${API_BASE}/api/unsubscribe-link`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-        } catch (e) {
-            throw new Error('Could not reach the server. Check your connection and try again.');
+        const saved = savedSubscription();
+        if (saved && saved.email === email.toLowerCase()) {
+            const data = await postUnsubscribe(saved.token);
+            rememberSubscription(null);
+            el('subscribeMessage').classList.add('hidden');  // The "Subscribed" confirmation no longer holds
+            showNotice(msg, `${data.email} has been unsubscribed. You won't get any more daily alerts.`, false);
+        } else {
+            let res;
+            try {
+                res = await fetch(`${API_BASE}/api/unsubscribe-link`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+            } catch (e) {
+                throw new Error('Could not reach the server. Check your connection and try again.');
+            }
+            if (!res.ok) throw new Error(await errorMessage(res, 'Could not unsubscribe. Please try again.'));
+            showNotice(msg, `Check your inbox. If ${email} is subscribed, we've sent a link to finish unsubscribing.`, false);
         }
-        if (!res.ok) throw new Error(await errorMessage(res, 'Could not send the link. Please try again.'));
-        showNotice(msg, `If ${email} is subscribed, an unsubscribe link is on its way.`, false);
+        el('optOutForm').classList.add('hidden');
+        el('optOutToggle').setAttribute('aria-expanded', 'false');
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
@@ -901,8 +911,8 @@ function init() {
     });
     el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
-    el('unsubscribeBtn').addEventListener('click', handleUnsubscribe);
-    el('unsubscribeLinkBtn').addEventListener('click', handleUnsubscribeLink);
+    el('optOutToggle').addEventListener('click', toggleOptOut);
+    el('optOutForm').addEventListener('submit', handleOptOut);
     showSubscription(savedSubscription());
 
     const params = new URLSearchParams(window.location.search);

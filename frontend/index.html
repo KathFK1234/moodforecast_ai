@@ -219,15 +219,24 @@
                         </div>
                         <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
                         <div id="subscribeMessage" class="notice hidden" role="status"></div>
-                        <p class="subscription-status">
-                            Subscribed on another device? Enter your email above and
-                            <button type="button" class="link-button" id="unsubscribeLinkBtn">get an unsubscribe link by email</button>.
-                        </p>
-                        <p id="subscriptionStatus" class="subscription-status hidden">
-                            <span id="subscriptionText"></span>
-                            <button type="button" class="link-button" id="unsubscribeBtn">Unsubscribe</button>
-                        </p>
                     </form>
+
+                    <!-- Opting out -->
+                    <div class="opt-out">
+                        <p id="subscriptionStatus" class="subscription-status hidden"></p>
+                        <p class="subscription-status">
+                            Already subscribed and want to opt out?
+                            <button type="button" class="link-button" id="optOutToggle" aria-expanded="false" aria-controls="optOutForm">Unsubscribe here</button>
+                        </p>
+                        <form id="optOutForm" class="opt-out-form hidden" novalidate>
+                            <div class="form-group">
+                                <label for="optOutEmail">Email you subscribed with</label>
+                                <input type="email" id="optOutEmail" placeholder="you@example.com" autocomplete="email" required>
+                            </div>
+                            <button type="submit" id="optOutBtn">Unsubscribe</button>
+                        </form>
+                        <div id="optOutMessage" class="notice hidden" role="status"></div>
+                    </div>
             </section>
         </main>
 
