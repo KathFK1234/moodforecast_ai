@@ -123,7 +123,8 @@ class WeatherClient:
                     "sunrise": "HH:MM" | None, "sunset": "HH:MM" | None (local time)
                 },
                 ...
-            ]
+            ],
+            "utc_offset_seconds": int (local time at the location minus UTC)
         }
         """
         cache_key = f"weather:{lat}:{lon}"
@@ -157,6 +158,7 @@ class WeatherClient:
                 "condition": self._get_condition_text(condition_code),
             },
             "daily": self._parse_daily(data.get("daily") or {}),
+            "utc_offset_seconds": int(data.get("utc_offset_seconds") or 0),
         }
         cache.set(cache_key, result)
         return result

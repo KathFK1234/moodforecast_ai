@@ -158,7 +158,10 @@ CURIOSITY_PLACES = {
 
 def find_activity(text: str) -> Activity | None:
     """Find the activity a question is about, e.g. "Can I go for a run?" -> running."""
-    text_lower = text.lower()
+    text_lower = text.strip().lower()
+    for activity in ACTIVITIES:
+        if text_lower == activity.name:
+            return activity
     for alias, activity in _ALIASES:
         if re.search(rf"\b{re.escape(alias)}\b", text_lower):
             return activity

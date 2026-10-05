@@ -190,19 +190,21 @@
             <!-- Subscribe -->
             <section class="card subscribe-card reveal" aria-labelledby="subHeading">
                     <h2 class="card-title" id="subHeading">Subscribe to daily alerts</h2>
-                    <p class="card-note">Register your number and location for mood and weather alerts.</p>
+                    <p class="card-note">Get a daily email with the mood forecast for your location and an activity to go with it.</p>
                     <form id="subscribeForm" class="subscribe-form" novalidate>
                         <div class="form-group">
-                            <label for="phoneInput">Phone number</label>
-                            <input type="tel" id="phoneInput" placeholder="+254712345678" autocomplete="tel" required>
+                            <label for="emailInput">Email</label>
+                            <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" required>
                         </div>
                         <div class="form-group">
-                            <label for="cropLocationInput">Location</label>
-                            <input type="text" id="cropLocationInput" placeholder="Your location" required>
+                            <label for="subLocationInput">Location</label>
+                            <input type="text" id="subLocationInput" placeholder="Your location" autocomplete="off" required>
                         </div>
                         <div class="form-group">
-                            <label for="cropInput">Crop <span class="optional">optional</span></label>
-                            <input type="text" id="cropInput" placeholder="e.g. Maize, Tea, Wheat">
+                            <label for="activitySelect">Activity</label>
+                            <select id="activitySelect">
+                                <option value="">Surprise me each day</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="languageSelect">Language</label>

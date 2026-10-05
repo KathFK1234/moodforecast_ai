@@ -2,28 +2,45 @@
 
 import re
 from pydantic import BaseModel, Field, field_validator
+from app.services.activity_advisor import find_activity
 
 
-E164_PATTERN = re.compile(r"\+[1-9]\d{7,14}")
+EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def normalise_email(value: str) -> str:
+    """Trim and lowercase an email address, rejecting anything that isn't one."""
+    value = value.strip().lower()
+    if len(value) > 254 or not EMAIL_PATTERN.fullmatch(value):
+        raise ValueError("Enter a valid email address")
+    return value
 
 
 # Request Models
 
 class SubscribeRequest(BaseModel):
-    """SMS subscriber registration request."""
-    phone: str = Field(..., description="E.164 format, e.g. +254712345678")
+    """Daily alert subscription request."""
+    email: str = Field(..., description="Where to send the daily alert")
     location: str = Field(..., description="City name or lat/lon coordinates")
-    crop: str | None = Field(None, description="Crop type (optional)")
+    activity: str | None = Field(None, description="Activity to report on each day; omit for a random pick")
     language: str = Field("en", description="en or sw")
     
-    @field_validator("phone")
+    @field_validator("email")
     @classmethod
-    def validate_phone(cls, v: str) -> str:
-        """Validate E.164 format: '+', then 8-15 digits, not starting with 0."""
-        v = v.strip().replace(" ", "")
-        if not E164_PATTERN.fullmatch(v):
-            raise ValueError("Phone must be in E.164 format (e.g., +254712345678)")
-        return v
+    def validate_email(cls, v: str) -> str:
+        """Email is stored trimmed and lowercase."""
+        return normalise_email(v)
+    
+    @field_validator("activity")
+    @classmethod
+    def validate_activity(cls, v: str | None) -> str | None:
+        """Activity must be one the advisor knows; blank means a random pick."""
+        if v is None or not v.strip():
+            return None
+        activity = find_activity(v)
+        if activity is None:
+            raise ValueError(f"Unknown activity '{v.strip()}'")
+        return activity.name
     
     @field_validator("location")
     @classmethod
@@ -129,9 +146,10 @@ class ActivityResponse(BaseModel):
 class SubscribeResponse(BaseModel):
     """Subscription response."""
     subscriber_id: str
-    phone: str
-    location: str
-    status: str = "subscribed"
+    email: str
+    location: str = Field(..., description="Resolved display name")
+    activity: str | None = None
+    status: str = Field("subscribed", description="subscribed, or updated if the email was already subscribed")
 
 
 class HealthResponse(BaseModel):

@@ -2,11 +2,17 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from app.services.weather import get_weather_client
-from app.services.activity_advisor import check_activity, random_activity
+from app.services.activity_advisor import ACTIVITIES, check_activity, random_activity
 from app.models.schemas import ActivityResponse
 from app.routers.common import build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["activity"])
+
+
+@router.get("/activities")
+async def list_activities() -> list[str]:
+    """Names of the activities the advisor knows, e.g. for a subscription form."""
+    return [activity.name for activity in ACTIVITIES]
 
 
 @router.get("/activity/{location}")

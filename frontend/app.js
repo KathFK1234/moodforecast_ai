@@ -127,7 +127,7 @@ async function handleSearch(location) {
         displayForecast(forecastData.daily || []);
         displayWellbeing(wellbeingData);
 
-        el('cropLocationInput').value = wellbeingData.location;
+        el('subLocationInput').value = location;
         currentLocation = location;
         el('activityPlace').textContent = wellbeingData.location;
         if (lastActivity) askActivity(lastActivity);
@@ -609,14 +609,14 @@ function replayReveal() {
 async function handleSubscribe(event) {
     event.preventDefault();
 
-    const phone = el('phoneInput').value.trim();
-    const location = el('cropLocationInput').value.trim();
-    const crop = el('cropInput').value.trim() || null;
+    const email = el('emailInput').value.trim();
+    const location = el('subLocationInput').value.trim();
+    const activity = el('activitySelect').value || null;
     const language = el('languageSelect').value;
     const msg = el('subscribeMessage');
 
-    if (!phone || !location) {
-        showNotice(msg, 'Enter a phone number and a location.', true);
+    if (!email || !location) {
+        showNotice(msg, 'Enter an email address and a location.', true);
         return;
     }
 
@@ -630,7 +630,7 @@ async function handleSubscribe(event) {
             res = await fetch(`${API_BASE}/api/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, location, crop, language })
+                body: JSON.stringify({ email, location, activity, language })
             });
         } catch (e) {
             throw new Error('Could not reach the server. Check your connection and try again.');
@@ -639,14 +639,32 @@ async function handleSubscribe(event) {
         if (!res.ok) throw new Error(await errorMessage(res, 'Subscription failed. Please try again.'));
 
         const data = await res.json();
-        showNotice(msg, `Subscribed. Your subscriber ID is ${data.subscriber_id}`, false);
-        el('phoneInput').value = '';
-        el('cropInput').value = '';
+        const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
+        showNotice(
+            msg,
+            `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}.`,
+            false
+        );
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Subscribe';
+    }
+}
+
+// Fill the subscription form's activity choices from the advisor's list
+async function loadActivityChoices() {
+    try {
+        const activities = await fetchJson('/api/activities', '');
+        activities.forEach((name) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+            el('activitySelect').appendChild(option);
+        });
+    } catch (e) {
+        // The form still works with the default random pick
     }
 }
 
@@ -699,13 +717,14 @@ function init() {
     el('brandMark').innerHTML = icon('partly-day');
     el('searchIcon').innerHTML = icon('search');
     buildChips();
+    loadActivityChoices();
 
     el('searchForm').addEventListener('submit', (event) => {
         event.preventDefault();
         handleSearch(el('locationInput').value);
     });
     attachSuggestions(el('locationInput'), handleSearch);
-    attachSuggestions(el('cropLocationInput'));
+    attachSuggestions(el('subLocationInput'));
 
     el('activityForm').addEventListener('submit', (event) => {
         event.preventDefault();

@@ -12,13 +12,25 @@ from app.models.db import Subscriber
 client = TestClient(app)
 
 
+def memory_engine():
+    """A fresh in-memory database with the tables created."""
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool
+    )
+    SQLModel.metadata.create_all(engine)
+    return engine
+
+
 @pytest.fixture
 def mock_weather():
     """Mock weather client for all tests."""
     with patch('app.routers.forecast.get_weather_client') as mock_forecast, \
          patch('app.routers.wellbeing.get_weather_client') as mock_wellbeing, \
          patch('app.routers.activity.get_weather_client') as mock_activity, \
-         patch('app.routers.subscribe.get_engine'):
+         patch('app.routers.subscribe.get_weather_client') as mock_subscribe, \
+         patch('app.routers.subscribe.get_engine', return_value=memory_engine()):
         
         mock_client = AsyncMock()
         
@@ -55,12 +67,14 @@ def mock_weather():
                     "humidity": 90, "precipitation_chance": 100, "uv_index": 2.0,
                     "sunrise": "06:17", "sunset": "18:24"
                 },
-            ]
+            ],
+            "utc_offset_seconds": 10800
         })
         
         mock_forecast.return_value = mock_client
         mock_wellbeing.return_value = mock_client
         mock_activity.return_value = mock_client
+        mock_subscribe.return_value = mock_client
         
         yield mock_client
 
@@ -72,38 +86,32 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.asyncio
-async def test_subscribe_endpoint_valid(mock_weather):
+def test_subscribe_endpoint_valid(mock_weather):
     """POST /api/subscribe with valid data should return 201."""
     response = client.post("/api/subscribe", json={
-        "phone": "+254712345678",
+        "email": "amina@example.com",
         "location": "Nairobi",
-        "crop": "maize",
+        "activity": "running",
         "language": "en"
     })
     assert response.status_code == 201
     data = response.json()
     
     assert "subscriber_id" in data
-    assert data["phone"] == "+254712345678"
-    assert data["location"] == "Nairobi"
+    assert data["email"] == "amina@example.com"
+    assert data["location"] == "Nairobi, KE"
+    assert data["activity"] == "running"
     assert data["status"] == "subscribed"
 
 
-def test_subscribe_persists_subscriber():
+def test_subscribe_persists_subscriber(mock_weather):
     """POST /api/subscribe should store the subscriber in the database."""
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool
-    )
-    SQLModel.metadata.create_all(engine)
+    engine = memory_engine()
     
     with patch('app.routers.subscribe.get_engine', return_value=engine):
         response = client.post("/api/subscribe", json={
-            "phone": "+254712345678",
-            "location": "Nairobi",
-            "crop": "maize",
+            "email": "amina@example.com",
+            "location": "nairobi",
             "language": "sw"
         })
     assert response.status_code == 201
@@ -111,50 +119,96 @@ def test_subscribe_persists_subscriber():
     with Session(engine) as session:
         subscribers = session.exec(select(Subscriber)).all()
     assert len(subscribers) == 1
-    assert subscribers[0].id == response.json()["subscriber_id"]
-    assert subscribers[0].phone == "+254712345678"
-    assert subscribers[0].language == "sw"
-    assert subscribers[0].active is True
-    assert subscribers[0].created_at is not None
+    subscriber = subscribers[0]
+    assert subscriber.id == response.json()["subscriber_id"]
+    assert subscriber.email == "amina@example.com"
+    assert subscriber.location == "nairobi"
+    assert subscriber.place == "Nairobi, KE"
+    assert (subscriber.lat, subscriber.lon) == (-1.2921, 36.8219)
+    assert subscriber.utc_offset_seconds == 10800
+    assert subscriber.activity is None
+    assert subscriber.language == "sw"
+    assert subscriber.active is True
+    assert subscriber.token
+    assert subscriber.created_at is not None
+    assert subscriber.last_sent_on is None
 
 
-@pytest.mark.asyncio
-async def test_subscribe_endpoint_invalid_phone(mock_weather):
-    """POST /api/subscribe with invalid phone format should return 422."""
+def test_subscribing_again_updates_the_subscription(mock_weather):
+    """The same email should not be stored twice."""
+    engine = memory_engine()
+    
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        first = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        second = client.post("/api/subscribe", json={
+            "email": " Amina@Example.com ", "location": "Nairobi", "activity": "a picnic"
+        })
+    assert first.json()["status"] == "subscribed"
+    assert second.status_code == 201
+    assert second.json()["status"] == "updated"
+    assert second.json()["subscriber_id"] == first.json()["subscriber_id"]
+    
+    with Session(engine) as session:
+        subscribers = session.exec(select(Subscriber)).all()
+    assert len(subscribers) == 1
+    assert subscribers[0].activity == "a picnic"
+
+
+@pytest.mark.parametrize("email", ["invalid", "amina@", "@example.com", "amina@example", "a b@example.com", ""])
+def test_subscribe_rejects_malformed_email(mock_weather, email):
+    """Emails need a name, an @ and a domain with a dot."""
+    response = client.post("/api/subscribe", json={"email": email, "location": "Nairobi"})
+    assert response.status_code == 422
+
+
+def test_subscribe_understands_activities_in_free_text(mock_weather):
+    """The activity is stored under the advisor's name for it."""
     response = client.post("/api/subscribe", json={
-        "phone": "invalid",
-        "location": "Nairobi"
+        "email": "amina@example.com", "location": "Nairobi", "activity": "Go for a run"
+    })
+    assert response.status_code == 201
+    assert response.json()["activity"] == "running"
+
+
+def test_subscribe_rejects_unknown_activity(mock_weather):
+    response = client.post("/api/subscribe", json={
+        "email": "amina@example.com", "location": "Nairobi", "activity": "underwater basket weaving"
     })
     assert response.status_code == 422
-
-
-@pytest.mark.parametrize("phone", ["+abcdefghijk", "+0712345678", "+2547", "+2547123456789012345", "254712345678"])
-def test_subscribe_rejects_malformed_phone(mock_weather, phone):
-    """Phone numbers must be '+' followed by 8-15 digits."""
-    response = client.post("/api/subscribe", json={"phone": phone, "location": "Nairobi"})
-    assert response.status_code == 422
-
-
-def test_subscribe_accepts_spaces_in_phone(mock_weather):
-    """Spaces are stripped before the number is stored."""
-    response = client.post("/api/subscribe", json={"phone": "+254 712 345 678", "location": "Nairobi"})
-    assert response.status_code == 201
-    assert response.json()["phone"] == "+254712345678"
 
 
 def test_subscribe_rejects_blank_location(mock_weather):
-    """A location of only spaces is not a location."""
-    response = client.post("/api/subscribe", json={"phone": "+254712345678", "location": "   "})
+    """Location is required, not just present."""
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "   "})
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
-async def test_subscribe_endpoint_missing_phone(mock_weather):
-    """POST /api/subscribe without phone should return 422."""
+def test_subscribe_rejects_unknown_location(mock_weather):
+    """An alert can't be sent for a place the geocoder can't find."""
+    mock_weather.get_location_by_name.return_value = {
+        "error": "Location 'UnknownPlace123' not found",
+        "lat": None,
+        "lon": None
+    }
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "UnknownPlace123"})
+    assert response.status_code == 422
+    assert "not found" in response.json()["detail"]
+
+
+def test_subscribe_endpoint_missing_email(mock_weather):
+    """POST /api/subscribe without email should return 422."""
     response = client.post("/api/subscribe", json={
         "location": "Nairobi"
     })
     assert response.status_code == 422
+
+
+def test_activities_endpoint():
+    """GET /api/activities should list the activities a subscriber can choose."""
+    response = client.get("/api/activities")
+    assert response.status_code == 200
+    assert "running" in response.json()
+    assert "stargazing" in response.json()
 
 
 def test_forecast_endpoint(mock_weather):
