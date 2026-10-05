@@ -87,7 +87,7 @@ async def get_coordinates(location: str) -> dict:
             "lat": float(data["lat"]),
             "lon": float(data["lon"]),
             # Prefer the place's proper name over what the user typed
-            "name": data.get("name") or location,
+            "name": (data.get("name") or location).removeprefix("City of "),
             "country": data.get("address", {}).get("country_code", "").upper(),
             "timezone": "",  # Nominatim doesn't provide timezone
         }
@@ -117,6 +117,8 @@ async def _search_nominatim(query: str) -> list[dict]:
                     "format": "json",
                     "limit": 1,
                     "addressdetails": 1,
+                    # Names as an English speaker would search for them: Sapporo, not 札幌市
+                    "accept-language": "en",
                 },
                 headers={"User-Agent": "MoodForecastAI/1.0"},
                 timeout=5.0

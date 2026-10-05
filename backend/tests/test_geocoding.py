@@ -182,3 +182,16 @@ async def test_unknown_location_says_what_to_try(monkeypatch):
     assert result["error"] == (
         "We couldn't find 'Zzyzx'. Check the spelling, or add the country (for example 'Kisumu, Kenya')."
     )
+
+
+@pytest.mark.asyncio
+async def test_lookup_asks_for_english_names_and_drops_city_of(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["accept-language"] == "en"
+        return httpx.Response(200, json=[{
+            "lat": "-1.95", "lon": "30.06", "name": "City of Kigali", "address": {"country_code": "rw"}
+        }])
+    
+    mock_nominatim(monkeypatch, handler)
+    result = await geocoding.get_coordinates("Kigali")
+    assert result["name"] == "Kigali"
