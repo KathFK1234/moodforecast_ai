@@ -314,7 +314,11 @@ Conditions are WMO weather codes, mapped to text in `CONDITION_MAP`.
 Location names are resolved in `app/services/geocoding.py`:
 
 - A built-in list of popular cities is checked first (no network call)
+- Then places already looked up since the server started, or offered as suggestions
 - Otherwise `GET https://nominatim.openstreetmap.org/search` (OpenStreetMap, no API key)
+- If Nominatim can't be reached, Open-Meteo's geocoder is tried instead
+
+Lookups for the same name made at the same moment share one request, which keeps the app within Nominatim's limit of one request per second for a single search.
 
 Suggestions while typing come from `GET https://geocoding-api.open-meteo.com/v1/search` instead, because Nominatim's usage policy does not allow autocomplete.
 

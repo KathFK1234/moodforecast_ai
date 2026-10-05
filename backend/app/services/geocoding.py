@@ -1,5 +1,6 @@
 """Geocoding service - Convert location names to coordinates."""
 
+import asyncio
 import httpx
 from app.services.cache import cache
 
@@ -29,21 +30,35 @@ POPULAR_LOCATIONS = {
 }
 
 
-# Coordinates of places offered as suggestions, keyed by lowercase label, so
-# picking one finds exactly that place without a second lookup.
+# Coordinates already worked out, keyed by lowercase name: places offered as
+# suggestions (so picking one finds exactly that place) and places looked up
+# before. Places don't move, so these are kept until the server restarts.
 _suggested: dict[str, dict] = {}
 MAX_SUGGESTED = 2000
+
+# Lookups in flight, by lowercase name, so identical ones share a single request.
+# A search asks for the forecast and the wellbeing score at the same moment, and
+# Nominatim allows one request per second.
+_pending: dict[str, asyncio.Future] = {}
+
+
+def _remember(name: str, result: dict) -> None:
+    """Keep a place's coordinates for later lookups of the same name."""
+    if len(_suggested) >= MAX_SUGGESTED:
+        _suggested.clear()
+    _suggested[name.lower()] = result
 
 
 async def get_coordinates(location: str) -> dict:
     """
     Convert location name to coordinates.
     
-    Checks the hardcoded popular locations and places recently offered as
-    suggestions first, then Nominatim (OpenStreetMap).
+    Checks the hardcoded popular locations, then places already looked up or
+    offered as suggestions, then Nominatim (OpenStreetMap). If Nominatim can't
+    be reached, Open-Meteo's geocoder is tried instead.
     Cache key: geo:{location_name}
     
-    Raises TimeoutError / RuntimeError if the online lookup fails.
+    Raises TimeoutError / RuntimeError if both online lookups fail.
     
     Returns: {
         "lat": float,
@@ -67,23 +82,50 @@ async def get_coordinates(location: str) -> dict:
         cache.set(cache_key, result)
         return result
     
-    # A suggestion the user picked
+    # Looked up before, or a suggestion the user picked
     if location_lower in _suggested:
         result = _suggested[location_lower].copy()
         cache.set(cache_key, result)
         return result
     
-    # Try online geocoding via Nominatim (free, no API key needed)
-    matches = await _search_nominatim(location)
+    # Look it up online, sharing the request with anyone already asking for the same place
+    pending = _pending.get(location_lower)
+    if pending is None:
+        pending = asyncio.ensure_future(_look_up(location))
+        _pending[location_lower] = pending
+        pending.add_done_callback(lambda _: _pending.pop(location_lower, None))
+    result = await asyncio.shield(pending)
     
-    # "Town, Region, Country" can fail on the region's spelling - retry without it
-    parts = [part.strip() for part in location.split(",")]
-    if not matches and len(parts) >= 3:
-        matches = await _search_nominatim(f"{parts[0]}, {parts[-1]}")
+    if "error" not in result:
+        cache.set(cache_key, result)
+        _remember(location, result)
+    return result.copy()
+
+
+async def _look_up(location: str) -> dict:
+    """
+    Find a place online: Nominatim first, Open-Meteo's geocoder if Nominatim fails.
+    
+    Returns the coordinates, or a dict with "error" if neither knows the place.
+    Raises TimeoutError / RuntimeError if neither could be reached.
+    """
+    # Try online geocoding via Nominatim (free, no API key needed)
+    try:
+        matches = await _search_nominatim(location)
+        
+        # "Town, Region, Country" can fail on the region's spelling - retry without it
+        parts = [part.strip() for part in location.split(",")]
+        if not matches and len(parts) >= 3:
+            matches = await _search_nominatim(f"{parts[0]}, {parts[-1]}")
+    except (TimeoutError, RuntimeError):
+        fallback = await _search_open_meteo(location)
+        if fallback:
+            return fallback
+        raise
     
     if matches:
         data = matches[0]
-        result = {
+        return {
             "lat": float(data["lat"]),
             "lon": float(data["lon"]),
             # Prefer the place's proper name over what the user typed
@@ -91,14 +133,49 @@ async def get_coordinates(location: str) -> dict:
             "country": data.get("address", {}).get("country_code", "").upper(),
             "timezone": "",  # Nominatim doesn't provide timezone
         }
-        cache.set(cache_key, result)
-        return result
     
     # Location not found
     return {
         "error": f"We couldn't find '{location}'. Check the spelling, or add the country (for example 'Kisumu, Kenya').",
         "lat": None,
         "lon": None
+    }
+
+
+async def _search_open_meteo(location: str) -> dict | None:
+    """
+    Find a place with Open-Meteo's geocoder, for when Nominatim can't be reached.
+    
+    It searches by name only, so "Kisumu, Kenya" is searched as "Kisumu" and
+    the rest is used to choose between places of that name. Returns None if
+    nothing matches or this lookup fails too.
+    """
+    name, *hints = [part.strip().lower() for part in location.split(",") if part.strip()]
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": name, "count": 10, "language": "en", "format": "json"},
+                timeout=5.0
+            )
+            response.raise_for_status()
+            matches = response.json().get("results") or []
+    except (httpx.HTTPError, ValueError):
+        return None
+    
+    def fits(match: dict) -> bool:
+        described = {str(match.get(key, "")).lower() for key in ("country", "country_code", "admin1")}
+        return all(hint in described for hint in hints)
+    
+    match = next((m for m in matches if fits(m)), None)
+    if match is None or match.get("latitude") is None or match.get("longitude") is None:
+        return None
+    return {
+        "lat": float(match["latitude"]),
+        "lon": float(match["longitude"]),
+        "name": match.get("name") or location,
+        "country": match.get("country_code", ""),
+        "timezone": match.get("timezone", ""),
     }
 
 
@@ -193,15 +270,13 @@ async def suggest_locations(query: str, limit: int = 5) -> list[dict]:
         seen.add(label)
         suggestions.append({"name": name, "region": region, "country": country, "label": label})
         if match.get("latitude") is not None and match.get("longitude") is not None:
-            if len(_suggested) >= MAX_SUGGESTED:
-                _suggested.clear()
-            _suggested[label.lower()] = {
+            _remember(label, {
                 "lat": float(match["latitude"]),
                 "lon": float(match["longitude"]),
                 "name": name,
                 "country": match.get("country_code", ""),
                 "timezone": match.get("timezone", ""),
-            }
+            })
         if len(suggestions) == limit:
             break
     

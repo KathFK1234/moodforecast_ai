@@ -1,5 +1,7 @@
 """Unit tests for the geocoding service - HTTP layer is mocked."""
 
+import asyncio
+
 import httpx
 import pytest
 from app.services import geocoding
@@ -195,3 +197,93 @@ async def test_lookup_asks_for_english_names_and_drops_city_of(monkeypatch):
     mock_nominatim(monkeypatch, handler)
     result = await geocoding.get_coordinates("Kigali")
     assert result["name"] == "Kigali"
+
+
+@pytest.mark.asyncio
+async def test_simultaneous_lookups_share_one_request(monkeypatch):
+    """A search looks the same place up twice at once; Nominatim should hear about it once."""
+    calls = 0
+    
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.01)
+        return httpx.Response(200, json=[{
+            "lat": "-4.05", "lon": "39.67", "name": "Mombasa", "address": {"country_code": "ke"}
+        }])
+    
+    mock_nominatim(monkeypatch, handler)
+    first, second = await asyncio.gather(
+        geocoding.get_coordinates("Mombasa"), geocoding.get_coordinates("mombasa")
+    )
+    assert first == second
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_a_place_is_only_looked_up_once_even_after_the_cache_expires(monkeypatch):
+    calls = 0
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=[{
+            "lat": "-4.05", "lon": "39.67", "name": "Mombasa", "address": {"country_code": "ke"}
+        }])
+    
+    mock_nominatim(monkeypatch, handler)
+    first = await geocoding.get_coordinates("Mombasa")
+    cache.clear()
+    assert await geocoding.get_coordinates("Mombasa") == first
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_falls_back_to_open_meteo_when_nominatim_is_down(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "nominatim.openstreetmap.org":
+            raise httpx.ReadTimeout("timed out", request=request)
+        assert request.url.params["name"] == "kisumu"
+        return httpx.Response(200, json={"results": [
+            {"name": "Kisumu", "country": "Uganda", "country_code": "UG", "latitude": 1.0, "longitude": 33.0},
+            {"name": "Kisumu", "country": "Kenya", "country_code": "KE", "admin1": "Kisumu County",
+             "latitude": -0.10221, "longitude": 34.76171, "timezone": "Africa/Nairobi"},
+        ]})
+    
+    mock_nominatim(monkeypatch, handler)
+    result = await geocoding.get_coordinates("Kisumu, Kenya")
+    assert result == {
+        "lat": -0.10221, "lon": 34.76171, "name": "Kisumu", "country": "KE", "timezone": "Africa/Nairobi",
+    }
+
+
+@pytest.mark.asyncio
+async def test_lookup_fails_when_both_geocoders_are_down(monkeypatch):
+    down = True
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        if not down:
+            return httpx.Response(200, json=[{
+                "lat": "-0.10", "lon": "34.75", "name": "Kisumu", "address": {"country_code": "ke"}
+            }])
+        if request.url.host == "nominatim.openstreetmap.org":
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(503, text="unavailable")
+    
+    mock_nominatim(monkeypatch, handler)
+    with pytest.raises(TimeoutError):
+        await geocoding.get_coordinates("Kisumu")
+    
+    # A failure is not remembered: the next search tries again
+    down = False
+    assert (await geocoding.get_coordinates("Kisumu"))["country"] == "KE"
+
+
+@pytest.mark.asyncio
+async def test_unknown_places_are_not_remembered(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+    
+    mock_nominatim(monkeypatch, handler)
+    assert "error" in await geocoding.get_coordinates("Zzyzx")
+    assert "zzyzx" not in geocoding._suggested
