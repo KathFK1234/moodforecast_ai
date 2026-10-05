@@ -96,7 +96,7 @@ async def get_coordinates(location: str) -> dict:
     
     # Location not found
     return {
-        "error": f"Location '{location}' not found",
+        "error": f"We couldn't find '{location}'. Check the spelling, or add the country (for example 'Kisumu, Kenya').",
         "lat": None,
         "lon": None
     }

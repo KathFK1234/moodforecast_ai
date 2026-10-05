@@ -170,3 +170,15 @@ async def test_lookup_retries_without_the_region(monkeypatch):
     assert queries == ["Mombo, Lunda Sul Province, Angola", "Mombo, Angola"]
     assert result["name"] == "Mombo"
     assert result["country"] == "AO"
+
+
+@pytest.mark.asyncio
+async def test_unknown_location_says_what_to_try(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+    
+    mock_nominatim(monkeypatch, handler)
+    result = await geocoding.get_coordinates("Zzyzx")
+    assert result["error"] == (
+        "We couldn't find 'Zzyzx'. Check the spelling, or add the country (for example 'Kisumu, Kenya')."
+    )
