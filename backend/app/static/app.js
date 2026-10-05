@@ -100,7 +100,8 @@ async function fetchJson(path, fallback) {
     return response.json();
 }
 
-async function handleSearch(location) {
+// `record` adds the search to the browser history; Back and Forward pass false
+async function handleSearch(location, record = true) {
     location = (location || '').trim();
     if (!location) {
         showError('Enter a location to search.');
@@ -129,6 +130,7 @@ async function handleSearch(location) {
         currentLocation = location;
         el('activityPlace').textContent = wellbeingData.location;
         showLocalActivities(location);
+        describePage(wellbeingData, location, record);
         if (lastActivity) askActivity(lastActivity);
         else surpriseMe();
         el('results').classList.remove('hidden');
@@ -149,6 +151,19 @@ async function handleSearch(location) {
             el('searchButton').disabled = false;
         }
     }
+}
+
+// Name the place in the tab title and the address, so the page can be bookmarked, shared and stepped back through
+function describePage(data, location, record) {
+    document.title = `${data.location}: ${round(data.weather.temp_c)}°C, ${data.weather.condition} · MoodForecast AI`;
+    if (!record) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('q') === location) return;
+    const firstResult = !hasResults;
+    url.searchParams.set('q', location);
+    // The first result replaces the bare address; later searches each get a history entry
+    if (firstResult) window.history.replaceState(null, '', url);
+    else window.history.pushState(null, '', url);
 }
 
 function displayWeather(data) {
@@ -928,6 +943,14 @@ function init() {
     initial = params.get('q') || initial;
     el('locationInput').value = initial;
     handleSearch(initial);
+
+    // Back and Forward step through earlier searches
+    window.addEventListener('popstate', () => {
+        const place = new URLSearchParams(window.location.search).get('q');
+        if (!place) return;
+        el('locationInput').value = place;
+        handleSearch(place, false);
+    });
 }
 
 init();
