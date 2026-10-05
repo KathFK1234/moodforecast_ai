@@ -47,6 +47,9 @@
         <!-- Error State -->
         <div id="errorState" class="notice notice-error hidden" role="alert"></div>
 
+        <!-- Shown when the page is opened from an email's unsubscribe link -->
+        <div id="unsubscribeBanner" class="notice notice-info hidden" role="status"></div>
+
         <!-- Loading State -->
         <div id="loadingState" class="skeleton-grid hidden" aria-live="polite" aria-label="Loading forecast">
             <div class="card skeleton"></div>
@@ -215,6 +218,10 @@
                         </div>
                         <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
                         <div id="subscribeMessage" class="notice hidden" role="status"></div>
+                        <p id="subscriptionStatus" class="subscription-status hidden">
+                            <span id="subscriptionText"></span>
+                            <button type="button" class="link-button" id="unsubscribeBtn">Unsubscribe</button>
+                        </p>
                     </form>
             </section>
         </main>

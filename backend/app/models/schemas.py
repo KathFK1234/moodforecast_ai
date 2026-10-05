@@ -150,6 +150,13 @@ class SubscribeResponse(BaseModel):
     location: str = Field(..., description="Resolved display name")
     activity: str | None = None
     status: str = Field("subscribed", description="subscribed, or updated if the email was already subscribed")
+    unsubscribe_token: str = Field(..., description="Pass to POST /api/unsubscribe/{token} to stop the alerts")
+
+
+class UnsubscribeResponse(BaseModel):
+    """Unsubscribe response."""
+    email: str
+    status: str = "unsubscribed"
 
 
 class HealthResponse(BaseModel):

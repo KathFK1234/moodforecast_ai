@@ -1,11 +1,11 @@
-"""Subscribe router - POST /api/subscribe"""
+"""Subscribe router - POST /api/subscribe and POST /api/unsubscribe/{token}"""
 
 import secrets
 import uuid
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from app.models.db import Subscriber, get_engine
-from app.models.schemas import SubscribeRequest, SubscribeResponse
+from app.models.schemas import SubscribeRequest, SubscribeResponse, UnsubscribeResponse
 from app.routers.common import resolve_location
 from app.services.weather import get_weather_client
 
@@ -21,7 +21,7 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     geocoder can find. Subscribing again with the same email updates the
     existing subscription instead of adding another.
     
-    Returns subscriber ID and confirmation.
+    Returns subscriber ID, confirmation, and the token that unsubscribes.
     """
     try:
         client = get_weather_client()
@@ -64,7 +64,8 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             email=subscriber.email,
             location=subscriber.place,
             activity=subscriber.activity,
-            status=status
+            status=status,
+            unsubscribe_token=subscriber.token
         )
     
     except HTTPException:
@@ -77,3 +78,25 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
         raise HTTPException(status_code=503, detail="Weather service unavailable")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Subscription failed: {str(e)}")
+
+
+@router.post("/unsubscribe/{token}")
+async def unsubscribe(token: str) -> UnsubscribeResponse:
+    """
+    Stop daily alerts for the subscription the token belongs to.
+    
+    The token comes from the subscribe response and from the link in every
+    email. Unsubscribing twice is fine. Returns 404 for an unknown token.
+    """
+    engine = get_engine()
+    with Session(engine) as session:
+        subscriber = session.exec(
+            select(Subscriber).where(Subscriber.token == token)
+        ).first()
+        if subscriber is None:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        
+        subscriber.active = False
+        session.add(subscriber)
+        session.commit()
+        return UnsubscribeResponse(email=subscriber.email)

@@ -6,6 +6,7 @@ const POPULAR_ACTIVITIES = [
     'Stargaze', 'Have a barbecue', 'Go skiing', 'Read a book',
 ];
 const LAST_LOCATION_KEY = 'moodforecast:lastLocation';
+const SUBSCRIPTION_KEY = 'moodforecast:subscription';
 
 // Line icons, drawn on a 24x24 grid
 const CLOUD = '<path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 9.2 4.5 4.5 0 0 0 7 18z"/>';
@@ -645,12 +646,95 @@ async function handleSubscribe(event) {
             `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}.`,
             false
         );
+        rememberSubscription({ email: data.email, location: data.location, token: data.unsubscribe_token });
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Subscribe';
     }
+}
+
+async function postUnsubscribe(token) {
+    let res;
+    try {
+        res = await fetch(`${API_BASE}/api/unsubscribe/${encodeURIComponent(token)}`, { method: 'POST' });
+    } catch (e) {
+        throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+    if (!res.ok) throw new Error(await errorMessage(res, 'Could not unsubscribe. Please try again.'));
+    return res.json();
+}
+
+// The subscription made in this browser, so it can be cancelled from here
+function savedSubscription() {
+    try {
+        return JSON.parse(localStorage.getItem(SUBSCRIPTION_KEY));
+    } catch (e) {
+        return null;
+    }
+}
+
+function rememberSubscription(subscription) {
+    try {
+        if (subscription) localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
+        else localStorage.removeItem(SUBSCRIPTION_KEY);
+    } catch (e) {
+        // Storage unavailable - the link in each email still unsubscribes
+    }
+    showSubscription(subscription);
+}
+
+function showSubscription(subscription) {
+    el('subscriptionStatus').classList.toggle('hidden', !subscription);
+    if (subscription) {
+        el('subscriptionText').textContent = `Daily alerts for ${subscription.location} go to ${subscription.email}.`;
+    }
+}
+
+async function handleUnsubscribe() {
+    const subscription = savedSubscription();
+    if (!subscription) return;
+
+    const btn = el('unsubscribeBtn');
+    btn.disabled = true;
+    try {
+        const data = await postUnsubscribe(subscription.token);
+        rememberSubscription(null);
+        showNotice(el('subscribeMessage'), `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
+    } catch (error) {
+        showNotice(el('subscribeMessage'), error.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// Opened from an email's unsubscribe link: ask before unsubscribing
+function showUnsubscribePrompt(token) {
+    const banner = el('unsubscribeBanner');
+    const text = document.createElement('span');
+    text.textContent = 'Stop the daily MoodForecast emails?';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'banner-button';
+    confirm.textContent = 'Yes, unsubscribe';
+    confirm.addEventListener('click', async () => {
+        confirm.disabled = true;
+        try {
+            const data = await postUnsubscribe(token);
+            banner.className = 'notice notice-success';
+            banner.textContent = `${data.email} has been unsubscribed. No more daily alerts will be sent.`;
+            const saved = savedSubscription();
+            if (saved && saved.token === token) rememberSubscription(null);
+            // Drop the token from the address bar so a reload doesn't ask again
+            window.history.replaceState(null, '', window.location.pathname);
+        } catch (error) {
+            banner.className = 'notice notice-error';
+            banner.textContent = error.message;
+        }
+    });
+    banner.append(text, confirm);
+    banner.classList.remove('hidden');
 }
 
 // Fill the subscription form's activity choices from the advisor's list
@@ -732,6 +816,11 @@ function init() {
     });
     el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
+    el('unsubscribeBtn').addEventListener('click', handleUnsubscribe);
+    showSubscription(savedSubscription());
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('unsubscribe')) showUnsubscribePrompt(params.get('unsubscribe'));
 
     // Start from ?q= in the link, then the last place searched, then the default
     let initial = el('locationInput').value;
@@ -740,7 +829,7 @@ function init() {
     } catch (e) {
         // Storage unavailable - use the default
     }
-    initial = new URLSearchParams(window.location.search).get('q') || initial;
+    initial = params.get('q') || initial;
     el('locationInput').value = initial;
     handleSearch(initial);
 }

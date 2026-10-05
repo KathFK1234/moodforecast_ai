@@ -195,6 +195,36 @@ def test_subscribe_rejects_unknown_location(mock_weather):
     assert "not found" in response.json()["detail"]
 
 
+def test_unsubscribe(mock_weather):
+    """POST /api/unsubscribe/{token} should stop the alerts, and subscribing again restarts them."""
+    engine = memory_engine()
+    
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        token = client.post(
+            "/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"}
+        ).json()["unsubscribe_token"]
+        
+        response = client.post(f"/api/unsubscribe/{token}")
+        assert response.status_code == 200
+        assert response.json() == {"email": "amina@example.com", "status": "unsubscribed"}
+        with Session(engine) as session:
+            assert session.exec(select(Subscriber)).one().active is False
+        
+        # Unsubscribing twice is harmless
+        assert client.post(f"/api/unsubscribe/{token}").status_code == 200
+        
+        again = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        assert again.json()["status"] == "subscribed"
+        assert again.json()["unsubscribe_token"] == token
+        with Session(engine) as session:
+            assert session.exec(select(Subscriber)).one().active is True
+
+
+def test_unsubscribe_unknown_token(mock_weather):
+    response = client.post("/api/unsubscribe/not-a-real-token")
+    assert response.status_code == 404
+
+
 def test_subscribe_endpoint_missing_email(mock_weather):
     """POST /api/subscribe without email should return 422."""
     response = client.post("/api/subscribe", json={

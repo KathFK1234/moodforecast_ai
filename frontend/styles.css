@@ -1034,6 +1034,60 @@ body {
     color: #e2ffe2;
 }
 
+.notice-info {
+    background: rgba(57, 135, 229, 0.18);
+    border: 1px solid rgba(120, 170, 240, 0.5);
+    color: #e3efff;
+}
+
+#unsubscribeBanner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px 16px;
+    max-width: 560px;
+    margin: 0 auto 20px;
+}
+
+.banner-button {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #0c1122;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.banner-button:disabled {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+.subscription-status {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.link-button {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent-ink);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-button:disabled {
+    opacity: 0.55;
+    cursor: progress;
+}
+
 #errorState {
     max-width: 560px;
     margin: 0 auto 20px;
