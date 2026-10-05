@@ -864,7 +864,25 @@ function buildChips() {
     });
 }
 
+// A cached page from before this script's fields existed: fetch the current one, once.
+// If that doesn't help, say so instead of failing on the missing fields.
+function reloadIfPageIsStale() {
+    if (el('subLocationInput') && el('activityForm')) return false;
+    let alreadyReloaded = true;
+    try {
+        alreadyReloaded = Boolean(sessionStorage.getItem('moodforecast:reloaded'));
+        sessionStorage.setItem('moodforecast:reloaded', '1');
+    } catch (e) {
+        // Can't remember having reloaded, so don't risk a loop
+    }
+    if (alreadyReloaded) showError('This page is out of date. Refresh it with Ctrl+Shift+R (Cmd+Shift+R on a Mac).');
+    else window.location.reload();
+    return true;
+}
+
 function init() {
+    if (reloadIfPageIsStale()) return;
+
     el('brandMark').innerHTML = icon('partly-day');
     el('searchIcon').innerHTML = icon('search');
     buildChips();

@@ -552,7 +552,7 @@ def test_frontend_served():
     assert response.status_code == 200
     assert "MoodForecast AI" in response.text
     for asset in ["app.js", "styles.css", "favicon.ico"]:
-        assert f'"{asset}"' in response.text
+        assert f'"{asset}' in response.text
         assert client.get(f"/{asset}").status_code == 200
 
 
