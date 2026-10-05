@@ -13,6 +13,7 @@ from app.config import settings
 from app.models.db import Subscriber, create_tables, get_engine
 from app.services import mailer
 from app.services.activity_advisor import check_activity, random_activity
+from app.services.cache import cache
 from app.services.curiosity import curiosity_prompts
 from app.services.locality import build_place
 from app.services.mood_engine import build_summary, score_mood
@@ -110,6 +111,24 @@ def unsubscribe_link_email(subscriber: Subscriber) -> Email:
         token=subscriber.token,
         footer="To stop the daily alerts:",
     )
+
+
+async def send_once(subscriber: Subscriber, email: Email, kind: str) -> bool:
+    """
+    Send an email that anyone can trigger by typing an address into the site,
+    at most once per address per cache lifetime (10 minutes by default).
+    
+    Stops the subscribe and unsubscribe forms being used to flood someone's
+    inbox. Returns True if the email was sent now or is already on its way
+    from a moment ago.
+    """
+    cache_key = f"mail:{kind}:{subscriber.email}"
+    if cache.get(cache_key):
+        return True
+    sent = await send(subscriber, email)
+    if sent:
+        cache.set(cache_key, True)
+    return sent
 
 
 async def send(subscriber: Subscriber, email: Email) -> bool:

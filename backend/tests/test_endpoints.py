@@ -311,6 +311,24 @@ def test_unsubscribe_link_is_emailed_to_subscribers_only(mock_weather, outbox):
     assert f"https://moodforecast.test/?unsubscribe={token}" in message.get_body(("plain",)).get_content()
 
 
+def test_repeat_requests_do_not_flood_an_inbox(mock_weather, outbox):
+    """Typing someone's address into the forms again and again sends each email once."""
+    for _ in range(5):
+        response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        assert response.status_code == 201
+        assert response.json()["confirmation_sent"] is True
+    assert [message["Subject"] for _, message in outbox] == ["You're subscribed to MoodForecast for Nairobi, KE"]
+    
+    outbox.clear()
+    for _ in range(5):
+        assert client.post("/api/unsubscribe-link", json={"email": "amina@example.com"}).status_code == 202
+    assert [message["Subject"] for _, message in outbox] == ["Your MoodForecast unsubscribe link"]
+    
+    # A different address is not held back
+    client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
+    assert outbox[-1][1]["To"] == "ben@example.com"
+
+
 def test_unsubscribe_link_needs_email_configured(mock_weather):
     response = client.post("/api/unsubscribe-link", json={"email": "amina@example.com"})
     assert response.status_code == 503

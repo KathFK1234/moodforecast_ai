@@ -86,7 +86,7 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             session.commit()
             session.refresh(subscriber)
         
-        confirmation_sent = await alerts.send(subscriber, alerts.welcome_email(subscriber))
+        confirmation_sent = await alerts.send_once(subscriber, alerts.welcome_email(subscriber), "welcome")
         
         return SubscribeResponse(
             subscriber_id=subscriber.id,
@@ -155,6 +155,6 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeL
         ).first()
     
     if subscriber is not None:
-        await alerts.send(subscriber, alerts.unsubscribe_link_email(subscriber))
+        await alerts.send_once(subscriber, alerts.unsubscribe_link_email(subscriber), "unsubscribe-link")
     
     return UnsubscribeLinkResponse()

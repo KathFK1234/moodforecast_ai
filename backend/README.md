@@ -411,6 +411,8 @@ Three emails exist, all composed in `app/services/alerts.py` as plain text with 
 - **Daily alert** - current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
+The confirmation and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default).
+
 Every email ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
 
 The daily send runs inside the web process: a background task started with the app checks every 15 minutes for subscribers where it is past `ALERT_HOUR` local time and today's alert has not gone out. A subscriber is marked as sent only after their email is accepted, so a failed send is retried on the next check. Someone who subscribes after `ALERT_HOUR` gets their first alert the next morning. Because the task runs in every process, run a single instance of the app, or each one will send its own copy.

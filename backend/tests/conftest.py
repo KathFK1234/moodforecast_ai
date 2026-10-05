@@ -3,6 +3,7 @@
 import pytest
 from app.config import settings
 from app.services import mailer
+from app.services.cache import cache
 
 
 class FakeSMTP:
@@ -29,6 +30,14 @@ class FakeSMTP:
     
     def send_message(self, message):
         self.outbox.append((self, message))
+
+
+@pytest.fixture(autouse=True)
+def empty_cache():
+    """Start every test with an empty cache, so one test's lookups and sends don't affect the next."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture(autouse=True)
