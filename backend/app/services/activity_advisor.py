@@ -279,13 +279,15 @@ def check_activity(
     humidity: float,
     wind_kph: float,
     is_day: bool = True,
-    rng: random.Random | None = None
+    rng: random.Random | None = None,
+    searched_as: str = ""
 ) -> ActivityAdvice:
     """
     Main entry point: judge whether the weather suits what the user wants to do.
 
     `question` is free text ("Can I go for a run?"). An activity that isn't
-    recognised is judged as general time outdoors.
+    recognised is judged as general time outdoors. `searched_as` is what the
+    user typed for the location; it is left out of the places to compare.
 
     Returns: activity, recognised, verdict (go, maybe or skip), headline, reasons,
     suggestion, curiosity.
@@ -321,6 +323,8 @@ def check_activity(
         "suggestion": rng.choice(INDOOR_SWAPS) if verdict == "skip" else None,
         "curiosity": {
             "question": curiosity_question,
-            "places": curiosity.pick_places(CURIOSITY_PLACES[activity.category], location, 3, rng),
+            "places": curiosity.pick_places(
+                CURIOSITY_PLACES[activity.category], f"{location} {searched_as}", 3, rng
+            ),
         },
     }

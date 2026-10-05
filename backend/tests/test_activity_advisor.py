@@ -139,6 +139,14 @@ class TestAdvice:
             )
             assert "Mombasa" not in advice["curiosity"]["places"]
     
+    def test_curiosity_leaves_out_the_location_as_the_user_typed_it(self):
+        for seed in range(30):
+            advice = check_activity(
+                "ski", "札幌市, JP", "Snow", -3, 80, 10,
+                rng=random.Random(seed), searched_as="Sapporo"
+            )
+            assert "Sapporo" not in advice["curiosity"]["places"]
+    
     def test_seeded_rng_gives_repeatable_advice(self):
         first = check_activity("run", "Nairobi, KE", "Rain", 15, 85, 10, rng=random.Random(5))
         second = check_activity("run", "Nairobi, KE", "Rain", 15, 85, 10, rng=random.Random(5))

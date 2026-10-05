@@ -79,15 +79,20 @@ def curiosity_prompts(
     temperature_c: float,
     is_day: bool = True,
     count: int = 3,
-    rng: random.Random | None = None
+    rng: random.Random | None = None,
+    searched_as: str = ""
 ) -> list[CuriosityPrompt]:
     """
     Suggest other places to look up, starting with ones that contrast with here.
 
     Hot weather points to cold places, rain to dry ones, night to the other side
     of the world. General questions fill any remaining slots.
+
+    `searched_as` is what the user typed, which can differ from the resolved
+    name (Sapporo resolves to 札幌市) and is left out of the suggestions too.
     """
     rng = rng or random
+    here = f"{location} {searched_as}"
     condition_lower = condition.lower()
 
     # (questions, places) that contrast with the current conditions
@@ -113,7 +118,7 @@ def curiosity_prompts(
         if len(prompts) == count:
             break
         fresh = tuple(place for place in places if place not in used)
-        picked = pick_places(fresh, location, 1, rng)
+        picked = pick_places(fresh, here, 1, rng)
         if not picked:
             continue
         used.add(picked[0])

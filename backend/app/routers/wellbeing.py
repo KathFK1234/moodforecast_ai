@@ -50,7 +50,8 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
             ),
             recommendations=mood_result["recommendations"],
             curiosity=curiosity_prompts(
-                resolved_location, weather.condition, weather.temp_c, weather.is_day
+                resolved_location, weather.condition, weather.temp_c, weather.is_day,
+                searched_as=location
             )
         )
     

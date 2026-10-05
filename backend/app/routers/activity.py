@@ -37,7 +37,8 @@ async def get_activity_advice(
             weather.temp_c,
             weather.humidity,
             weather.wind_kph,
-            weather.is_day
+            weather.is_day,
+            searched_as=location
         )
         
         return ActivityResponse(location=resolved_location, weather=weather, **advice)

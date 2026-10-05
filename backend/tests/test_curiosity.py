@@ -26,6 +26,14 @@ class TestCuriosityPrompts:
             )
             assert all(p["location"] != "Reykjavik" for p in prompts)
 
+    def test_never_suggests_the_place_as_the_user_typed_it(self):
+        """The resolved name can be in another script, so the typed name counts too."""
+        for seed in range(50):
+            prompts = curiosity_prompts(
+                "東京都, JP", "Cloudy", 20, count=6, rng=random.Random(seed), searched_as="tokyo"
+            )
+            assert all(p["location"] != "Tokyo" for p in prompts)
+
     def test_heat_points_to_somewhere_cold(self):
         prompts = curiosity_prompts("Dubai, AE", "Cloudy", 40, count=2)
         assert any(p["location"] in curiosity.COLD_PLACES for p in prompts)
