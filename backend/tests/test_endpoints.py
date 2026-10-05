@@ -249,6 +249,20 @@ def test_activity_endpoint_requires_an_activity(mock_weather):
     assert client.get("/api/activity/Nairobi", params={"activity": ""}).status_code == 422
 
 
+def test_locations_endpoint():
+    """GET /api/locations should return suggestions for what has been typed."""
+    suggestion = {
+        "name": "Kisumu", "region": "Kisumu County", "country": "Kenya",
+        "label": "Kisumu, Kisumu County, Kenya",
+    }
+    with patch('app.routers.locations.suggest_locations', AsyncMock(return_value=[suggestion])) as suggest:
+        response = client.get("/api/locations", params={"q": "kis"})
+    assert response.status_code == 200
+    assert response.json() == [suggestion]
+    suggest.assert_awaited_once_with("kis")
+    assert client.get("/api/locations").status_code == 422
+
+
 def test_forecast_unknown_location(mock_weather):
     """GET /api/forecast with unknown location should return 422."""
     mock_weather.get_location_by_name.return_value = {

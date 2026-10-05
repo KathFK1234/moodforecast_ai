@@ -29,11 +29,18 @@ POPULAR_LOCATIONS = {
 }
 
 
+# Coordinates of places offered as suggestions, keyed by lowercase label, so
+# picking one finds exactly that place without a second lookup.
+_suggested: dict[str, dict] = {}
+MAX_SUGGESTED = 2000
+
+
 async def get_coordinates(location: str) -> dict:
     """
     Convert location name to coordinates.
     
-    Checks the hardcoded popular locations first, then Nominatim (OpenStreetMap).
+    Checks the hardcoded popular locations and places recently offered as
+    suggestions first, then Nominatim (OpenStreetMap).
     Cache key: geo:{location_name}
     
     Raises TimeoutError / RuntimeError if the online lookup fails.
@@ -60,27 +67,19 @@ async def get_coordinates(location: str) -> dict:
         cache.set(cache_key, result)
         return result
     
+    # A suggestion the user picked
+    if location_lower in _suggested:
+        result = _suggested[location_lower].copy()
+        cache.set(cache_key, result)
+        return result
+    
     # Try online geocoding via Nominatim (free, no API key needed)
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={
-                    "q": location,
-                    "format": "json",
-                    "limit": 1,
-                    "addressdetails": 1,
-                },
-                headers={"User-Agent": "MoodForecastAI/1.0"},
-                timeout=5.0
-            )
-            response.raise_for_status()
-            matches = response.json()
-    except httpx.TimeoutException:
-        raise TimeoutError("Geocoding request timed out")
-    except (httpx.HTTPError, ValueError) as e:
-        # Don't report "not found" (or guess a city) when the lookup itself failed
-        raise RuntimeError(f"Geocoding service unavailable: {e}")
+    matches = await _search_nominatim(location)
+    
+    # "Town, Region, Country" can fail on the region's spelling - retry without it
+    parts = [part.strip() for part in location.split(",")]
+    if not matches and len(parts) >= 3:
+        matches = await _search_nominatim(f"{parts[0]}, {parts[-1]}")
     
     if matches:
         data = matches[0]
@@ -101,3 +100,108 @@ async def get_coordinates(location: str) -> dict:
         "lat": None,
         "lon": None
     }
+
+
+async def _search_nominatim(query: str) -> list[dict]:
+    """
+    Look a place up on Nominatim. Returns the best match, or an empty list.
+    
+    Raises TimeoutError / RuntimeError if the lookup fails.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": query,
+                    "format": "json",
+                    "limit": 1,
+                    "addressdetails": 1,
+                },
+                headers={"User-Agent": "MoodForecastAI/1.0"},
+                timeout=5.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.TimeoutException:
+        raise TimeoutError("Geocoding request timed out")
+    except (httpx.HTTPError, ValueError) as e:
+        # Don't report "not found" (or guess a city) when the lookup itself failed
+        raise RuntimeError(f"Geocoding service unavailable: {e}")
+
+
+async def suggest_locations(query: str, limit: int = 5) -> list[dict]:
+    """
+    Suggest places whose names start with what the user has typed so far.
+    
+    Uses Open-Meteo's geocoding API, which is built for search-as-you-type
+    (Nominatim's usage policy does not allow autocomplete).
+    Cache key: suggest:{query}
+    
+    Suggestions are a convenience, so any failure returns an empty list.
+    
+    Returns: [{"name": str, "region": str | None, "country": str | None, "label": str}, ...]
+    with the closest names and largest places first. `label` is the text to search for.
+    """
+    query = query.strip()
+    if len(query) < 2:
+        return []
+    
+    cache_key = f"suggest:{query.lower()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": query, "count": 10, "language": "en", "format": "json"},
+                timeout=3.0
+            )
+            response.raise_for_status()
+            matches = response.json().get("results") or []
+    except (httpx.HTTPError, ValueError):
+        return []
+    
+    # Names that start with the query first (the API also matches alternate
+    # names), then the largest places
+    query_lower = query.lower()
+    matches.sort(
+        key=lambda match: (
+            str(match.get("name", "")).lower().startswith(query_lower),
+            match.get("population") or 0,
+        ),
+        reverse=True
+    )
+    
+    suggestions = []
+    seen = set()
+    for match in matches:
+        name = match.get("name")
+        if not name:
+            continue
+        region = match.get("admin1")
+        country = match.get("country")
+        # "Nairobi, Nairobi County, Kenya" - skip a region that only repeats the name
+        parts = [name, region if region != name else None, country]
+        label = ", ".join(part for part in parts if part)
+        if label in seen:
+            continue
+        seen.add(label)
+        suggestions.append({"name": name, "region": region, "country": country, "label": label})
+        if match.get("latitude") is not None and match.get("longitude") is not None:
+            if len(_suggested) >= MAX_SUGGESTED:
+                _suggested.clear()
+            _suggested[label.lower()] = {
+                "lat": float(match["latitude"]),
+                "lon": float(match["longitude"]),
+                "name": name,
+                "country": match.get("country_code", ""),
+                "timezone": match.get("timezone", ""),
+            }
+        if len(suggestions) == limit:
+            break
+    
+    cache.set(cache_key, suggestions)
+    return suggestions

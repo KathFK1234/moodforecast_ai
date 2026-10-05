@@ -47,6 +47,14 @@ class WeatherData(BaseModel):
     is_day: bool = True
 
 
+class LocationSuggestion(BaseModel):
+    """A place offered while the user is typing a location."""
+    name: str
+    region: str | None = None
+    country: str | None = None
+    label: str = Field(..., description="Text to search for, e.g. 'Kisumu, Kisumu County, Kenya'")
+
+
 class DailyForecast(BaseModel):
     """Forecast for a single day."""
     date: str = Field(..., description="Local date, YYYY-MM-DD")

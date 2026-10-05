@@ -345,6 +345,116 @@ function searchPlace(place, scrollToTop = true) {
     return handleSearch(place);
 }
 
+// Offer matching places under a location field as the user types
+function attachSuggestions(input, onPick) {
+    const box = document.createElement('ul');
+    box.className = 'suggestions hidden';
+    box.id = `${input.id}Suggestions`;
+    box.setAttribute('role', 'listbox');
+    input.parentElement.appendChild(box);
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', box.id);
+    input.setAttribute('aria-expanded', 'false');
+
+    let timer = null;
+    let token = 0;
+    let items = [];
+    let active = -1;
+
+    function close() {
+        token++;  // Drop any lookup still in flight
+        clearTimeout(timer);
+        items = [];
+        active = -1;
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+    }
+
+    function pick(item) {
+        input.value = item.label;
+        close();
+        if (onPick) onPick(item.label);
+    }
+
+    function setActive(index) {
+        active = index;
+        [...box.children].forEach((option, i) => {
+            option.classList.toggle('is-active', i === active);
+            option.setAttribute('aria-selected', i === active ? 'true' : 'false');
+        });
+        if (active >= 0) input.setAttribute('aria-activedescendant', box.children[active].id);
+        else input.removeAttribute('aria-activedescendant');
+    }
+
+    function render(list) {
+        items = list;
+        active = -1;
+        box.innerHTML = '';
+        items.forEach((item, index) => {
+            const option = document.createElement('li');
+            option.id = `${box.id}-${index}`;
+            option.setAttribute('role', 'option');
+            const name = document.createElement('span');
+            name.className = 'suggestion-name';
+            name.textContent = item.name;
+            const where = document.createElement('span');
+            where.className = 'suggestion-where';
+            where.textContent = [item.region !== item.name ? item.region : null, item.country].filter(Boolean).join(', ');
+            option.append(name, where);
+            // mousedown, so the pick lands before the field loses focus
+            option.addEventListener('mousedown', (event) => {
+                event.preventDefault();
+                pick(item);
+            });
+            box.appendChild(option);
+        });
+        box.classList.toggle('hidden', items.length === 0);
+        input.setAttribute('aria-expanded', items.length ? 'true' : 'false');
+    }
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim();
+        if (query.length < 2) {
+            close();
+            return;
+        }
+        clearTimeout(timer);
+        const current = ++token;
+        timer = setTimeout(async () => {
+            try {
+                const list = await fetchJson(`/api/locations?q=${encodeURIComponent(query)}`, '');
+                if (current === token) render(list);
+            } catch (e) {
+                // Suggestions are optional - typing a place still works without them
+            }
+        }, 250);
+    });
+
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            close();
+        } else if (!items.length) {
+            return;
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActive((active + 1) % items.length);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActive(active <= 0 ? items.length - 1 : active - 1);
+        } else if (event.key === 'Enter' && active >= 0) {
+            event.preventDefault();
+            pick(items[active]);
+        } else if (event.key === 'Enter') {
+            close();
+        }
+    });
+
+    input.addEventListener('blur', close);
+}
+
 // Ask whether the weather at the current place suits an activity
 async function askActivity(question) {
     question = (question || '').trim();
@@ -574,6 +684,9 @@ function init() {
         event.preventDefault();
         handleSearch(el('locationInput').value);
     });
+    attachSuggestions(el('locationInput'), handleSearch);
+    attachSuggestions(el('cropLocationInput'));
+
     el('activityForm').addEventListener('submit', (event) => {
         event.preventDefault();
         askActivity(el('activityInput').value);
