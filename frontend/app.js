@@ -1,10 +1,7 @@
 const API_BASE = '';  // Use same domain as frontend
 
 const POPULAR_CITIES = ['Nairobi', 'Mombasa', 'Kisumu', 'Lagos', 'London', 'Tokyo', 'New York'];
-const POPULAR_ACTIVITIES = [
-    'Go for a run', 'Have a picnic', 'Go swimming', 'Ride a bike', 'Fly a kite',
-    'Stargaze', 'Have a barbecue', 'Go skiing', 'Read a book',
-];
+const ACTIVITY_CHIP_COUNT = 9;
 const LAST_LOCATION_KEY = 'moodforecast:lastLocation';
 const SUBSCRIPTION_KEY = 'moodforecast:subscription';
 
@@ -131,6 +128,7 @@ async function handleSearch(location) {
         el('subLocationInput').value = location;
         currentLocation = location;
         el('activityPlace').textContent = wellbeingData.location;
+        showLocalActivities(location);
         if (lastActivity) askActivity(lastActivity);
         else surpriseMe();
         el('results').classList.remove('hidden');
@@ -771,18 +769,61 @@ function showUnsubscribePrompt(token) {
     banner.classList.remove('hidden');
 }
 
-// Fill the subscription form's activity choices from the advisor's list
-async function loadActivityChoices() {
+// The activities that are practical at a place, local favourites first
+function fetchLocalActivities(location) {
+    return fetchJson(`/api/activities/${encodeURIComponent(location)}`, '');
+}
+
+// After a search: quick picks for the place, and the same choices in the subscription form
+async function showLocalActivities(location) {
+    const token = searchToken;
     try {
-        const activities = await fetchJson('/api/activities', '');
-        activities.forEach((name) => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-            el('activitySelect').appendChild(option);
-        });
+        const choices = await fetchLocalActivities(location);
+        if (token !== searchToken) return;
+        renderActivityChips(choices);
+        fillActivityChoices(choices);
     } catch (e) {
-        // The form still works with the default random pick
+        // Quick picks are optional - typing a question still works
+    }
+}
+
+// A few local favourites, then a different handful of the rest on each visit
+function renderActivityChips(choices) {
+    const favourites = choices.slice(0, 3);
+    const rest = choices.slice(3).sort(() => Math.random() - 0.5);
+    const chips = el('activityChips');
+    chips.innerHTML = '';
+    favourites.concat(rest).slice(0, ACTIVITY_CHIP_COUNT).forEach((choice) => {
+        chips.appendChild(chipButton(choice.prompt, () => {
+            el('activityInput').value = choice.prompt;
+            askActivity(choice.prompt);
+        }));
+    });
+}
+
+// Offer only what can be done at the subscription's location, keeping the current choice if it still fits
+function fillActivityChoices(choices) {
+    const select = el('activitySelect');
+    const chosen = select.value;
+    while (select.options.length > 1) select.remove(1);
+    choices.forEach((choice) => {
+        const option = document.createElement('option');
+        option.value = choice.name;
+        option.textContent = choice.name.charAt(0).toUpperCase() + choice.name.slice(1);
+        select.appendChild(option);
+    });
+    select.value = choices.some((choice) => choice.name === chosen) ? chosen : '';
+}
+
+// The subscription's location was changed by hand: refresh its activity choices
+async function loadActivityChoices(location) {
+    location = (location || '').trim();
+    if (!location) return;
+    try {
+        const choices = await fetchLocalActivities(location);
+        if (el('subLocationInput').value.trim() === location) fillActivityChoices(choices);
+    } catch (e) {
+        // An unknown place is reported when subscribing
     }
 }
 
@@ -821,28 +862,20 @@ function buildChips() {
             handleSearch(city);
         }));
     });
-
-    const activities = el('activityChips');
-    POPULAR_ACTIVITIES.forEach((activity) => {
-        activities.appendChild(chipButton(activity, () => {
-            el('activityInput').value = activity;
-            askActivity(activity);
-        }));
-    });
 }
 
 function init() {
     el('brandMark').innerHTML = icon('partly-day');
     el('searchIcon').innerHTML = icon('search');
     buildChips();
-    loadActivityChoices();
 
     el('searchForm').addEventListener('submit', (event) => {
         event.preventDefault();
         handleSearch(el('locationInput').value);
     });
     attachSuggestions(el('locationInput'), handleSearch);
-    attachSuggestions(el('subLocationInput'));
+    attachSuggestions(el('subLocationInput'), loadActivityChoices);
+    el('subLocationInput').addEventListener('change', (event) => loadActivityChoices(event.target.value));
 
     el('activityForm').addEventListener('submit', (event) => {
         event.preventDefault();
