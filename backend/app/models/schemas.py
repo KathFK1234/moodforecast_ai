@@ -151,6 +151,23 @@ class SubscribeResponse(BaseModel):
     activity: str | None = None
     status: str = Field("subscribed", description="subscribed, or updated if the email was already subscribed")
     unsubscribe_token: str = Field(..., description="Pass to POST /api/unsubscribe/{token} to stop the alerts")
+    confirmation_sent: bool = Field(False, description="Whether a confirmation email went out")
+
+
+class UnsubscribeLinkRequest(BaseModel):
+    """Request for an unsubscribe link by email."""
+    email: str
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        """Email is matched trimmed and lowercase."""
+        return normalise_email(v)
+
+
+class UnsubscribeLinkResponse(BaseModel):
+    """Unsubscribe link response. The same whether or not the address is subscribed."""
+    status: str = "sent_if_subscribed"
 
 
 class UnsubscribeResponse(BaseModel):

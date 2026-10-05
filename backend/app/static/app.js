@@ -641,9 +641,12 @@ async function handleSubscribe(event) {
 
         const data = await res.json();
         const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
+        const confirmation = data.confirmation_sent
+            ? 'Check your inbox for a confirmation.'
+            : "We couldn't send a confirmation email just now, so alerts may not reach you yet.";
         showNotice(
             msg,
-            `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}.`,
+            `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}. ${confirmation}`,
             false
         );
         rememberSubscription({ email: data.email, location: data.location, token: data.unsubscribe_token });
@@ -704,6 +707,37 @@ async function handleUnsubscribe() {
         showNotice(el('subscribeMessage'), `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
     } catch (error) {
         showNotice(el('subscribeMessage'), error.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// For a subscription this browser doesn't remember: email the unsubscribe link
+async function handleUnsubscribeLink() {
+    const email = el('emailInput').value.trim();
+    const msg = el('subscribeMessage');
+    if (!email) {
+        showNotice(msg, 'Enter the email address you subscribed with.', true);
+        return;
+    }
+
+    const btn = el('unsubscribeLinkBtn');
+    btn.disabled = true;
+    try {
+        let res;
+        try {
+            res = await fetch(`${API_BASE}/api/unsubscribe-link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+        } catch (e) {
+            throw new Error('Could not reach the server. Check your connection and try again.');
+        }
+        if (!res.ok) throw new Error(await errorMessage(res, 'Could not send the link. Please try again.'));
+        showNotice(msg, `If ${email} is subscribed, an unsubscribe link is on its way.`, false);
+    } catch (error) {
+        showNotice(msg, error.message, true);
     } finally {
         btn.disabled = false;
     }
@@ -817,6 +851,7 @@ function init() {
     el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
     el('unsubscribeBtn').addEventListener('click', handleUnsubscribe);
+    el('unsubscribeLinkBtn').addEventListener('click', handleUnsubscribeLink);
     showSubscription(savedSubscription());
 
     const params = new URLSearchParams(window.location.search);

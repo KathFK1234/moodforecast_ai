@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
 from app.models.db import Subscriber
+from app.services import mailer
 
 
 client = TestClient(app)
@@ -223,6 +224,73 @@ def test_unsubscribe(mock_weather):
 def test_unsubscribe_unknown_token(mock_weather):
     response = client.post("/api/unsubscribe/not-a-real-token")
     assert response.status_code == 404
+
+
+def test_subscribe_without_email_configured_still_subscribes(mock_weather):
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert response.status_code == 201
+    assert response.json()["confirmation_sent"] is False
+
+
+def test_subscribe_sends_a_confirmation_email(mock_weather, outbox):
+    response = client.post("/api/subscribe", json={
+        "email": "amina@example.com", "location": "Nairobi", "activity": "a picnic"
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["confirmation_sent"] is True
+    
+    assert len(outbox) == 1
+    message = outbox[0][1]
+    assert message["To"] == "amina@example.com"
+    assert message["Subject"] == "You're subscribed to MoodForecast for Nairobi, KE"
+    link = f"https://moodforecast.test/?unsubscribe={data['unsubscribe_token']}"
+    text = message.get_body(("plain",)).get_content()
+    assert "how the weather suits a picnic" in text
+    assert "around 07:00" in text
+    assert link in text
+    assert link in message.get_body(("html",)).get_content()
+    assert message["List-Unsubscribe"] == (
+        f"<https://moodforecast.test/api/unsubscribe/{data['unsubscribe_token']}>"
+    )
+    assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+
+def test_subscribe_survives_a_mail_failure(mock_weather, outbox, monkeypatch):
+    def unreachable(host, port, **kwargs):
+        raise ConnectionRefusedError("nothing listening")
+    
+    monkeypatch.setattr(mailer.smtplib, "SMTP", unreachable)
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert response.status_code == 201
+    assert response.json()["confirmation_sent"] is False
+
+
+def test_unsubscribe_link_is_emailed_to_subscribers_only(mock_weather, outbox):
+    engine = memory_engine()
+    
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        token = client.post(
+            "/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"}
+        ).json()["unsubscribe_token"]
+        outbox.clear()
+        
+        subscribed = client.post("/api/unsubscribe-link", json={"email": "Amina@example.com"})
+        stranger = client.post("/api/unsubscribe-link", json={"email": "nobody@example.com"})
+    
+    # Same answer for both, so the endpoint doesn't reveal who is subscribed
+    assert subscribed.status_code == stranger.status_code == 202
+    assert subscribed.json() == stranger.json() == {"status": "sent_if_subscribed"}
+    
+    assert len(outbox) == 1
+    message = outbox[0][1]
+    assert message["To"] == "amina@example.com"
+    assert f"https://moodforecast.test/?unsubscribe={token}" in message.get_body(("plain",)).get_content()
+
+
+def test_unsubscribe_link_needs_email_configured(mock_weather):
+    response = client.post("/api/unsubscribe-link", json={"email": "amina@example.com"})
+    assert response.status_code == 503
 
 
 def test_subscribe_endpoint_missing_email(mock_weather):

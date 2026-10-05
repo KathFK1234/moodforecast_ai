@@ -1,12 +1,19 @@
-"""Subscribe router - POST /api/subscribe and POST /api/unsubscribe/{token}"""
+"""Subscribe router - POST /api/subscribe, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
 import secrets
 import uuid
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from app.models.db import Subscriber, get_engine
-from app.models.schemas import SubscribeRequest, SubscribeResponse, UnsubscribeResponse
+from app.models.schemas import (
+    SubscribeRequest,
+    SubscribeResponse,
+    UnsubscribeLinkRequest,
+    UnsubscribeLinkResponse,
+    UnsubscribeResponse,
+)
 from app.routers.common import resolve_location
+from app.services import alerts, mailer
 from app.services.weather import get_weather_client
 
 router = APIRouter(prefix="/api", tags=["subscribe"])
@@ -20,6 +27,9 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     Stores: email, location, activity, language. The location must be one the
     geocoder can find. Subscribing again with the same email updates the
     existing subscription instead of adding another.
+    
+    Sends a confirmation email if email is configured; the subscription is
+    stored either way, and `confirmation_sent` says which happened.
     
     Returns subscriber ID, confirmation, and the token that unsubscribes.
     """
@@ -59,13 +69,16 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             session.commit()
             session.refresh(subscriber)
         
+        confirmation_sent = await alerts.send(subscriber, alerts.welcome_email(subscriber))
+        
         return SubscribeResponse(
             subscriber_id=subscriber.id,
             email=subscriber.email,
             location=subscriber.place,
             activity=subscriber.activity,
             status=status,
-            unsubscribe_token=subscriber.token
+            unsubscribe_token=subscriber.token,
+            confirmation_sent=confirmation_sent
         )
     
     except HTTPException:
@@ -100,3 +113,27 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
         session.add(subscriber)
         session.commit()
         return UnsubscribeResponse(email=subscriber.email)
+
+
+@router.post("/unsubscribe-link", status_code=202)
+async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeLinkResponse:
+    """
+    Email a subscriber their unsubscribe link.
+    
+    For someone who no longer has an alert email to hand. The response is the
+    same whether or not the address is subscribed, so it can't be used to find
+    out who is. Returns 503 if email is not configured.
+    """
+    if not mailer.is_configured():
+        raise HTTPException(status_code=503, detail="Email is not set up on this server")
+    
+    engine = get_engine()
+    with Session(engine) as session:
+        subscriber = session.exec(
+            select(Subscriber).where(Subscriber.email == request.email, Subscriber.active == True)  # noqa: E712
+        ).first()
+    
+    if subscriber is not None:
+        await alerts.send(subscriber, alerts.unsubscribe_link_email(subscriber))
+    
+    return UnsubscribeLinkResponse()
