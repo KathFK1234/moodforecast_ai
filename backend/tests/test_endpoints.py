@@ -537,6 +537,20 @@ def test_forecast_weather_service_down(mock_weather):
     mock_weather.get_forecast.side_effect = RuntimeError("Server error")
     response = client.get("/api/forecast/Nairobi")
     assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "The weather service can't be reached right now. Please try again in a moment."
+    )
+
+
+def test_slow_weather_service_says_to_try_again(mock_weather):
+    mock_weather.get_forecast.side_effect = TimeoutError("slow")
+    mock_weather.get_current.side_effect = TimeoutError("slow")
+    for path in ["/api/wellbeing/Nairobi", "/api/random-activity/Nairobi"]:
+        response = client.get(path)
+        assert response.status_code == 504
+        assert response.json()["detail"] == (
+            "The weather service is taking too long to answer. Please try again in a moment."
+        )
 
 
 def test_docs_available():

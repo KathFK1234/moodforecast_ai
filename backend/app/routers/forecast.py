@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
 from app.services.mood_engine import calculate_mood_score, classify_mood_label
 from app.models.schemas import DailyForecast, ForecastResponse
-from app.routers.common import build_weather, resolve_location
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["forecast"])
 
@@ -63,8 +63,8 @@ async def get_forecast(location: str) -> ForecastResponse:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather API timeout")
+        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather service unavailable")
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

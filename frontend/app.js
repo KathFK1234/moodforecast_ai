@@ -875,6 +875,11 @@ function showError(message) {
     const node = el('errorState');
     node.textContent = message;
     node.classList.remove('hidden');
+    // A search started from further down the page would otherwise fail out of sight
+    const box = node.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) {
+        node.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+    }
 }
 
 function highlightChip(location) {

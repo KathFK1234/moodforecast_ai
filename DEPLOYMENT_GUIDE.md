@@ -125,7 +125,7 @@ The free hosted Open-Meteo API is for non-commercial use, at about 10,000 calls 
 | Build fails | Railway build logs; `backend/requirements.txt` installs locally |
 | App crashes on start | Railway deploy logs; `DATABASE_URL` is a valid URL if set |
 | "Location not found" (422) | Spelling of the location; try adding the country |
-| "Weather service unavailable" (503) | Open-Meteo or Nominatim is unreachable or rate limiting - retry shortly |
+| "The weather service can't be reached right now" (503) | Open-Meteo or Nominatim is unreachable or rate limiting - retry shortly |
 | Timeout (504) | Upstream service is slow - retry shortly |
 | Frontend shows old content | `backend/app/static/` was not updated from `frontend/`; browser cache |
 | Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |

@@ -5,7 +5,7 @@ from app.services.weather import get_weather_client
 from app.services.mood_engine import BASELINE_SCORE, build_summary, score_mood
 from app.services.curiosity import curiosity_prompts
 from app.models.schemas import WellbeingResponse
-from app.routers.common import build_weather, resolve_location
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["wellbeing"])
 
@@ -60,8 +60,8 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather API timeout")
+        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather service unavailable")
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.services.weather import get_weather_client
 from app.services.activity_advisor import ACTIVITIES, check_activity, local_activities, random_activity
 from app.models.schemas import ActivityChoice, ActivityResponse
-from app.routers.common import local_weather
+from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, local_weather
 
 router = APIRouter(prefix="/api", tags=["activity"])
 
@@ -36,9 +36,9 @@ async def list_local_activities(location: str) -> list[ActivityChoice]:
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather API timeout")
+        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather service unavailable")
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
@@ -84,9 +84,9 @@ async def get_activity_advice(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather API timeout")
+        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather service unavailable")
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
@@ -127,8 +127,8 @@ async def get_random_activity(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except TimeoutError:
-        raise HTTPException(status_code=504, detail="Weather API timeout")
+        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail="Weather service unavailable")
+        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")

@@ -7,6 +7,11 @@ from app.services.locality import Place, build_place
 from app.services.weather import WeatherClient
 
 
+# Shown to visitors when the weather or place lookup fails, so they say what to do next
+TIMEOUT_MESSAGE = "The weather service is taking too long to answer. Please try again in a moment."
+UNAVAILABLE_MESSAGE = "The weather service can't be reached right now. Please try again in a moment."
+
+
 async def resolve_location(client: WeatherClient, location: str) -> tuple[float, float, str]:
     """
     Resolve a location name to (lat, lon, display name).

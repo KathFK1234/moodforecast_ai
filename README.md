@@ -168,7 +168,7 @@ See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md).
 
 **"Location not found"** - check the spelling, or add the country (`Kisumu, Kenya`).
 
-**"Weather service unavailable"** - Open-Meteo or Nominatim could not be reached. Check your connection:
+**"The weather service can't be reached right now"** - Open-Meteo or Nominatim could not be reached. Check your connection:
 
 ```bash
 curl "https://api.open-meteo.com/v1/forecast?latitude=-1.29&longitude=36.82&current=temperature_2m"
