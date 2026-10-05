@@ -1,5 +1,6 @@
 """Rule-based mood scoring engine with psychological rationale."""
 
+import random
 from typing import TypedDict
 
 
@@ -136,14 +137,164 @@ def classify_risk_level(mood_score: int) -> str:
         return "High"
 
 
+# Recommendation pools: one entry is picked at random from the pool that fits,
+# so the same weather doesn't always give the same advice.
+
+CLEAR_DAY_IDEAS = (
+    "Sun's out — take a walk, a jog or a bike ride while the light is at its best.",
+    "Perfect picnic weather. Take lunch outside and let the daylight do its thing.",
+    "Call a friend for an outdoor catch-up — a park bench beats a group chat today.",
+    "Get your hands dirty: water the plants, pull some weeds or start that garden project.",
+    "Kick a ball, shoot some hoops or throw a frisbee — playing outside counts as self-care.",
+    "Take your camera or phone out and photograph five things that make you smile.",
+    "Move your workout outdoors — skipping rope, yoga on the grass or a dance in the yard.",
+    "Explore somewhere new: a market, a trail or a street you've never walked down.",
+)
+
+HOT_SUN_IDEAS = (
+    "Blazing out there — if you can get to a pool or the sea, a swim is the best move today.",
+    "Save outdoor plans for early morning or after sunset, and find a shady spot in between.",
+    "Hot and bright: read under a tree with something cold to drink within reach.",
+    "Make it an ice cream or smoothie kind of day, and keep outings short and shaded.",
+)
+
+RAIN_IDEAS = (
+    "Rainy-day classic: put a pot on the stove and try a new recipe.",
+    "Great weather for a movie marathon, a good book or that series everyone keeps recommending.",
+    "Put on a playlist and dance it out in the living room — no one's watching.",
+    "Break out a board game, a puzzle or a deck of cards.",
+    "Use the rain as cover for indoor focus work, then reward yourself with a hot drink.",
+    "Get creative indoors: sketch, journal, write, or pick the guitar back up.",
+    "Grab an umbrella and splash through a few puddles — a short wet walk is oddly refreshing.",
+    "Tidy one drawer, shelf or corner. Small indoor wins feel great on grey days.",
+)
+
+STORM_IDEAS = (
+    "Stay in and get cosy — blanket, hot drink and a film you've seen a hundred times.",
+    "Storm outside, calm inside: try an indoor yoga or stretching session.",
+    "Good day for a long phone or video call with someone you miss.",
+    "Bake something — the house will smell amazing while the storm does its thing.",
+    "Light a candle and settle into a book, a puzzle or some indoor crafting.",
+    "Listen to the storm from somewhere comfortable, with a podcast or an album start to finish.",
+)
+
+CLOUDY_IDEAS = (
+    "No glare, no sweat — cloudy days are great for a run, a hike or a long bike ride.",
+    "Soft light is a photographer's dream. Go for a photo walk.",
+    "Wander to a café, museum, library or market you haven't visited in a while.",
+    "Sit by a window or step outside at lunch — daylight still counts through the clouds.",
+    "Meet a friend for a coffee, or just a lap around the block.",
+    "Good conditions for errands on foot. Add a detour through a park.",
+    "Try a workout class, a swim or a gym session — let endorphins fill in for sunshine.",
+)
+
+LOW_LIGHT_IDEAS = (
+    "Light is low today — keep indoor spaces bright and take short movement breaks.",
+    "Moody weather outside: lean in with tea, a candle and a good book.",
+    "Put on a jacket and take a short misty walk — quiet streets are oddly calming.",
+    "Do ten minutes of stretching or a quick home workout to wake yourself up.",
+    "Cook something warm and colourful — soup, curry or a big stew.",
+    "Start a small project: a puzzle, a playlist, a sketch or a photo album.",
+)
+
+SNOW_IDEAS = (
+    "Snow day! Build a snowman, throw a snowball or go and make the first footprints.",
+    "Go sledding or take a crunchy winter walk, then thaw out with hot chocolate.",
+    "Watch the snow fall from a warm spot with a book and a big mug.",
+    "Snow brightens everything — wrap up well and step out for a few minutes of daylight.",
+    "Slow-cook or bake something hearty and let it warm the whole house.",
+)
+
+CLEAR_NIGHT_IDEAS = (
+    "Clear night — a few minutes of fresh air outside can help you wind down.",
+    "Clear skies tonight — step outside and see how many stars you can spot.",
+    "Sit outside with a warm drink and let the day settle.",
+    "Nice night to eat dinner outside or by an open window.",
+    "Look up and find the moon, then take five slow breaths before heading in.",
+)
+
+NIGHT_IDEAS = (
+    "Wind down with dim lights and a screen-free half hour before bed.",
+    "Put on some calm music and do a few gentle stretches before bed.",
+    "Take a warm shower or bath and let the day rinse off.",
+    "Write down three good things from today, however small.",
+    "Cosy night in: a film, a puzzle or a slow home-cooked dinner.",
+    "Brew a caffeine-free tea and plan one thing to look forward to tomorrow.",
+)
+
+COLD_IDEAS = (
+    "Bundle up warmly — cold stress impairs focus. Layers, a hat and a hot drink go a long way.",
+    "Cold out: warm up from the inside with soup, tea or hot chocolate.",
+    "Get your blood moving — a brisk walk in warm layers or a quick indoor workout.",
+    "Cold days are made for warm socks, a blanket and something baking in the oven.",
+    "Keep warm and keep sipping water — it's easy to forget to drink when it's cold.",
+)
+
+HOT_IDEAS = (
+    "Prioritize hydration and breaks indoors or in the shade. Heat stress reduces mental clarity.",
+    "Keep a water bottle within reach — add ice, lemon or mint to make it interesting.",
+    "Slow the pace: do demanding things early or late and rest through the hottest hours.",
+    "Cool down with a cold shower, a swim or some frozen fruit.",
+    "Wear light, loose clothing and keep your space shaded and breezy.",
+)
+
+MILD_DAY_IDEAS = (
+    "Schedule your most focused work before 2pm — energy typically dips mid-afternoon.",
+    "Tackle your hardest task first, then celebrate with a proper break.",
+    "Take a stretch break every hour — shoulders, neck and a lap around the room.",
+    "Learn something small today: a new word, a recipe, a chord or a dance step.",
+    "Send a message to someone you've been meaning to check in on.",
+    "Eat lunch away from your screen — your afternoon self will thank you.",
+    "Put on a favourite song between tasks and move for the length of it.",
+)
+
+MILD_NIGHT_IDEAS = (
+    "Keep a consistent bedtime — tomorrow's energy starts with tonight's rest.",
+    "Lay out what you need for tomorrow so the morning starts easy.",
+    "Swap the last scroll of the night for a few pages of a book or a podcast.",
+    "Try a few slow breaths before sleep: in for four, out for six.",
+)
+
+HUMID_IDEAS = (
+    "High humidity can mask fluid loss — maintain active hydration.",
+    "Sticky air today: drink water regularly and choose light, breathable clothes.",
+    "Humidity makes effort feel harder — ease the pace and keep water nearby.",
+    "Muggy out — a fan, a cool shower and plenty of water will keep you fresher.",
+)
+
+DRY_IDEAS = (
+    "Dry air can affect concentration. Use a humidifier or drink extra water.",
+    "Dry air today — keep a glass of water close, and lip balm and moisturiser closer.",
+    "Low humidity: sip water through the day, and give your houseplants a drink too.",
+)
+
+LOW_MOOD_IDEAS = (
+    "Consider a brief mindfulness break or gentle stretching to reset your mood.",
+    "Put on a song you love and sing along, badly if necessary.",
+    "Call or text someone who makes you laugh.",
+    "Watch something silly — a favourite comedy or ten minutes of animal videos.",
+    "Be kind to yourself today: pick one small, doable thing and call that a win.",
+    "Make a favourite comfort meal or snack and actually sit down to enjoy it.",
+    "Try five minutes of doodling, colouring or journaling — no talent required.",
+    "Give a pet, a plant or a person some attention — caring for something lifts the mood.",
+)
+
+
 def generate_recommendations(
     mood_score: int,
     condition: str,
     temperature_c: float,
     humidity: float,
-    is_day: bool = True
+    is_day: bool = True,
+    rng: random.Random | None = None
 ) -> list[str]:
-    """Generate wellbeing recommendations based on weather parameters."""
+    """
+    Generate wellbeing recommendations based on weather parameters.
+    
+    Each recommendation is picked at random from the pool that fits the conditions.
+    Pass a seeded rng for repeatable picks.
+    """
+    pick = (rng or random).choice
     recommendations = []
     
     condition_lower = condition.lower()
@@ -151,63 +302,42 @@ def generate_recommendations(
     # Light-based recommendations (daylight advice only applies during the day)
     if not is_day:
         if "sunny" in condition_lower or "clear" in condition_lower:
-            recommendations.append(
-                "Clear night — a few minutes of fresh air outside can help you wind down."
-            )
+            recommendations.append(pick(CLEAR_NIGHT_IDEAS))
         else:
-            recommendations.append(
-                "Wind down with dim lights and a screen-free half hour before bed."
-            )
-    elif "storm" in condition_lower or "thunder" in condition_lower or "rain" in condition_lower:
-        recommendations.append(
-            "Schedule indoor focus work; use this weather for reflection or creative tasks."
-        )
+            recommendations.append(pick(NIGHT_IDEAS))
+    elif "storm" in condition_lower or "thunder" in condition_lower:
+        recommendations.append(pick(STORM_IDEAS))
+    elif "rain" in condition_lower:
+        recommendations.append(pick(RAIN_IDEAS))
     elif "sunny" in condition_lower or "clear" in condition_lower:
-        recommendations.append(
-            "Take a 15-minute outdoor walk before 11am while light levels are highest."
-        )
+        # Too hot for a run or a picnic in full sun
+        recommendations.append(pick(HOT_SUN_IDEAS if temperature_c > 30 else CLEAR_DAY_IDEAS))
     elif "cloudy" in condition_lower or "overcast" in condition_lower:
-        recommendations.append(
-            "Consider a brief midday break by a window to maintain light exposure."
-        )
-    elif "drizzle" in condition_lower or "snow" in condition_lower or "fog" in condition_lower:
-        recommendations.append(
-            "Light is low today — keep indoor spaces bright and take short movement breaks."
-        )
+        recommendations.append(pick(CLOUDY_IDEAS))
+    elif "snow" in condition_lower:
+        recommendations.append(pick(SNOW_IDEAS))
+    elif "drizzle" in condition_lower or "fog" in condition_lower:
+        recommendations.append(pick(LOW_LIGHT_IDEAS))
     
     # Temperature-based recommendations
     if temperature_c < 10:
-        recommendations.append(
-            "Bundle up warmly — cold stress impairs focus. Stay hydrated indoors."
-        )
+        recommendations.append(pick(COLD_IDEAS))
     elif temperature_c > 30:
-        recommendations.append(
-            "Prioritize hydration and indoor breaks. Heat stress reduces mental clarity."
-        )
+        recommendations.append(pick(HOT_IDEAS))
     elif is_day:
-        recommendations.append(
-            "Schedule your most focused work before 2pm — energy typically dips mid-afternoon."
-        )
+        recommendations.append(pick(MILD_DAY_IDEAS))
     else:
-        recommendations.append(
-            "Keep a consistent bedtime — tomorrow's energy starts with tonight's rest."
-        )
+        recommendations.append(pick(MILD_NIGHT_IDEAS))
     
     # Humidity-based recommendations
     if humidity > 80:
-        recommendations.append(
-            "High humidity can mask fluid loss — maintain active hydration."
-        )
+        recommendations.append(pick(HUMID_IDEAS))
     elif humidity < 30:
-        recommendations.append(
-            "Dry air can affect concentration. Use a humidifier or drink extra water."
-        )
+        recommendations.append(pick(DRY_IDEAS))
     
     # General mood management
     if mood_score < 50:
-        recommendations.append(
-            "Consider a brief mindfulness break or gentle stretching to reset your mood."
-        )
+        recommendations.append(pick(LOW_MOOD_IDEAS))
     
     return recommendations
 
