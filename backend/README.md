@@ -384,6 +384,8 @@ Limits worth knowing:
 - TTL of 10 minutes by default (`CACHE_TTL_SECONDS`)
 - Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}` and `suggest:{query}`
 - `/api/forecast` and `/api/wellbeing` share the same cached weather for a location
+- Requests for the same forecast made at the same moment share one call to Open-Meteo
+- A forecast request that times out or hits a server error is retried once. If Open-Meteo still can't be reached, the last forecast for that place is served if it is under an hour old
 
 ## Database
 

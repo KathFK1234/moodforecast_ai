@@ -1,5 +1,6 @@
 """Async HTTP client for the Open-Meteo weather API (https://open-meteo.com)."""
 
+import asyncio
 import httpx
 from typing import Any
 from app.config import settings
@@ -48,8 +49,19 @@ DAILY_VARIABLES = (
 )
 FORECAST_DAYS = 7
 
+# A failed forecast request is tried again this many times, after this pause (seconds)
+RETRIES = 1
+RETRY_DELAY = 0.5
+
+# If Open-Meteo still can't be reached, a forecast up to this old (seconds) is served instead
+STALE_SECONDS = 3600
+
 # How far around a place to look for open sea, in degrees (about 20 km)
 SEA_SEARCH_DEGREES = 0.2
+
+
+class RateLimitedError(RuntimeError):
+    """Open-Meteo is refusing requests for now; asking again straight away would not help."""
 
 
 class WeatherClient:
@@ -58,6 +70,8 @@ class WeatherClient:
     def __init__(self, base_url: str):
         self.base_url = base_url
         self._client: httpx.AsyncClient | None = None
+        # Forecast requests in flight, by cache key, so identical ones share a single call
+        self._pending: dict[str, asyncio.Future] = {}
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create async HTTP client. Open-Meteo needs no API key."""
@@ -74,8 +88,26 @@ class WeatherClient:
             await self._client.aclose()
             self._client = None
     
-    async def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
-        """Make HTTP request with error handling."""
+    async def _request(self, method: str, endpoint: str, retries: int = 0, **kwargs) -> dict[str, Any]:
+        """
+        Make HTTP request with error handling.
+        
+        Timeouts, connection failures and server errors are tried again up to
+        `retries` times. Bad requests and rate limiting are not: repeating
+        those cannot help.
+        """
+        for attempt in range(retries + 1):
+            try:
+                return await self._request_once(method, endpoint, **kwargs)
+            except RateLimitedError:
+                raise
+            except (TimeoutError, RuntimeError):
+                if attempt == retries:
+                    raise
+                await asyncio.sleep(RETRY_DELAY)
+    
+    async def _request_once(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
+        """Make one HTTP request, turning httpx errors into ValueError / RuntimeError / TimeoutError."""
         client = await self._get_client()
         try:
             response = await client.request(method, endpoint, **kwargs)
@@ -85,7 +117,9 @@ class WeatherClient:
             error_text = e.response.text
             status = e.response.status_code
             # 429 = rate limited, which is the service being unavailable to us
-            if 400 <= status < 500 and status != 429:
+            if status == 429:
+                raise RateLimitedError(f"Server error: {error_text}")
+            if 400 <= status < 500:
                 raise ValueError(f"Bad request: {error_text}")
             else:
                 raise RuntimeError(f"Server error: {error_text}")
@@ -106,6 +140,10 @@ class WeatherClient:
         GET /forecast - Current conditions + daily forecast for a set of coordinates.
         
         Cache key: weather:{lat}:{lon}
+        
+        A failed request is retried once. If Open-Meteo still can't be reached,
+        the last forecast for these coordinates is returned if it is under an
+        hour old; otherwise TimeoutError / RuntimeError is raised.
         
         Returns: {
             "current": {
@@ -136,6 +174,17 @@ class WeatherClient:
         if cached:
             return cached
         
+        # A search asks for the forecast and the wellbeing score at the same
+        # moment; the second caller waits for the first one's request
+        pending = self._pending.get(cache_key)
+        if pending is None:
+            pending = asyncio.ensure_future(self._fetch_forecast(lat, lon, cache_key))
+            self._pending[cache_key] = pending
+            pending.add_done_callback(lambda _: self._pending.pop(cache_key, None))
+        return await asyncio.shield(pending)
+    
+    async def _fetch_forecast(self, lat: float, lon: float, cache_key: str) -> dict[str, Any]:
+        """Fetch and cache a forecast, falling back to a recent one if Open-Meteo can't be reached."""
         params = {
             "latitude": lat,
             "longitude": lon,
@@ -145,7 +194,13 @@ class WeatherClient:
             "timezone": "auto",
         }
         
-        data = await self._request("GET", "/forecast", params=params)
+        try:
+            data = await self._request("GET", "/forecast", retries=RETRIES, params=params)
+        except (TimeoutError, RuntimeError):
+            stale = cache.get_stale(cache_key, STALE_SECONDS)
+            if stale:
+                return stale
+            raise
         current = data.get("current")
         if not current:
             raise RuntimeError("Weather API returned no current conditions")

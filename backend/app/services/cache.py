@@ -14,12 +14,19 @@ class TTLCache:
     
     def get(self, key: str) -> Optional[Any]:
         """Get cached value if not expired."""
+        return self.get_stale(key, self.ttl_seconds)
+    
+    def get_stale(self, key: str, max_age_seconds: float) -> Optional[Any]:
+        """
+        Get a cached value up to max_age_seconds old, even if it is past the TTL.
+        
+        For falling back to the last known value when a fresh one can't be fetched.
+        """
         if key not in self._cache:
             return None
         
         value, timestamp = self._cache[key]
-        if time.time() - timestamp > self.ttl_seconds:
-            del self._cache[key]
+        if time.time() - timestamp > max_age_seconds:
             return None
         
         return value

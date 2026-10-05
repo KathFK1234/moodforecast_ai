@@ -2,6 +2,10 @@
 
 import httpx
 import pytest
+import asyncio
+import time
+
+from app.services import weather
 from app.services.cache import cache
 from app.services.weather import WeatherClient
 
@@ -226,6 +230,105 @@ class TestGetCurrent:
         client = make_client(handler)
         with pytest.raises(TimeoutError):
             await client.get_current(-1.2921, 36.8219)
+
+
+class TestResilience:
+    """Test what happens when Open-Meteo is slow or briefly down."""
+    
+    @pytest.fixture(autouse=True)
+    def no_pause(self, monkeypatch):
+        monkeypatch.setattr(weather, "RETRY_DELAY", 0)
+    
+    @pytest.mark.asyncio
+    async def test_a_timeout_is_retried(self):
+        calls = 0
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise httpx.ReadTimeout("timed out", request=request)
+            return httpx.Response(200, json=OPEN_METEO_RESPONSE)
+        
+        client = make_client(handler)
+        current = await client.get_current(-1.2921, 36.8219)
+        assert current["temperature"] == 18.8
+        assert calls == 2
+    
+    @pytest.mark.asyncio
+    async def test_a_server_error_is_retried(self):
+        responses = [httpx.Response(502, text="bad gateway"), httpx.Response(200, json=OPEN_METEO_RESPONSE)]
+        client = make_client(lambda request: responses.pop(0))
+        assert (await client.get_current(-1.2921, 36.8219))["temperature"] == 18.8
+    
+    @pytest.mark.asyncio
+    async def test_bad_requests_and_rate_limits_are_not_retried(self):
+        for status, error in [(400, ValueError), (429, RuntimeError)]:
+            calls = 0
+            
+            def handler(request: httpx.Request) -> httpx.Response:
+                nonlocal calls
+                calls += 1
+                return httpx.Response(status, json={"error": True, "reason": "no"})
+            
+            client = make_client(handler)
+            with pytest.raises(error):
+                await client.get_current(-1.2921, 36.8219)
+            assert calls == 1
+    
+    @pytest.mark.asyncio
+    async def test_gives_up_after_the_retry(self):
+        calls = 0
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            raise httpx.ReadTimeout("timed out", request=request)
+        
+        client = make_client(handler)
+        with pytest.raises(TimeoutError):
+            await client.get_current(-1.2921, 36.8219)
+        assert calls == 2
+    
+    @pytest.mark.asyncio
+    async def test_simultaneous_requests_share_one_call(self):
+        calls = 0
+        
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.01)
+            return httpx.Response(200, json=OPEN_METEO_RESPONSE)
+        
+        client = make_client(handler)
+        forecast, current = await asyncio.gather(
+            client.get_forecast(-1.2921, 36.8219), client.get_current(-1.2921, 36.8219)
+        )
+        assert forecast["current"] == current
+        assert calls == 1
+    
+    @pytest.mark.asyncio
+    async def test_recent_forecast_is_served_when_open_meteo_is_down(self):
+        healthy = True
+        
+        def handler(request: httpx.Request) -> httpx.Response:
+            if healthy:
+                return httpx.Response(200, json=OPEN_METEO_RESPONSE)
+            return httpx.Response(503, text="unavailable")
+        
+        client = make_client(handler)
+        fresh = await client.get_forecast(-1.2921, 36.8219)
+        
+        # Twenty minutes later the cached copy has expired and Open-Meteo is down
+        healthy = False
+        key = "weather:-1.2921:36.8219"
+        cache._cache[key] = (cache._cache[key][0], time.time() - 1200)
+        assert await client.get_forecast(-1.2921, 36.8219) == fresh
+        
+        # After more than an hour it is too old to pass off as current
+        cache._cache[key] = (cache._cache[key][0], time.time() - 4000)
+        with pytest.raises(RuntimeError):
+            await client.get_forecast(-1.2921, 36.8219)
 
 
 class TestGetSea:
