@@ -385,9 +385,15 @@ def _join(items: list[str]) -> str:
     return ", ".join(items[:-1]) + " and " + items[-1]
 
 
+# Factor labels that are grammatically plural on their own ("clear skies help")
+PLURAL_LABELS = {"clear skies"}
+
+
 def _verb(subjects: list[str], singular: str, plural: str) -> str:
-    """Pick the verb form that agrees with the number of subjects."""
-    return singular if len(subjects) == 1 else plural
+    """Pick the verb form that agrees with the subjects."""
+    if len(subjects) == 1 and subjects[0] not in PLURAL_LABELS:
+        return singular
+    return plural
 
 
 def score_mood(

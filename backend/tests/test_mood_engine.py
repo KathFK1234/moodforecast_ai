@@ -284,6 +284,18 @@ class TestSummary:
             "lifting the mood. A calm night to rest and recharge."
         )
     
+    def test_verbs_agree_with_plural_factors(self):
+        """'Clear skies' is plural on its own; 'cold stress' is not."""
+        factors = mood_factors("Clear", 27, 50)
+        summary = build_summary("Nairobi", "Clear", 27, 77, factors)
+        assert "Clear skies help, while warm air pulls the score down." in summary
+        
+        factors = mood_factors("Clear", 30, 50, is_day=True)[:1]
+        assert "Clear skies are lifting the mood." in build_summary("Nairobi", "Clear", 30, 80, factors)
+        
+        factors = mood_factors("Unknown", 5, 50)
+        assert "Cold stress is weighing on the mood." in build_summary("Oslo", "Unknown", 5, 50, factors)
+    
     def test_neutral_summary(self):
         summary = build_summary("Lima", "Unknown", 20, 65, [])
         assert "neutral" in summary
