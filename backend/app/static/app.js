@@ -630,7 +630,6 @@ async function handleSubscribe(event) {
     const email = el('emailInput').value.trim();
     const location = el('subLocationInput').value.trim();
     const activity = el('activitySelect').value || null;
-    const language = el('languageSelect').value;
     const msg = el('subscribeMessage');
 
     if (!email || !location) {
@@ -648,7 +647,7 @@ async function handleSubscribe(event) {
             res = await fetch(`${API_BASE}/api/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, location, activity, language })
+                body: JSON.stringify({ email, location, activity })
             });
         } catch (e) {
             throw new Error('Could not reach the server. Check your connection and try again.');

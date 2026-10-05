@@ -227,7 +227,7 @@ curl http://localhost:8000/api/activities/Nairobi
 
 ### POST /api/subscribe
 
-Subscribes an email address to daily alerts for a location. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is stored, but emails are currently written in English only.
+Subscribes an email address to daily alerts for a location. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is still accepted and stored, but the page no longer asks for it: emails are written in English only.
 
 ```bash
 curl -X POST http://localhost:8000/api/subscribe \
@@ -417,6 +417,6 @@ The daily send runs inside the web process: a background task started with the a
 
 ## Notes
 
-- Emails are in English whatever `language` a subscriber chose
+- Emails are in English only, so the page's subscribe form has no language choice
 - Subscribing does not ask the address owner to confirm first (no double opt-in), so anyone can sign an address up; every email has an unsubscribe link
 - Deployment: see [../DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)

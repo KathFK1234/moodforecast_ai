@@ -962,7 +962,7 @@ body {
 /* Subscribe */
 .subscribe-form {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     align-items: end;
     gap: 12px;
     margin-top: 14px;
@@ -1201,6 +1201,11 @@ body {
 
     .subscribe-form {
         grid-template-columns: 1fr 1fr;
+    }
+
+    /* Three fields in two columns: the email takes the first row */
+    .subscribe-form .form-group:first-child {
+        grid-column: 1 / -1;
     }
 
     .curiosity-list {
