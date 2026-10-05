@@ -14,6 +14,22 @@ from app.services import alerts, mailer
 from app.services.weather import get_weather_client
 
 
+class RevalidatedStaticFiles(StaticFiles):
+    """
+    Static files that browsers must check are current before reusing.
+    
+    Without a Cache-Control header browsers guess how long to keep each file,
+    and can pair a cached app.js with a newer index.html. That breaks the page
+    whenever the two change together.
+    """
+    
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        # "no-cache" still allows caching, but only after asking the server (a cheap 304)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
@@ -74,7 +90,7 @@ def create_app() -> FastAPI:
     # Static files (frontend)
     static_path = Path(__file__).parent / "static"
     if static_path.exists():
-        app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
+        app.mount("/", RevalidatedStaticFiles(directory=str(static_path), html=True), name="static")
     
     return app
 

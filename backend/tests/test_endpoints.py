@@ -554,3 +554,15 @@ def test_frontend_served():
     for asset in ["app.js", "styles.css", "favicon.ico"]:
         assert f'"{asset}"' in response.text
         assert client.get(f"/{asset}").status_code == 200
+
+
+def test_frontend_is_revalidated_not_blindly_cached():
+    """A cached app.js must never be paired with a newer index.html."""
+    for path in ["/", "/app.js", "/styles.css"]:
+        response = client.get(path)
+        assert response.headers["cache-control"] == "no-cache"
+        
+        # An unchanged file is still cheap: the browser gets a 304, with the same instruction
+        unchanged = client.get(path, headers={"If-None-Match": response.headers["etag"]})
+        assert unchanged.status_code == 304
+        assert unchanged.headers["cache-control"] == "no-cache"
