@@ -1,5 +1,6 @@
 """What is known about a place beyond its weather: country, coast, height."""
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
 
 
@@ -11,6 +12,7 @@ class Place(NamedTuple):
     elevation: float | None = None    # Metres above sea level
     coastal: bool | None = None       # Open sea within about 20 km; None if it could not be checked
     sea_temp_c: float | None = None
+    local_hour: int | None = None     # Hour of the day there, 0-23; None if unknown
 
 
 def country_of(display_name: str) -> str:
@@ -24,7 +26,8 @@ def build_place(
     display_name: str,
     lat: float,
     forecast: dict[str, Any] | None = None,
-    sea: dict[str, Any] | None = None
+    sea: dict[str, Any] | None = None,
+    now_utc: datetime | None = None
 ) -> Place:
     """
     Put together what is known about a place.
@@ -34,6 +37,10 @@ def build_place(
     """
     forecast = forecast or {}
     sea = sea or {}
+    local_hour = None
+    if forecast.get("utc_offset_seconds") is not None:
+        now_utc = now_utc or datetime.now(timezone.utc)
+        local_hour = (now_utc + timedelta(seconds=forecast["utc_offset_seconds"])).hour
     return Place(
         name=display_name.split(",")[0].strip(),
         country=country_of(display_name),
@@ -41,7 +48,13 @@ def build_place(
         elevation=forecast.get("elevation"),
         coastal=sea.get("coastal"),
         sea_temp_c=sea.get("sea_temp_c"),
+        local_hour=local_hour,
     )
+
+
+def is_late_night(place: Place) -> bool:
+    """Whether it is the small hours there (23:00 to 05:00), when most people are winding down or asleep."""
+    return place.local_hour is not None and (place.local_hour >= 23 or place.local_hour < 5)
 
 
 # Where an activity is part of everyday life. These lists are judgement calls,

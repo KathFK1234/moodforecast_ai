@@ -366,3 +366,31 @@ class TestLocalRandomActivity:
         london = Place(name="London", country="GB", lat=51.5, elevation=16, coastal=False)
         assert "nyama choma" in barbecue_pitch(NAIROBI)
         assert "nyama choma" not in barbecue_pitch(london)
+
+
+class TestLateNightPicks:
+    """Test that random picks suit the hour."""
+    
+    def picks(self, hour, condition="Clear"):
+        place = NAIROBI._replace(local_hour=hour)
+        return {
+            random_activity(
+                "Nairobi, KE", condition, 18, 50, 8, False, rng=random.Random(seed), place=place
+            )["activity"]
+            for seed in range(200)
+        }
+    
+    def test_small_hours_only_get_quiet_picks(self):
+        for hour in [23, 0, 2, 4]:
+            assert self.picks(hour) <= set(activity_advisor.LATE_NIGHT_PICKS)
+        # Stargazing drops out when the sky is covered
+        assert "stargazing" not in self.picks(2, "Overcast")
+        assert "stargazing" in self.picks(2)
+    
+    def test_evening_still_gets_evening_activities(self):
+        assert "a barbecue" in self.picks(20)
+    
+    def test_asking_is_not_restricted_by_the_hour(self):
+        place = NAIROBI._replace(local_hour=2)
+        advice = check_activity("barbecue", "Nairobi, KE", "Clear", 18, 50, 8, False, place=place)
+        assert advice["verdict"] == "go"

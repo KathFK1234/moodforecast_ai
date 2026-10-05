@@ -5,7 +5,7 @@ import re
 from typing import NamedTuple, TypedDict
 
 from app.services import curiosity
-from app.services.locality import LOCAL_FAVOURITES, Place, is_local, local_issue
+from app.services.locality import LOCAL_FAVOURITES, Place, is_late_night, is_local, local_issue
 
 
 class Activity(NamedTuple):
@@ -193,6 +193,9 @@ LOCAL_PITCHES = {
     ("cricket", "PK"): "A bat, a taped tennis ball and a quiet street is all you need.",
     ("cycling", "NL"): "You're in the right country for it — just follow the bike paths.",
 }
+
+# The only things suggested unprompted in the small hours
+LATE_NIGHT_PICKS = ("stargazing", "reading", "a movie", "games")
 
 # Offered when the answer is no. All indoors, so they hold in any weather.
 INDOOR_SWAPS = (
@@ -469,7 +472,8 @@ def random_activity(
     asking again gives something different.
 
     With a `place`, activities it can't offer or where they aren't commonly
-    done are never picked, and local favourites come up more often.
+    done are never picked, and local favourites come up more often. In the
+    small hours there, only quiet picks are made.
 
     Returns the same shape as check_activity, with the verdict always "go".
     """
@@ -509,6 +513,9 @@ def _pick(
         if activity.name != exclude
         and not _issues(activity, condition, temperature_c, humidity, wind_kph, is_day, place)
     ]
+    # Nobody wants to be told to light a barbecue at 2am
+    if place is not None and is_late_night(place):
+        suited = [activity for activity in suited if activity.name in LATE_NIGHT_PICKS] or suited
     outdoor = [activity for activity in suited if activity.category != "indoor"]
     pool = outdoor if outdoor and rng.random() < 0.75 else suited
     favourites = LOCAL_FAVOURITES.get(place.country, ()) if place is not None else ()
