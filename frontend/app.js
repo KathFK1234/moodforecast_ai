@@ -1,7 +1,9 @@
 const API_BASE = '';  // Use same domain as frontend
 
 const POPULAR_CITIES = ['Nairobi', 'Mombasa', 'Kisumu', 'Lagos', 'London', 'Tokyo', 'New York'];
+const ACTIVITY_CHIP_COUNT = 9;
 const LAST_LOCATION_KEY = 'moodforecast:lastLocation';
+const SUBSCRIPTION_KEY = 'moodforecast:subscription';
 
 // Line icons, drawn on a 24x24 grid
 const CLOUD = '<path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.2 9.2 4.5 4.5 0 0 0 7 18z"/>';
@@ -68,6 +70,10 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 
 let searchToken = 0;  // Guards against a slow earlier search overwriting a newer one
 let hasResults = false;
+let currentLocation = '';  // The place the results on screen are for
+let lastActivity = '';     // Re-asked when the place changes; empty means a random pick
+let shownActivity = '';    // Left out of the next random pick
+let activityToken = 0;
 
 // Read the API's error message, whatever shape it comes in
 async function errorMessage(response, fallback) {
@@ -119,7 +125,12 @@ async function handleSearch(location) {
         displayForecast(forecastData.daily || []);
         displayWellbeing(wellbeingData);
 
-        el('cropLocationInput').value = wellbeingData.location;
+        el('subLocationInput').value = location;
+        currentLocation = location;
+        el('activityPlace').textContent = wellbeingData.location;
+        showLocalActivities(location);
+        if (lastActivity) askActivity(lastActivity);
+        else surpriseMe();
         el('results').classList.remove('hidden');
         hasResults = true;
         replayReveal();
@@ -302,6 +313,237 @@ function displayWellbeing(data) {
         li.textContent = rec;
         recList.appendChild(li);
     });
+
+    displayCuriosity(data.curiosity || []);
+}
+
+// Questions about other places; tapping one searches that place
+function displayCuriosity(prompts) {
+    const list = el('curiosityList');
+    list.innerHTML = '';
+    prompts.forEach((prompt) => {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'curiosity-prompt';
+        const question = document.createElement('span');
+        question.textContent = prompt.question;
+        const place = document.createElement('span');
+        place.className = 'curiosity-place';
+        place.textContent = `${prompt.location} →`;
+        button.append(question, place);
+        button.addEventListener('click', () => searchPlace(prompt.location));
+        li.appendChild(button);
+        list.appendChild(li);
+    });
+    el('curiositySection').classList.toggle('hidden', prompts.length === 0);
+}
+
+// Search a suggested place, by default bringing the results back into view
+function searchPlace(place, scrollToTop = true) {
+    el('locationInput').value = place;
+    if (scrollToTop) window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+    return handleSearch(place);
+}
+
+// Offer matching places under a location field as the user types
+function attachSuggestions(input, onPick) {
+    const box = document.createElement('ul');
+    box.className = 'suggestions hidden';
+    box.id = `${input.id}Suggestions`;
+    box.setAttribute('role', 'listbox');
+    input.parentElement.appendChild(box);
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-controls', box.id);
+    input.setAttribute('aria-expanded', 'false');
+
+    let timer = null;
+    let token = 0;
+    let items = [];
+    let active = -1;
+
+    function close() {
+        token++;  // Drop any lookup still in flight
+        clearTimeout(timer);
+        items = [];
+        active = -1;
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+    }
+
+    function pick(item) {
+        input.value = item.label;
+        close();
+        if (onPick) onPick(item.label);
+    }
+
+    function setActive(index) {
+        active = index;
+        [...box.children].forEach((option, i) => {
+            option.classList.toggle('is-active', i === active);
+            option.setAttribute('aria-selected', i === active ? 'true' : 'false');
+        });
+        if (active >= 0) input.setAttribute('aria-activedescendant', box.children[active].id);
+        else input.removeAttribute('aria-activedescendant');
+    }
+
+    function render(list) {
+        items = list;
+        active = -1;
+        box.innerHTML = '';
+        items.forEach((item, index) => {
+            const option = document.createElement('li');
+            option.id = `${box.id}-${index}`;
+            option.setAttribute('role', 'option');
+            const name = document.createElement('span');
+            name.className = 'suggestion-name';
+            name.textContent = item.name;
+            const where = document.createElement('span');
+            where.className = 'suggestion-where';
+            where.textContent = [item.region !== item.name ? item.region : null, item.country].filter(Boolean).join(', ');
+            option.append(name, where);
+            // mousedown, so the pick lands before the field loses focus
+            option.addEventListener('mousedown', (event) => {
+                event.preventDefault();
+                pick(item);
+            });
+            box.appendChild(option);
+        });
+        box.classList.toggle('hidden', items.length === 0);
+        input.setAttribute('aria-expanded', items.length ? 'true' : 'false');
+    }
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim();
+        if (query.length < 2) {
+            close();
+            return;
+        }
+        clearTimeout(timer);
+        const current = ++token;
+        timer = setTimeout(async () => {
+            try {
+                const list = await fetchJson(`/api/locations?q=${encodeURIComponent(query)}`, '');
+                if (current === token) render(list);
+            } catch (e) {
+                // Suggestions are optional - typing a place still works without them
+            }
+        }, 250);
+    });
+
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            close();
+        } else if (!items.length) {
+            return;
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActive((active + 1) % items.length);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActive(active <= 0 ? items.length - 1 : active - 1);
+        } else if (event.key === 'Enter' && active >= 0) {
+            event.preventDefault();
+            pick(items[active]);
+        } else if (event.key === 'Enter') {
+            close();
+        }
+    });
+
+    input.addEventListener('blur', close);
+}
+
+// Ask whether the weather at the current place suits an activity
+function askActivity(question) {
+    question = (question || '').trim();
+    if (!question) {
+        showNotice(el('activityError'), 'Type something you would like to do.', true);
+        return;
+    }
+    if (!currentLocation) return;
+
+    lastActivity = question;
+    loadActivity(
+        `/api/activity/${encodeURIComponent(currentLocation)}?activity=${encodeURIComponent(question)}`,
+        'Could not check that activity.'
+    );
+}
+
+// Pick something at random that the weather at the current place suits
+function surpriseMe() {
+    if (!currentLocation) return;
+
+    lastActivity = '';
+    el('activityInput').value = '';
+    loadActivity(
+        `/api/random-activity/${encodeURIComponent(currentLocation)}?exclude=${encodeURIComponent(shownActivity)}`,
+        'Could not pick an activity.'
+    );
+}
+
+async function loadActivity(path, fallback) {
+    const error = el('activityError');
+    const buttons = [el('activityButton'), el('surpriseButton')];
+    const token = ++activityToken;
+    error.classList.add('hidden');
+    buttons.forEach((button) => { button.disabled = true; });
+
+    try {
+        const data = await fetchJson(path, fallback);
+        if (token !== activityToken) return;
+        shownActivity = data.activity;
+        displayActivity(data);
+    } catch (e) {
+        if (token !== activityToken) return;
+        el('activityResult').classList.add('hidden');
+        showNotice(error, e.message, true);
+    } finally {
+        if (token === activityToken) buttons.forEach((button) => { button.disabled = false; });
+    }
+}
+
+function displayActivity(data) {
+    const verdict = {
+        go: ['Go for it', 'high'],
+        maybe: ['With a little care', 'low'],
+        skip: ['Not right now', 'verylow'],
+    }[data.verdict] || ['', 'medium'];
+    setBadge(el('activityVerdict'), verdict[0], verdict[1]);
+    el('activityHeadline').textContent = data.headline;
+
+    const reasons = el('activityReasons');
+    reasons.innerHTML = '';
+    data.reasons.forEach((reason) => {
+        const li = document.createElement('li');
+        li.textContent = reason;
+        reasons.appendChild(li);
+    });
+
+    const suggestion = el('activitySuggestion');
+    suggestion.textContent = data.suggestion || '';
+    suggestion.classList.toggle('hidden', !data.suggestion);
+
+    // Other places to try the same question
+    el('activityCuriosity').textContent = data.curiosity.question;
+    const places = el('activityPlaces');
+    places.innerHTML = '';
+    data.curiosity.places.forEach((place) => {
+        places.appendChild(chipButton(place, () => searchPlace(place, false)));
+    });
+
+    el('activityResult').classList.remove('hidden');
+}
+
+function chipButton(text, onClick) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = text;
+    chip.addEventListener('click', onClick);
+    return chip;
 }
 
 function factorRow(label, value, isBaseline) {
@@ -366,14 +608,14 @@ function replayReveal() {
 async function handleSubscribe(event) {
     event.preventDefault();
 
-    const phone = el('phoneInput').value.trim();
-    const location = el('cropLocationInput').value.trim();
-    const crop = el('cropInput').value.trim() || null;
+    const email = el('emailInput').value.trim();
+    const location = el('subLocationInput').value.trim();
+    const activity = el('activitySelect').value || null;
     const language = el('languageSelect').value;
     const msg = el('subscribeMessage');
 
-    if (!phone || !location) {
-        showNotice(msg, 'Enter a phone number and a location.', true);
+    if (!email || !location) {
+        showNotice(msg, 'Enter an email address and a location.', true);
         return;
     }
 
@@ -387,7 +629,7 @@ async function handleSubscribe(event) {
             res = await fetch(`${API_BASE}/api/subscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, location, crop, language })
+                body: JSON.stringify({ email, location, activity, language })
             });
         } catch (e) {
             throw new Error('Could not reach the server. Check your connection and try again.');
@@ -396,14 +638,192 @@ async function handleSubscribe(event) {
         if (!res.ok) throw new Error(await errorMessage(res, 'Subscription failed. Please try again.'));
 
         const data = await res.json();
-        showNotice(msg, `Subscribed. Your subscriber ID is ${data.subscriber_id}`, false);
-        el('phoneInput').value = '';
-        el('cropInput').value = '';
+        const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
+        const confirmation = data.confirmation_sent
+            ? 'Check your inbox for a confirmation.'
+            : "We couldn't send a confirmation email just now, so alerts may not reach you yet.";
+        showNotice(
+            msg,
+            `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}. ${confirmation}`,
+            false
+        );
+        rememberSubscription({ email: data.email, location: data.location, token: data.unsubscribe_token });
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Subscribe';
+    }
+}
+
+async function postUnsubscribe(token) {
+    let res;
+    try {
+        res = await fetch(`${API_BASE}/api/unsubscribe/${encodeURIComponent(token)}`, { method: 'POST' });
+    } catch (e) {
+        throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+    if (!res.ok) throw new Error(await errorMessage(res, 'Could not unsubscribe. Please try again.'));
+    return res.json();
+}
+
+// The subscription made in this browser, so it can be cancelled from here
+function savedSubscription() {
+    try {
+        return JSON.parse(localStorage.getItem(SUBSCRIPTION_KEY));
+    } catch (e) {
+        return null;
+    }
+}
+
+function rememberSubscription(subscription) {
+    try {
+        if (subscription) localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
+        else localStorage.removeItem(SUBSCRIPTION_KEY);
+    } catch (e) {
+        // Storage unavailable - the link in each email still unsubscribes
+    }
+    showSubscription(subscription);
+}
+
+function showSubscription(subscription) {
+    el('subscriptionStatus').classList.toggle('hidden', !subscription);
+    if (subscription) {
+        el('subscriptionText').textContent = `Daily alerts for ${subscription.location} go to ${subscription.email}.`;
+    }
+}
+
+async function handleUnsubscribe() {
+    const subscription = savedSubscription();
+    if (!subscription) return;
+
+    const btn = el('unsubscribeBtn');
+    btn.disabled = true;
+    try {
+        const data = await postUnsubscribe(subscription.token);
+        rememberSubscription(null);
+        showNotice(el('subscribeMessage'), `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
+    } catch (error) {
+        showNotice(el('subscribeMessage'), error.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// For a subscription this browser doesn't remember: email the unsubscribe link
+async function handleUnsubscribeLink() {
+    const email = el('emailInput').value.trim();
+    const msg = el('subscribeMessage');
+    if (!email) {
+        showNotice(msg, 'Enter the email address you subscribed with.', true);
+        return;
+    }
+
+    const btn = el('unsubscribeLinkBtn');
+    btn.disabled = true;
+    try {
+        let res;
+        try {
+            res = await fetch(`${API_BASE}/api/unsubscribe-link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+        } catch (e) {
+            throw new Error('Could not reach the server. Check your connection and try again.');
+        }
+        if (!res.ok) throw new Error(await errorMessage(res, 'Could not send the link. Please try again.'));
+        showNotice(msg, `If ${email} is subscribed, an unsubscribe link is on its way.`, false);
+    } catch (error) {
+        showNotice(msg, error.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// Opened from an email's unsubscribe link: ask before unsubscribing
+function showUnsubscribePrompt(token) {
+    const banner = el('unsubscribeBanner');
+    const text = document.createElement('span');
+    text.textContent = 'Stop the daily MoodForecast emails?';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'banner-button';
+    confirm.textContent = 'Yes, unsubscribe';
+    confirm.addEventListener('click', async () => {
+        confirm.disabled = true;
+        try {
+            const data = await postUnsubscribe(token);
+            banner.className = 'notice notice-success';
+            banner.textContent = `${data.email} has been unsubscribed. No more daily alerts will be sent.`;
+            const saved = savedSubscription();
+            if (saved && saved.token === token) rememberSubscription(null);
+            // Drop the token from the address bar so a reload doesn't ask again
+            window.history.replaceState(null, '', window.location.pathname);
+        } catch (error) {
+            banner.className = 'notice notice-error';
+            banner.textContent = error.message;
+        }
+    });
+    banner.append(text, confirm);
+    banner.classList.remove('hidden');
+}
+
+// The activities that are practical at a place, local favourites first
+function fetchLocalActivities(location) {
+    return fetchJson(`/api/activities/${encodeURIComponent(location)}`, '');
+}
+
+// After a search: quick picks for the place, and the same choices in the subscription form
+async function showLocalActivities(location) {
+    const token = searchToken;
+    try {
+        const choices = await fetchLocalActivities(location);
+        if (token !== searchToken) return;
+        renderActivityChips(choices);
+        fillActivityChoices(choices);
+    } catch (e) {
+        // Quick picks are optional - typing a question still works
+    }
+}
+
+// A few local favourites, then a different handful of the rest on each visit
+function renderActivityChips(choices) {
+    const favourites = choices.slice(0, 3);
+    const rest = choices.slice(3).sort(() => Math.random() - 0.5);
+    const chips = el('activityChips');
+    chips.innerHTML = '';
+    favourites.concat(rest).slice(0, ACTIVITY_CHIP_COUNT).forEach((choice) => {
+        chips.appendChild(chipButton(choice.prompt, () => {
+            el('activityInput').value = choice.prompt;
+            askActivity(choice.prompt);
+        }));
+    });
+}
+
+// Offer only what can be done at the subscription's location, keeping the current choice if it still fits
+function fillActivityChoices(choices) {
+    const select = el('activitySelect');
+    const chosen = select.value;
+    while (select.options.length > 1) select.remove(1);
+    choices.forEach((choice) => {
+        const option = document.createElement('option');
+        option.value = choice.name;
+        option.textContent = choice.name.charAt(0).toUpperCase() + choice.name.slice(1);
+        select.appendChild(option);
+    });
+    select.value = choices.some((choice) => choice.name === chosen) ? chosen : '';
+}
+
+// The subscription's location was changed by hand: refresh its activity choices
+async function loadActivityChoices(location) {
+    location = (location || '').trim();
+    if (!location) return;
+    try {
+        const choices = await fetchLocalActivities(location);
+        if (el('subLocationInput').value.trim() === location) fillActivityChoices(choices);
+    } catch (e) {
+        // An unknown place is reported when subscribing
     }
 }
 
@@ -429,7 +849,7 @@ function showError(message) {
 }
 
 function highlightChip(location) {
-    document.querySelectorAll('.chip').forEach((chip) => {
+    document.querySelectorAll('#cityChips .chip').forEach((chip) => {
         chip.classList.toggle('is-active', chip.textContent.toLowerCase() === location.toLowerCase());
     });
 }
@@ -437,15 +857,10 @@ function highlightChip(location) {
 function buildChips() {
     const wrap = el('cityChips');
     POPULAR_CITIES.forEach((city) => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip';
-        chip.textContent = city;
-        chip.addEventListener('click', () => {
+        wrap.appendChild(chipButton(city, () => {
             el('locationInput').value = city;
             handleSearch(city);
-        });
-        wrap.appendChild(chip);
+        }));
     });
 }
 
@@ -458,7 +873,22 @@ function init() {
         event.preventDefault();
         handleSearch(el('locationInput').value);
     });
+    attachSuggestions(el('locationInput'), handleSearch);
+    attachSuggestions(el('subLocationInput'), loadActivityChoices);
+    el('subLocationInput').addEventListener('change', (event) => loadActivityChoices(event.target.value));
+
+    el('activityForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        askActivity(el('activityInput').value);
+    });
+    el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
+    el('unsubscribeBtn').addEventListener('click', handleUnsubscribe);
+    el('unsubscribeLinkBtn').addEventListener('click', handleUnsubscribeLink);
+    showSubscription(savedSubscription());
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('unsubscribe')) showUnsubscribePrompt(params.get('unsubscribe'));
 
     // Start from ?q= in the link, then the last place searched, then the default
     let initial = el('locationInput').value;
@@ -467,7 +897,7 @@ function init() {
     } catch (e) {
         // Storage unavailable - use the default
     }
-    initial = new URLSearchParams(window.location.search).get('q') || initial;
+    initial = params.get('q') || initial;
     el('locationInput').value = initial;
     handleSearch(initial);
 }

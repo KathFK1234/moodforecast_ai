@@ -154,6 +154,9 @@ body {
 
 /* Search */
 .search {
+    /* Above the cards, so the suggestions can drop over them */
+    position: relative;
+    z-index: 5;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -166,6 +169,50 @@ body {
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Places offered while typing a location */
+.suggestions {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 5;
+    list-style: none;
+    padding: 6px;
+    background: #141b33;
+    border: 1px solid var(--field-line);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    text-align: left;
+}
+
+.suggestions li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.suggestions li:hover,
+.suggestions li.is-active {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.suggestion-name {
+    color: var(--ink);
+    font-weight: 500;
+}
+
+.suggestion-where {
+    color: var(--ink-3);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .search:focus-within {
@@ -198,6 +245,7 @@ body {
 }
 
 .search button,
+.activity-form button,
 .subscribe-button {
     padding: 11px 22px;
     border: none;
@@ -212,16 +260,19 @@ body {
 }
 
 .search button:hover,
+.activity-form button:hover,
 .subscribe-button:hover {
     transform: translateY(-1px);
 }
 
 .search button:active,
+.activity-form button:active,
 .subscribe-button:active {
     transform: translateY(0);
 }
 
 .search button:disabled,
+.activity-form button:disabled,
 .subscribe-button:disabled {
     opacity: 0.55;
     cursor: progress;
@@ -795,6 +846,108 @@ body {
     color: var(--ink);
 }
 
+/* Activity check */
+.activity-form {
+    display: flex;
+    gap: 10px;
+}
+
+.activity-form input {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-form .button-ghost {
+    background: transparent;
+    border: 1px solid var(--field-line);
+    color: var(--ink);
+}
+
+.activity-form .button-ghost:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.activity-card .chips {
+    justify-content: flex-start;
+    margin: 12px 0 0;
+}
+
+.activity-card .notice {
+    margin-top: 14px;
+}
+
+.activity-result {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--card-line);
+}
+
+.activity-headline {
+    margin-top: 12px;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.activity-reasons {
+    list-style: none;
+    margin-top: 8px;
+}
+
+.activity-reasons li,
+.activity-suggestion {
+    padding: 3px 0;
+    font-size: 14px;
+    color: var(--ink-2);
+}
+
+.activity-suggestion {
+    margin-top: 6px;
+    color: var(--ink);
+}
+
+.activity-result .card-note {
+    margin-top: 16px;
+}
+
+/* Curiosity */
+.curiosity-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.curiosity-prompt {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius-sm);
+    background: var(--field);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.curiosity-prompt:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.curiosity-place {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-ink);
+}
+
 /* Subscribe */
 .subscribe-form {
     display: grid;
@@ -802,6 +955,10 @@ body {
     align-items: end;
     gap: 12px;
     margin-top: 14px;
+}
+
+.form-group {
+    position: relative;
 }
 
 .form-group label {
@@ -817,6 +974,7 @@ body {
     font-weight: 400;
 }
 
+.activity-form input,
 .form-group input,
 .form-group select {
     width: 100%;
@@ -834,10 +992,12 @@ body {
     color: #0c1122;
 }
 
+.activity-form input::placeholder,
 .form-group input::placeholder {
     color: var(--ink-3);
 }
 
+.activity-form input:focus,
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
@@ -872,6 +1032,60 @@ body {
     background: rgba(12, 163, 12, 0.18);
     border: 1px solid rgba(90, 210, 90, 0.5);
     color: #e2ffe2;
+}
+
+.notice-info {
+    background: rgba(57, 135, 229, 0.18);
+    border: 1px solid rgba(120, 170, 240, 0.5);
+    color: #e3efff;
+}
+
+#unsubscribeBanner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px 16px;
+    max-width: 560px;
+    margin: 0 auto 20px;
+}
+
+.banner-button {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #0c1122;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.banner-button:disabled {
+    opacity: 0.55;
+    cursor: progress;
+}
+
+.subscription-status {
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.link-button {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent-ink);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-button:disabled {
+    opacity: 0.55;
+    cursor: progress;
 }
 
 #errorState {
@@ -949,6 +1163,10 @@ body {
         grid-template-columns: 1fr 1fr;
     }
 
+    .curiosity-list {
+        grid-template-columns: 1fr;
+    }
+
     .day {
         grid-template-columns: 76px minmax(0, 1fr) 44px minmax(120px, 1fr);
         row-gap: 8px;
@@ -1007,6 +1225,18 @@ body {
 
     .subscribe-button {
         justify-self: stretch;
+    }
+
+    .activity-form {
+        flex-wrap: wrap;
+    }
+
+    .activity-form input {
+        flex-basis: 100%;
+    }
+
+    .activity-form button {
+        flex: 1;
     }
 }
 

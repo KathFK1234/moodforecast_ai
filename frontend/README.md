@@ -46,13 +46,16 @@ API calls use relative paths, so the page must be opened through the backend rat
 
 ## How It Works
 
-1. **Search** → user enters a location, picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser.
+1. **Search** → user enters a location (matching places are suggested while typing, from `GET /api/locations`), picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser.
 2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`, in parallel
 3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
 4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score
 5. **7-day mood outlook** → icon, rain chance, temperature range and expected mood per day
-6. **Recommendations** → wellbeing tips for the current conditions
-7. **Subscribe form** → `POST /api/subscribe` with phone, location, optional crop and language
+6. **Recommendations** → activity ideas and wellbeing tips for the current conditions, different on each visit
+7. **Activity check** → type a question or pick one of the quick picks, which come from `GET /api/activities/{location}` and so fit the place; `GET /api/activity/{location}?activity=...` returns a verdict, the reasons, something to do instead, and other places to try. Picking one of those places searches it and asks the same question there. Until a question is asked, the card shows a random pick from `GET /api/random-activity/{location}`; **Surprise me** rolls another.
+8. **Stay curious** → three questions about other places from the wellbeing response; tapping one searches that place
+9. **Subscribe form** → `POST /api/subscribe` with email, location, an activity (from `GET /api/activities/{location}` for the subscription's location, or a random pick each day) and language. The location field suggests places while typing. The browser remembers the subscription and shows an **Unsubscribe** link; a subscription made elsewhere can ask for its unsubscribe link by email.
+10. **Unsubscribe links** → emails link to `/?unsubscribe=<token>`; the page asks for confirmation, then calls `POST /api/unsubscribe/{token}`
 
 Errors show the message returned by the API.
 

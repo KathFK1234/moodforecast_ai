@@ -47,6 +47,9 @@
         <!-- Error State -->
         <div id="errorState" class="notice notice-error hidden" role="alert"></div>
 
+        <!-- Shown when the page is opened from an email's unsubscribe link -->
+        <div id="unsubscribeBanner" class="notice notice-info hidden" role="status"></div>
+
         <!-- Loading State -->
         <div id="loadingState" class="skeleton-grid hidden" aria-live="polite" aria-label="Loading forecast">
             <div class="card skeleton"></div>
@@ -139,6 +142,36 @@
                 </section>
             </div>
 
+            <!-- Activity check -->
+            <section class="card activity-card reveal" aria-labelledby="activityHeading">
+                <div class="card-head">
+                    <h2 class="card-title" id="activityHeading">Thinking of doing something?</h2>
+                    <p class="card-note">Ask whether the weather in <span id="activityPlace">this place</span> suits it, or let us pick something for you.</p>
+                </div>
+                <form class="activity-form" id="activityForm">
+                    <label class="visually-hidden" for="activityInput">Activity</label>
+                    <input
+                        type="text"
+                        id="activityInput"
+                        placeholder="e.g. Can I go for a run?"
+                        maxlength="120"
+                        autocomplete="off"
+                    >
+                    <button type="submit" id="activityButton">Ask</button>
+                    <button type="button" class="button-ghost" id="surpriseButton">Surprise me</button>
+                </form>
+                <div class="chips" id="activityChips" aria-label="Popular activities"></div>
+                <div id="activityError" class="notice notice-error hidden" role="alert"></div>
+                <div id="activityResult" class="activity-result hidden" aria-live="polite">
+                    <span class="badge" id="activityVerdict"></span>
+                    <p class="activity-headline" id="activityHeadline"></p>
+                    <ul class="activity-reasons" id="activityReasons"></ul>
+                    <p class="activity-suggestion hidden" id="activitySuggestion"></p>
+                    <p class="card-note" id="activityCuriosity"></p>
+                    <div class="chips" id="activityPlaces"></div>
+                </div>
+            </section>
+
             <!-- Forecast -->
             <section id="forecastSection" class="card forecast-card reveal hidden" aria-labelledby="forecastHeading">
                 <div class="card-head">
@@ -148,22 +181,33 @@
                 <ul class="forecast-list" id="forecastList"></ul>
             </section>
 
+            <!-- Curiosity -->
+            <section id="curiositySection" class="card curiosity-card reveal hidden" aria-labelledby="curiosityHeading">
+                <div class="card-head">
+                    <h2 class="card-title" id="curiosityHeading">Stay curious</h2>
+                    <p class="card-note">The weather is doing something different everywhere. Tap a question to find out.</p>
+                </div>
+                <ul class="curiosity-list" id="curiosityList"></ul>
+            </section>
+
             <!-- Subscribe -->
             <section class="card subscribe-card reveal" aria-labelledby="subHeading">
                     <h2 class="card-title" id="subHeading">Subscribe to daily alerts</h2>
-                    <p class="card-note">Register your number and location for mood and weather alerts.</p>
+                    <p class="card-note">Get a daily email with the mood forecast for your location and an activity to go with it.</p>
                     <form id="subscribeForm" class="subscribe-form" novalidate>
                         <div class="form-group">
-                            <label for="phoneInput">Phone number</label>
-                            <input type="tel" id="phoneInput" placeholder="+254712345678" autocomplete="tel" required>
+                            <label for="emailInput">Email</label>
+                            <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" required>
                         </div>
                         <div class="form-group">
-                            <label for="cropLocationInput">Location</label>
-                            <input type="text" id="cropLocationInput" placeholder="Your location" required>
+                            <label for="subLocationInput">Location</label>
+                            <input type="text" id="subLocationInput" placeholder="Your location" autocomplete="off" required>
                         </div>
                         <div class="form-group">
-                            <label for="cropInput">Crop <span class="optional">optional</span></label>
-                            <input type="text" id="cropInput" placeholder="e.g. Maize, Tea, Wheat">
+                            <label for="activitySelect">Activity</label>
+                            <select id="activitySelect">
+                                <option value="">Surprise me each day</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="languageSelect">Language</label>
@@ -174,6 +218,14 @@
                         </div>
                         <button type="submit" class="subscribe-button" id="subscribeBtn">Subscribe</button>
                         <div id="subscribeMessage" class="notice hidden" role="status"></div>
+                        <p class="subscription-status">
+                            Subscribed on another device? Enter your email above and
+                            <button type="button" class="link-button" id="unsubscribeLinkBtn">get an unsubscribe link by email</button>.
+                        </p>
+                        <p id="subscriptionStatus" class="subscription-status hidden">
+                            <span id="subscriptionText"></span>
+                            <button type="button" class="link-button" id="unsubscribeBtn">Unsubscribe</button>
+                        </p>
                     </form>
             </section>
         </main>

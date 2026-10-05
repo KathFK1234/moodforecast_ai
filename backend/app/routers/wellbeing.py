@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
 from app.services.mood_engine import BASELINE_SCORE, build_summary, score_mood
+from app.services.curiosity import curiosity_prompts
 from app.models.schemas import WellbeingResponse
 from app.routers.common import build_weather, resolve_location
 
@@ -15,7 +16,7 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
     Get mood and wellbeing score for a location.
     
     Returns mood score with the factors behind it, energy level, risk rating,
-    recommendations, and a summary.
+    recommendations, a summary, and questions about other places to look up.
     Cached for 10 minutes.
     """
     try:
@@ -47,7 +48,11 @@ async def get_wellbeing(location: str) -> WellbeingResponse:
                 mood_result["factors"],
                 weather.is_day
             ),
-            recommendations=mood_result["recommendations"]
+            recommendations=mood_result["recommendations"],
+            curiosity=curiosity_prompts(
+                resolved_location, weather.condition, weather.temp_c, weather.is_day,
+                searched_as=location
+            )
         )
     
     except HTTPException:

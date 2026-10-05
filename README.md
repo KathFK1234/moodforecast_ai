@@ -36,10 +36,15 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Mood scoring** - rule-based score (0-100) with a mood label, energy and risk levels
 - **Why this score** - the factors that raised or lowered the score, and by how much
 - **7-day mood outlook** - expected mood for each day of the forecast
-- **Recommendations** - wellbeing tips based on condition, temperature, humidity and time of day
+- **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
+- **Activity check** - ask whether the weather somewhere suits a run, a picnic, a swim, stargazing and more, and get a go, maybe or skip with the reasons
+- **Surprise me** - a random activity the current weather suits, different on every visit and every tap
+- **Local fit** - suggestions match the place as well as the weather: no beach days inland or skiing in the tropics, sports only where they are commonly played, and local favourites first
+- **Stay curious** - questions about the weather in other places, one tap away
+- **Location suggestions** - matching places appear as you type in either location field
 - **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim
-- **Subscriptions** - stores phone, location, crop and language for future SMS alerts (sending is not implemented yet)
+- **Daily email alerts** - subscribe with an email, a location and an activity (or a random pick each day); a confirmation goes out straight away and the alert every morning, local time. Every email has an unsubscribe link. Needs SMTP settings, see below
 - **Caching** - repeat requests are answered from an in-memory cache
 
 ## Project Structure
@@ -51,7 +56,7 @@ moodforecast_ai/
 │   │   ├── main.py            # App factory, CORS, static files
 │   │   ├── config.py          # Settings from environment / .env
 │   │   ├── models/            # Database table and request/response schemas
-│   │   ├── routers/           # forecast, wellbeing, subscribe endpoints
+│   │   ├── routers/           # forecast, wellbeing, activity, locations, subscribe endpoints
 │   │   ├── services/          # weather, geocoding, mood engine, cache
 │   │   └── static/            # Deployed copy of frontend/
 │   ├── tests/                 # pytest suite
@@ -74,7 +79,13 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | ------ | ---- | ----------- |
 | GET | `/api/forecast/{location}` | Current weather and 7-day forecast with a mood outlook per day |
 | GET | `/api/wellbeing/{location}` | Current weather, mood score and the factors behind it, energy, risk, recommendations |
-| POST | `/api/subscribe` | Register a subscriber |
+| GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
+| GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
+| GET | `/api/locations?q=...` | Places matching what has been typed so far |
+| GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
+| POST | `/api/subscribe` | Subscribe an email address to daily alerts, or update its subscription |
+| POST | `/api/unsubscribe/{token}` | Stop the alerts for a subscription |
+| POST | `/api/unsubscribe-link` | Email a subscriber their unsubscribe link |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger UI |
 
@@ -97,6 +108,20 @@ All are optional.
 | `CACHE_TTL_SECONDS` | `600` | How long weather and geocoding results are cached |
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
+| `SMTP_HOST` | (unset) | SMTP server for confirmation emails and daily alerts, e.g. `smtp.gmail.com`. Nothing is sent until this and `MAIL_FROM` are set |
+| `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
+| `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
+| `MAIL_FROM` | (unset) | Sender, e.g. `MoodForecast <you@gmail.com>` |
+| `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the unsubscribe links in emails |
+| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent |
+
+To check that email works, set the SMTP variables in `backend/.env` and run, from `backend/`:
+
+```bash
+python -m app.services.mailer you@example.com   # sends one test message
+python -m app.services.alerts --all             # sends today's alert to every subscriber now
+```
 
 ## Testing
 

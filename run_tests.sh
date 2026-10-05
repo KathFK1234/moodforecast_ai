@@ -79,7 +79,7 @@ wellbeing=$(curl -s $BASE_URL/api/wellbeing/London | grep -o '"mood_score"')
 # Subscribe
 subscribe=$(curl -s -X POST $BASE_URL/api/subscribe \
   -H "Content-Type: application/json" \
-  -d '{"phone":"+254712345678","location":"Nairobi"}' | grep -o '"subscriber_id"')
+  -d '{"email":"smoke-test@example.com","location":"Nairobi"}' | grep -o '"subscriber_id"')
 [ -n "$subscribe" ] && pass "Subscribe endpoint working" || fail "Subscribe endpoint not working"
 
 # Documentation
@@ -144,7 +144,7 @@ if [ -f "backend/moodforecast.db" ]; then
     pass "SQLite database initialized"
     
     # Check record count
-    record_count=$(cd backend && sqlite3 moodforecast.db "SELECT COUNT(*) FROM subscriber;" 2>/dev/null || echo "0")
+    record_count=$(cd backend && sqlite3 moodforecast.db "SELECT COUNT(*) FROM alert_subscriber;" 2>/dev/null || echo "0")
     pass "Database has $record_count subscriber record(s)"
 else
     skip "SQLite database not found - created on first run, or DATABASE_URL points elsewhere"

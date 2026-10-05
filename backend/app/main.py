@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
@@ -7,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.models.db import create_tables
-from app.routers import forecast, wellbeing, subscribe
+from app.routers import forecast, wellbeing, activity, locations, subscribe
 from app.models.schemas import HealthResponse
+from app.services import alerts, mailer
 from app.services.weather import get_weather_client
 
 
@@ -20,9 +22,19 @@ async def lifespan(app: FastAPI):
     print("✓ Database tables initialized")
     print("✓ Weather client ready (Open-Meteo)")
     
+    # Daily alerts run in the background, in this process
+    alert_task = None
+    if mailer.is_configured():
+        alert_task = asyncio.create_task(alerts.run_alert_loop())
+        print(f"✓ Daily alerts scheduled for {settings.alert_hour:02d}:00 local time")
+    else:
+        print("• Email not configured (SMTP_HOST, MAIL_FROM) - daily alerts are off")
+    
     yield
     
     # Shutdown
+    if alert_task:
+        alert_task.cancel()
     client = get_weather_client()
     await client.close()
     print("✓ Shutdown complete")
@@ -49,6 +61,8 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(forecast.router)
     app.include_router(wellbeing.router)
+    app.include_router(activity.router)
+    app.include_router(locations.router)
     app.include_router(subscribe.router)
     
     # Health check
