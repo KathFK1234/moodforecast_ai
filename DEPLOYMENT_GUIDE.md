@@ -9,9 +9,9 @@ Browser
    ↕
 FastAPI (backend/app)
    ├── Static frontend      backend/app/static
-   ├── Routers              forecast, wellbeing, subscribe
+   ├── Routers              forecast, wellbeing, activity, locations, subscribe
    ├── Services             weather, geocoding, mood engine, cache
-   └── Database             SQLite or PostgreSQL (subscriber table)
+   └── Database             SQLite or PostgreSQL (alert_subscriber table)
    ↕
 Open-Meteo (weather)  +  Nominatim / OpenStreetMap (geocoding)
 ```
@@ -65,10 +65,20 @@ In the project's "Variables" tab:
 | `ENVIRONMENT` | `production` |
 | `CACHE_TTL_SECONDS` | `600` (optional) |
 | `DATABASE_URL` | PostgreSQL URL (recommended, see below) |
+| `PUBLIC_URL` | `https://YOUR_DOMAIN` - used for the unsubscribe links in emails |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | Your email provider's SMTP details (see below) |
+| `ALERT_HOUR` | `7` (optional) - local hour the daily alert is sent |
 
 Variables left over from the old weather provider, such as `WEATHERAI_API_KEY`, are ignored and can be deleted.
 
 **Database:** if `DATABASE_URL` is not set, the app uses a SQLite file inside the container. That file is lost on every redeploy, so subscribers will not persist. To keep them, add a PostgreSQL database in Railway and set `DATABASE_URL` to its connection URL. Tables are created on startup.
+
+**Email:** confirmation emails and daily alerts are sent over SMTP, and nothing is sent until `SMTP_HOST` and `MAIL_FROM` are set. Any SMTP provider works, such as Gmail with an app password, Brevo, Mailgun or SendGrid. Two things to check on Railway:
+
+- Railway has blocked outbound SMTP on its Free, Trial and Hobby plans. If the logs show `Could not send email ... timed out` or `Network is unreachable`, that is the cause: move to a plan that allows SMTP, or host the app somewhere that does.
+- The daily send runs inside the web process, so keep the service at one replica. More replicas would each send their own copy of every alert.
+
+The deploy log shows `✓ Daily alerts scheduled for 07:00 local time` when email is configured, and `• Email not configured` when it is not.
 
 ### 4. Verify
 
@@ -119,6 +129,8 @@ The free hosted Open-Meteo API is for non-commercial use, at about 10,000 calls 
 | Timeout (504) | Upstream service is slow - retry shortly |
 | Frontend shows old content | `backend/app/static/` was not updated from `frontend/`; browser cache |
 | Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |
+| Subscribing works but no email arrives | `SMTP_HOST` and `MAIL_FROM` are set; the logs for `Could not send email`; the recipient's spam folder; whether the host allows outbound SMTP |
+| Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
 
 To see request details:
@@ -133,7 +145,9 @@ curl -v https://YOUR_DOMAIN/api/forecast/Nairobi
 - [ ] Different locations return different weather
 - [ ] The 7-day forecast shows in the weather card
 - [ ] Mood score and recommendations show
-- [ ] The subscribe form returns a subscriber ID
+- [ ] Typing in a location field suggests places
+- [ ] The activity card shows a pick, and "Surprise me" changes it
+- [ ] Subscribing sends a confirmation email, and its unsubscribe link works
 - [ ] No errors in the browser console or the Railway logs
 
 ## References

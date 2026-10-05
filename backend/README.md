@@ -34,12 +34,18 @@ app/
     forecast.py       # GET /api/forecast/{location}
     wellbeing.py      # GET /api/wellbeing/{location}
     common.py         # Location lookup and weather model shared by both
-    subscribe.py      # POST /api/subscribe
+    activity.py       # GET /api/activity, /api/random-activity, /api/activities
+    locations.py      # GET /api/locations
+    subscribe.py      # POST /api/subscribe, /api/unsubscribe/{token}, /api/unsubscribe-link
   
   services/           # Business logic
     weather.py        # Open-Meteo API client with caching
     geocoding.py      # Location name → coordinates
     mood_engine.py    # Rule-based mood scoring
+    activity_advisor.py  # Whether the weather suits an activity; random picks
+    curiosity.py      # Questions about other places
+    mailer.py         # SMTP email
+    alerts.py         # Confirmation and daily alert emails, and the daily send
     cache.py          # In-memory TTL cache
   
   models/             # Data schemas
@@ -53,6 +59,10 @@ tests/
   test_endpoints.py      # Endpoint tests (mocked weather client)
   test_weather.py        # Open-Meteo client tests (mocked HTTP)
   test_geocoding.py      # Geocoding tests (mocked HTTP)
+  test_activity_advisor.py  # Activity rules and random picks (no I/O)
+  test_curiosity.py      # Curiosity prompts (no I/O)
+  test_mailer.py         # Mailer tests (fake SMTP)
+  test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
   test_static_sync.py    # static/ matches ../frontend
 ```
 
@@ -183,19 +193,41 @@ curl "http://localhost:8000/api/locations?q=kis"
 
 `label` is the text to search for. A label that came from this endpoint resolves to exactly that place.
 
+### GET /api/activities
+
+The names of the activities the advisor knows, for the subscription form: `["running", "a walk", "cycling", ...]`.
+
 ### POST /api/subscribe
 
-Stores a subscriber. Requires `phone` (E.164: `+` then 8-15 digits) and `location`; `crop` and `language` (`en` or `sw`) are optional.
+Subscribes an email address to daily alerts for a location. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is stored, but emails are currently written in English only.
 
 ```bash
 curl -X POST http://localhost:8000/api/subscribe \
   -H "Content-Type: application/json" \
-  -d '{"phone": "+254712345678", "location": "Nairobi", "crop": "maize", "language": "en"}'
+  -d '{"email": "amina@example.com", "location": "Nairobi", "activity": "running"}'
 ```
 
 ```json
-{"subscriber_id": "550e8400-e29b-41d4-a716-446655440000", "phone": "+254712345678", "location": "Nairobi", "status": "subscribed"}
+{
+  "subscriber_id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "amina@example.com",
+  "location": "Nairobi, KE",
+  "activity": "running",
+  "status": "subscribed",
+  "unsubscribe_token": "dpBmuKD_4mX-H5PNjM9cc0IiXxA022Yb",
+  "confirmation_sent": true
+}
 ```
+
+The location must be one the geocoder can find (422 otherwise). Subscribing again with the same email updates that subscription and returns `"status": "updated"`. `confirmation_sent` is `false` when email is not configured or the confirmation could not be sent; the subscription is stored either way.
+
+### POST /api/unsubscribe/{token}
+
+Stops the alerts for the subscription the token belongs to. The token is the `unsubscribe_token` from subscribing, and is in the link in every email. Returns `{"email": "...", "status": "unsubscribed"}`, or 404 for an unknown token. Subscribing again with the same email turns the alerts back on.
+
+### POST /api/unsubscribe-link
+
+Emails a subscriber their unsubscribe link, for when they have no alert email to hand. Body: `{"email": "amina@example.com"}`. Always answers 202 with `{"status": "sent_if_subscribed"}`, so it does not reveal who is subscribed. Returns 503 if email is not configured.
 
 ### GET /health
 
@@ -229,6 +261,13 @@ All are optional.
 | `CACHE_TTL_SECONDS` | `600` | Cache time-to-live in seconds |
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Open-Meteo base URL (only change if self-hosting) |
+| `SMTP_HOST` | (unset) | SMTP server for confirmation emails and daily alerts, e.g. `smtp.gmail.com`. Nothing is sent until this and `MAIL_FROM` are set |
+| `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
+| `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
+| `MAIL_FROM` | (unset) | Sender, e.g. `MoodForecast <you@gmail.com>` |
+| `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the unsubscribe links in emails |
+| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent |
 
 ## Weather Provider
 
@@ -247,6 +286,8 @@ Location names are resolved in `app/services/geocoding.py`:
 
 - A built-in list of popular cities is checked first (no network call)
 - Otherwise `GET https://nominatim.openstreetmap.org/search` (OpenStreetMap, no API key)
+
+Suggestions while typing come from `GET https://geocoding-api.open-meteo.com/v1/search` instead, because Nominatim's usage policy does not allow autocomplete.
 
 ## Mood Scoring Model
 
@@ -297,10 +338,33 @@ Recommendations also depend on the time of day: daylight advice is replaced with
 Tables are created on startup. SQLite is used by default; set `DATABASE_URL` to a PostgreSQL URL for production.
 
 ```bash
-sqlite3 moodforecast.db "SELECT * FROM subscriber;"
+sqlite3 moodforecast.db "SELECT email, place, activity, active, last_sent_on FROM alert_subscriber;"
 ```
+
+Subscribers are in `alert_subscriber`. A database created before email alerts also has a `subscriber` table of phone numbers; it is no longer read or written.
+
+## Email Alerts
+
+Email is sent over SMTP by `app/services/mailer.py`, using the `SMTP_*` and `MAIL_FROM` variables above. Until `SMTP_HOST` and `MAIL_FROM` are set nothing is sent: subscriptions are still stored, and the startup log says daily alerts are off.
+
+```bash
+python -m app.services.mailer you@example.com   # send one test message
+python -m app.services.alerts                   # send the alerts that are due now
+python -m app.services.alerts --all             # send to every active subscriber now
+```
+
+Three emails exist, all composed in `app/services/alerts.py` as plain text with an HTML alternative:
+
+- **Confirmation** - sent when someone subscribes or changes their subscription
+- **Daily alert** - current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
+- **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
+
+Every email ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
+
+The daily send runs inside the web process: a background task started with the app checks every 15 minutes for subscribers where it is past `ALERT_HOUR` local time and today's alert has not gone out. A subscriber is marked as sent only after their email is accepted, so a failed send is retried on the next check. Someone who subscribes after `ALERT_HOUR` gets their first alert the next morning. Because the task runs in every process, run a single instance of the app, or each one will send its own copy.
 
 ## Notes
 
-- Subscribers are stored, but no SMS/USSD messages are sent - no gateway is integrated yet
+- Emails are in English whatever `language` a subscriber chose
+- Subscribing does not ask the address owner to confirm first (no double opt-in), so anyone can sign an address up; every email has an unsubscribe link
 - Deployment: see [../DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)
