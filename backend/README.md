@@ -120,6 +120,8 @@ curl http://localhost:8000/api/wellbeing/Nairobi
 
 `mood_score` is `baseline_score` plus the `delta` of every factor, clamped to 0-100. `ai_summary` is written from those factors by rules in `mood_engine.py`; no language model is involved.
 
+Each recommendation is picked at random from a pool of ideas that fit the conditions (a picnic or a bike ride on a clear day, a board game or a new recipe in the rain, stargazing on a clear night), so repeated requests for the same weather return different suggestions.
+
 ### POST /api/subscribe
 
 Stores a subscriber. Requires `phone` (E.164: `+` then 8-15 digits) and `location`; `crop` and `language` (`en` or `sw`) are optional.

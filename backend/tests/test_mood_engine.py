@@ -1,6 +1,9 @@
 """Unit tests for mood engine - no I/O dependencies."""
 
+import random
+
 import pytest
+from app.services import mood_engine
 from app.services.mood_engine import (
     BASELINE_SCORE,
     build_summary,
@@ -116,35 +119,51 @@ class TestRecommendationGeneration:
     """Test wellbeing recommendation generation."""
     
     def test_sunny_recommendations(self):
-        """Sunny weather should include outdoor activity recommendations."""
+        """Sunny weather should suggest something from the clear-day pool."""
         recs = generate_recommendations(75, "Sunny", 22, 50)
-        assert len(recs) > 0
-        assert any("outdoor" in r.lower() or "walk" in r.lower() for r in recs)
+        assert recs[0] in mood_engine.CLEAR_DAY_IDEAS
+    
+    def test_hot_sun_avoids_exertion_in_full_sun(self):
+        """Above 30°C a clear day should not suggest runs or picnics."""
+        recs = generate_recommendations(60, "Sunny", 36, 50)
+        assert recs[0] in mood_engine.HOT_SUN_IDEAS
+        assert recs[1] in mood_engine.HOT_IDEAS
     
     def test_rainy_recommendations(self):
-        """Rainy weather should suggest indoor focus work."""
+        """Rainy weather should suggest something from the rain pool."""
         recs = generate_recommendations(50, "Rainy", 18, 70)
-        assert len(recs) > 0
-        # Should suggest indoor activities
-        assert any("indoor" in r.lower() for r in recs)
+        assert recs[0] in mood_engine.RAIN_IDEAS
+    
+    def test_storm_and_snow_have_their_own_ideas(self):
+        assert generate_recommendations(40, "Thunderstorm", 18, 70)[0] in mood_engine.STORM_IDEAS
+        assert generate_recommendations(40, "Snow Showers", 0, 70)[0] in mood_engine.SNOW_IDEAS
     
     def test_extreme_cold_recommendations(self):
-        """Cold weather should suggest warmth and hydration."""
+        """Cold weather should suggest warmth."""
         recs = generate_recommendations(30, "Cloudy", 5, 50)
-        assert len(recs) > 0
-        assert any("warm" in r.lower() or "cold" in r.lower() for r in recs)
+        assert any(r in mood_engine.COLD_IDEAS for r in recs)
+        assert all("warm" in r.lower() or "cold" in r.lower() for r in mood_engine.COLD_IDEAS)
     
     def test_high_humidity_recommendations(self):
         """High humidity should mention hydration."""
         recs = generate_recommendations(50, "Cloudy", 28, 85)
-        assert len(recs) > 0
-        assert any("hydration" in r.lower() or "water" in r.lower() for r in recs)
+        assert any(r in mood_engine.HUMID_IDEAS for r in recs)
+        assert all("hydration" in r.lower() or "water" in r.lower() for r in mood_engine.HUMID_IDEAS)
     
     def test_low_mood_includes_wellness(self):
-        """Low mood should include mindfulness or wellness tips."""
+        """Low mood should add a pick-me-up."""
         recs = generate_recommendations(30, "Stormy", 10, 80)
-        assert len(recs) > 0
-        assert any("mindfulness" in r.lower() or "stretch" in r.lower() for r in recs)
+        assert recs[-1] in mood_engine.LOW_MOOD_IDEAS
+    
+    def test_recommendations_vary(self):
+        """The same weather should not always give the same advice."""
+        seen = {generate_recommendations(75, "Sunny", 22, 50)[0] for _ in range(200)}
+        assert len(seen) > 1
+    
+    def test_seeded_rng_gives_repeatable_picks(self):
+        first = generate_recommendations(40, "Rain", 15, 85, rng=random.Random(7))
+        second = generate_recommendations(40, "Rain", 15, 85, rng=random.Random(7))
+        assert first == second
 
 
 class TestFullMoodEngine:
@@ -217,17 +236,25 @@ class TestMoodLabel:
 class TestNightRecommendations:
     """Test recommendations after dark."""
     
-    def test_no_morning_walk_advice_at_night(self):
+    def test_night_advice_comes_from_the_night_pools(self):
         recs = generate_recommendations(80, "Clear", 20, 50, is_day=False)
-        text = " ".join(recs)
-        assert "11am" not in text
-        assert "2pm" not in text
-        assert len(recs) > 0
-    
-    def test_no_midday_advice_on_an_overcast_night(self):
+        assert recs[0] in mood_engine.CLEAR_NIGHT_IDEAS
+        assert recs[1] in mood_engine.MILD_NIGHT_IDEAS
+        
         recs = generate_recommendations(55, "Overcast", 18, 60, is_day=False)
-        assert "midday" not in " ".join(recs)
-        assert len(recs) > 0
+        assert recs[0] in mood_engine.NIGHT_IDEAS
+    
+    def test_night_pools_have_no_daytime_advice(self):
+        night_ideas = (
+            mood_engine.CLEAR_NIGHT_IDEAS
+            + mood_engine.NIGHT_IDEAS
+            + mood_engine.MILD_NIGHT_IDEAS
+        )
+        for idea in night_ideas:
+            assert "11am" not in idea
+            assert "2pm" not in idea
+            assert "midday" not in idea
+            assert "lunch" not in idea
 
 
 class TestSummary:
