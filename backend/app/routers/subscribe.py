@@ -2,6 +2,7 @@
 
 import secrets
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from app.models.db import Subscriber, get_engine
@@ -64,6 +65,11 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             subscriber.activity = request.activity
             subscriber.language = request.language
             subscriber.active = True
+            # The confirmation covers today if the alert hour has already passed,
+            # so the first daily alert arrives the next morning
+            now = datetime.now(timezone.utc)
+            if subscriber.last_sent_on is None and alerts.is_due(subscriber, now):
+                subscriber.last_sent_on = alerts.local_date(subscriber.utc_offset_seconds, now)
             
             session.add(subscriber)
             session.commit()

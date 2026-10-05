@@ -1,6 +1,7 @@
 """Integration tests for API endpoints with mocked weather client."""
 
 import pytest
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
@@ -132,7 +133,6 @@ def test_subscribe_persists_subscriber(mock_weather):
     assert subscriber.active is True
     assert subscriber.token
     assert subscriber.created_at is not None
-    assert subscriber.last_sent_on is None
 
 
 def test_subscribing_again_updates_the_subscription(mock_weather):
@@ -224,6 +224,27 @@ def test_unsubscribe(mock_weather):
 def test_unsubscribe_unknown_token(mock_weather):
     response = client.post("/api/unsubscribe/not-a-real-token")
     assert response.status_code == 404
+
+
+def test_first_daily_alert_waits_for_the_next_morning(mock_weather):
+    """Subscribing after the alert hour should not trigger an alert the same day."""
+    engine = memory_engine()
+    # The mocked location is UTC+3: 12:00 UTC is 15:00 there, 02:00 UTC is 05:00
+    afternoon = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
+    before_dawn = datetime(2026, 10, 5, 2, 0, tzinfo=timezone.utc)
+    
+    with patch('app.routers.subscribe.get_engine', return_value=engine), \
+         patch('app.routers.subscribe.datetime') as clock:
+        clock.now.return_value = afternoon
+        client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        clock.now.return_value = before_dawn
+        client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
+    
+    with Session(engine) as session:
+        by_email = {s.email: s for s in session.exec(select(Subscriber)).all()}
+    assert by_email["amina@example.com"].last_sent_on == "2026-10-05"
+    # Subscribed before the alert hour, so today's alert is still to come
+    assert by_email["ben@example.com"].last_sent_on is None
 
 
 def test_subscribe_without_email_configured_still_subscribes(mock_weather):
