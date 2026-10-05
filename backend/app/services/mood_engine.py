@@ -262,6 +262,13 @@ HUMID_IDEAS = (
     "Muggy out — a fan, a cool shower and plenty of water will keep you fresher.",
 )
 
+# Humid and cool is damp rather than muggy, and calls for the opposite advice
+DAMP_IDEAS = (
+    "Damp air makes the cold bite harder — add a layer and keep moving.",
+    "Cool and humid: dry off properly after being out, and warm up with a hot drink.",
+    "The air is heavy with moisture — air the room for a few minutes, then get cosy.",
+)
+
 DRY_IDEAS = (
     "Dry air can affect concentration. Use a humidifier or drink extra water.",
     "Dry air today — keep a glass of water close, and lip balm and moisturiser closer.",
@@ -331,7 +338,7 @@ def generate_recommendations(
     
     # Humidity-based recommendations
     if humidity > 80:
-        recommendations.append(pick(HUMID_IDEAS))
+        recommendations.append(pick(HUMID_IDEAS if temperature_c >= 22 else DAMP_IDEAS))
     elif humidity < 30:
         recommendations.append(pick(DRY_IDEAS))
     

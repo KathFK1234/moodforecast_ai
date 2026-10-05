@@ -150,6 +150,13 @@ class TestRecommendationGeneration:
         assert any(r in mood_engine.HUMID_IDEAS for r in recs)
         assert all("hydration" in r.lower() or "water" in r.lower() for r in mood_engine.HUMID_IDEAS)
     
+    def test_cool_humid_weather_is_damp_not_muggy(self):
+        """A fan and a cool shower are the wrong advice in cold rain."""
+        for _ in range(30):
+            recs = generate_recommendations(42, "Rain", 13, 96)
+            assert any(r in mood_engine.DAMP_IDEAS for r in recs)
+            assert not any(r in mood_engine.HUMID_IDEAS for r in recs)
+    
     def test_low_mood_includes_wellness(self):
         """Low mood should add a pick-me-up."""
         recs = generate_recommendations(30, "Stormy", 10, 80)
