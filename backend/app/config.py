@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     )
     
     weather_api_url: str = "https://api.open-meteo.com/v1"
+    marine_api_url: str = "https://marine-api.open-meteo.com/v1"
     database_url: str = "sqlite:///./moodforecast.db"
     cache_ttl_seconds: int = 600
     environment: str = "development"

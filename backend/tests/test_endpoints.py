@@ -70,8 +70,10 @@ def mock_weather():
                     "sunrise": "06:17", "sunset": "18:24"
                 },
             ],
-            "utc_offset_seconds": 10800
+            "utc_offset_seconds": 10800,
+            "elevation": 1668.0
         })
+        mock_client.get_sea = AsyncMock(return_value={"coastal": False, "sea_temp_c": None})
         
         mock_forecast.return_value = mock_client
         mock_wellbeing.return_value = mock_client

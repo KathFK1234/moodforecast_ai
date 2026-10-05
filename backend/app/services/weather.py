@@ -48,6 +48,9 @@ DAILY_VARIABLES = (
 )
 FORECAST_DAYS = 7
 
+# How far around a place to look for open sea, in degrees (about 20 km)
+SEA_SEARCH_DEGREES = 0.2
+
 
 class WeatherClient:
     """Async client for Open-Meteo with caching and error handling."""
@@ -124,7 +127,8 @@ class WeatherClient:
                 },
                 ...
             ],
-            "utc_offset_seconds": int (local time at the location minus UTC)
+            "utc_offset_seconds": int (local time at the location minus UTC),
+            "elevation": float | None (metres above sea level)
         }
         """
         cache_key = f"weather:{lat}:{lon}"
@@ -159,6 +163,7 @@ class WeatherClient:
             },
             "daily": self._parse_daily(data.get("daily") or {}),
             "utc_offset_seconds": int(data.get("utc_offset_seconds") or 0),
+            "elevation": data.get("elevation"),
         }
         cache.set(cache_key, result)
         return result
@@ -205,6 +210,47 @@ class WeatherClient:
         """Current conditions only - see get_forecast for the shape."""
         forecast = await self.get_forecast(lat, lon)
         return forecast["current"]
+    
+    async def get_sea(self, lat: float, lon: float) -> dict[str, Any] | None:
+        """
+        Whether there is open sea near a set of coordinates, from Open-Meteo's marine API.
+        
+        The marine model only has data over the sea, so a place counts as
+        coastal if it, or any of the eight points about 20 km around it, has a
+        wave height. Lakes and rivers are not covered.
+        
+        Cache key: sea:{lat}:{lon}
+        
+        Returns: {"coastal": bool, "sea_temp_c": float | None}, or None if the
+        lookup failed - this is extra detail, so it never raises.
+        """
+        cache_key = f"sea:{lat}:{lon}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+        
+        d = SEA_SEARCH_DEGREES
+        points = [(lat + a * d, lon + b * d) for a in (0, -1, 1) for b in (0, -1, 1)]
+        params = {
+            "latitude": ",".join(f"{max(-90, min(90, p[0])):.4f}" for p in points),
+            "longitude": ",".join(f"{(p[1] + 180) % 360 - 180:.4f}" for p in points),
+            "current": "wave_height,sea_surface_temperature",
+        }
+        try:
+            data = await self._request("GET", f"{settings.marine_api_url}/marine", params=params)
+        except (ValueError, RuntimeError, TimeoutError):
+            return None
+        
+        # One result per point; a single point comes back as a bare object
+        readings = [
+            (place.get("current") or {})
+            for place in (data if isinstance(data, list) else [data])
+        ]
+        at_sea = [r for r in readings if r.get("wave_height") is not None]
+        temps = [r["sea_surface_temperature"] for r in at_sea if r.get("sea_surface_temperature") is not None]
+        result = {"coastal": bool(at_sea), "sea_temp_c": temps[0] if temps else None}
+        cache.set(cache_key, result)
+        return result
     
     async def get_location_by_name(self, location: str) -> dict[str, Any]:
         """

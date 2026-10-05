@@ -3,6 +3,7 @@
 from typing import Any
 from fastapi import HTTPException
 from app.models.schemas import WeatherData
+from app.services.locality import Place, build_place
 from app.services.weather import WeatherClient
 
 
@@ -36,3 +37,16 @@ def build_weather(current: dict[str, Any]) -> WeatherData:
         wind_kph=float(current.get("wind_speed", 0)),
         is_day=current.get("is_day", True)
     )
+
+
+async def local_weather(client: WeatherClient, location: str) -> tuple[str, WeatherData, Place]:
+    """
+    Look a location up and return (display name, current weather, local facts).
+    
+    Raises HTTPException 422 if the location cannot be found.
+    """
+    lat, lon, resolved_location = await resolve_location(client, location)
+    forecast = await client.get_forecast(lat, lon)
+    sea = await client.get_sea(lat, lon)
+    place = build_place(resolved_location, lat, forecast, sea)
+    return resolved_location, build_weather(forecast["current"]), place

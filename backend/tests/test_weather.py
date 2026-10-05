@@ -226,3 +226,51 @@ class TestGetCurrent:
         client = make_client(handler)
         with pytest.raises(TimeoutError):
             await client.get_current(-1.2921, 36.8219)
+
+
+class TestGetSea:
+    """Test the nearby-sea lookup."""
+    
+    @pytest.mark.asyncio
+    async def test_coastal_when_any_nearby_point_is_at_sea(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.host == "marine-api.open-meteo.com"
+            assert len(request.url.params["latitude"].split(",")) == 9
+            return httpx.Response(200, json=[
+                {"current": {"wave_height": None, "sea_surface_temperature": None}},
+                {"current": {"wave_height": None, "sea_surface_temperature": None}},
+                {"current": {"wave_height": 1.4, "sea_surface_temperature": 27.6}},
+                {"current": {"wave_height": 1.2, "sea_surface_temperature": 27.1}},
+                {"current": {"wave_height": None, "sea_surface_temperature": None}},
+            ] + [{"current": {"wave_height": None, "sea_surface_temperature": None}}] * 4)
+        
+        client = make_client(handler)
+        assert await client.get_sea(-4.05, 39.67) == {"coastal": True, "sea_temp_c": 27.6}
+    
+    @pytest.mark.asyncio
+    async def test_inland_when_no_point_is_at_sea(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=[
+                {"current": {"wave_height": None, "sea_surface_temperature": None}}
+            ] * 9)
+        
+        client = make_client(handler)
+        assert await client.get_sea(-1.29, 36.82) == {"coastal": False, "sea_temp_c": None}
+    
+    @pytest.mark.asyncio
+    async def test_unknown_when_the_lookup_fails(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, text="unavailable")
+        
+        client = make_client(handler)
+        assert await client.get_sea(-1.29, 36.82) is None
+    
+    @pytest.mark.asyncio
+    async def test_points_stay_in_range_near_the_date_line(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            longitudes = [float(v) for v in request.url.params["longitude"].split(",")]
+            assert all(-180 <= lon <= 180 for lon in longitudes)
+            return httpx.Response(200, json={"current": {"wave_height": 2.0, "sea_surface_temperature": 24.0}})
+        
+        client = make_client(handler)
+        assert (await client.get_sea(-17.7, 179.95))["coastal"] is True
