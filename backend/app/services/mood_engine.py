@@ -239,7 +239,7 @@ HOT_IDEAS = (
 )
 
 MILD_DAY_IDEAS = (
-    "Schedule your most focused work before 2pm — energy typically dips mid-afternoon.",
+    "Give your most demanding work your sharpest hours — energy typically dips mid-afternoon.",
     "Tackle your hardest task first, then celebrate with a proper break.",
     "Take a stretch break every hour — shoulders, neck and a lap around the room.",
     "Learn something small today: a new word, a recipe, a chord or a dance step.",

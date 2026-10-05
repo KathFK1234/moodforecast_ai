@@ -301,7 +301,7 @@ function displayWellbeing(data) {
 
     setBadge(el('energyBadge'), `${data.energy_level} energy`, level);
     const riskLevel = { Minimal: 'high', Low: 'medium', Moderate: 'low', High: 'verylow' }[data.risk_level] || 'medium';
-    setBadge(el('riskBadge'), `${data.risk_level} risk`, riskLevel);
+    setBadge(el('riskBadge'), `${data.risk_level} risk of low mood`, riskLevel);
 
     // Summary
     const summary = el('aiSummaryDiv');
@@ -505,6 +505,7 @@ async function loadActivity(path, fallback) {
     const token = ++activityToken;
     error.classList.add('hidden');
     buttons.forEach((button) => { button.disabled = true; });
+    el('activityResult').classList.add('is-refreshing');
 
     try {
         const data = await fetchJson(path, fallback);
@@ -516,7 +517,10 @@ async function loadActivity(path, fallback) {
         el('activityResult').classList.add('hidden');
         showNotice(error, e.message, true);
     } finally {
-        if (token === activityToken) buttons.forEach((button) => { button.disabled = false; });
+        if (token === activityToken) {
+            buttons.forEach((button) => { button.disabled = false; });
+            el('activityResult').classList.remove('is-refreshing');
+        }
     }
 }
 

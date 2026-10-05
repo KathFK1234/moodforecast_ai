@@ -888,6 +888,11 @@ body {
     border-top: 1px solid var(--card-line);
 }
 
+.activity-result.is-refreshing {
+    opacity: 0.45;
+    transition: opacity 0.2s;
+}
+
 .activity-headline {
     margin-top: 12px;
     font-size: 19px;
