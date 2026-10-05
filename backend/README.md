@@ -34,7 +34,7 @@ app/
     forecast.py       # GET /api/forecast/{location}
     wellbeing.py      # GET /api/wellbeing/{location}
     common.py         # Location lookup and weather model shared by both
-    activity.py       # GET /api/activity, /api/random-activity, /api/activities
+    activity.py       # GET /api/activity, /api/random-activity, /api/activities[/{location}]
     locations.py      # GET /api/locations
     subscribe.py      # POST /api/subscribe, /api/unsubscribe/{token}, /api/unsubscribe-link
   
@@ -42,7 +42,8 @@ app/
     weather.py        # Open-Meteo API client with caching
     geocoding.py      # Location name → coordinates
     mood_engine.py    # Rule-based mood scoring
-    activity_advisor.py  # Whether the weather suits an activity; random picks
+    activity_advisor.py  # Whether an activity suits the weather and the place; random picks
+    locality.py       # What a place can offer: coast, snow country, local sports and favourites
     curiosity.py      # Questions about other places
     mailer.py         # SMTP email
     alerts.py         # Confirmation and daily alert emails, and the daily send
@@ -169,9 +170,20 @@ curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
 
 `verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight. A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
 
+The place is judged before the weather (see [Local Fit](#local-fit)). Asking about something the place can't offer is a `skip` with the reason and a local alternative:
+
+```json
+{
+  "activity": "surfing",
+  "verdict": "skip",
+  "reasons": ["Nairobi isn't on the coast, so surfing would mean a trip to the sea first."],
+  "suggestion": "Something that does work in Nairobi right now: hiking. Find a hill, bring water, earn the view."
+}
+```
+
 ### GET /api/random-activity/{location}
 
-A random activity that the current weather suits, in the same shape as the activity check. Only activities with nothing in their way are picked, so `verdict` is always `go`; outdoor ones are preferred when any qualify, and indoor ones always do. Pass `exclude=<activity>` (the `activity` from the previous pick) to get a different one.
+A random activity that suits the place and its current weather, in the same shape as the activity check. Activities the place can't offer, or where they aren't commonly done, are never picked, and ones that are popular in its country come up more often. Only activities with nothing in their way are picked, so `verdict` is always `go`; outdoor ones are preferred when any qualify, and indoor ones always do. Pass `exclude=<activity>` (the `activity` from the previous pick) to get a different one.
 
 ```bash
 curl "http://localhost:8000/api/random-activity/Nairobi?exclude=camping"
@@ -195,7 +207,23 @@ curl "http://localhost:8000/api/locations?q=kis"
 
 ### GET /api/activities
 
-The names of the activities the advisor knows, for the subscription form: `["running", "a walk", "cycling", ...]`.
+The names of every activity the advisor knows: `["running", "a walk", "cycling", ...]`.
+
+### GET /api/activities/{location}
+
+The activities that are practical at a location, local favourites first. The page uses it for the quick picks and for the subscription form's activity list.
+
+```bash
+curl http://localhost:8000/api/activities/Nairobi
+```
+
+```json
+[
+  {"name": "running", "prompt": "Go for a run"},
+  {"name": "hiking", "prompt": "Go hiking"},
+  {"name": "football", "prompt": "Play football"}
+]
+```
 
 ### POST /api/subscribe
 
@@ -219,7 +247,7 @@ curl -X POST http://localhost:8000/api/subscribe \
 }
 ```
 
-The location must be one the geocoder can find (422 otherwise). Subscribing again with the same email updates that subscription and returns `"status": "updated"`. `confirmation_sent` is `false` when email is not configured or the confirmation could not be sent; the subscription is stored either way.
+The location must be one the geocoder can find, and the activity one that can be done there: surfing in an inland town is refused with the reason (both 422). Subscribing again with the same email updates that subscription and returns `"status": "updated"`. `confirmation_sent` is `false` when email is not configured or the confirmation could not be sent; the subscription is stored either way.
 
 ### POST /api/unsubscribe/{token}
 
@@ -261,6 +289,7 @@ All are optional.
 | `CACHE_TTL_SECONDS` | `600` | Cache time-to-live in seconds |
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Open-Meteo base URL (only change if self-hosting) |
+| `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is by the sea |
 | `SMTP_HOST` | (unset) | SMTP server for confirmation emails and daily alerts, e.g. `smtp.gmail.com`. Nothing is sent until this and `MAIL_FROM` are set |
 | `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
@@ -326,11 +355,34 @@ The mood engine applies additive deltas to a baseline of 65, then clamps to 0-10
 
 Recommendations also depend on the time of day: daylight advice is replaced with wind-down advice at night.
 
+## Local Fit
+
+Advice is checked against the place as well as the weather, so an inland city is never offered a beach day. Three facts about a location are used, gathered in `app/services/locality.py`:
+
+| Fact | Source | Used for |
+| ---- | ------ | -------- |
+| Open sea within about 20 km, and its temperature | Open-Meteo marine API (`get_sea` in `weather.py`) | A beach day, sailing, surfing, snorkelling (which also needs the sea at 20°C or more) |
+| Latitude and elevation | Open-Meteo forecast | Snow sports: a skiing country, and at least 36° from the equator or 1,000 m up. Falling snow makes them possible anywhere |
+| Country | Geocoder | Sports that are only common in some countries: cricket, baseball, rugby, golf, surfing |
+
+Each activity in `activity_advisor.py` declares what it needs (`needs`). The rules are applied two ways:
+
+- **Asked about** (`/api/activity`, a subscriber's chosen activity): something the place can't offer is a `skip`; a sport that isn't common there is a `maybe`. Anything unknown, such as a failed sea lookup, gets the benefit of the doubt.
+- **Suggested unprompted** (`/api/random-activity`, `/api/activities/{location}`, the daily email's random pick): only what is confirmed practical is offered, so the unknown is left out.
+
+`LOCAL_FAVOURITES` lists activities that are especially popular in a country; random picks choose them three times as often. `LOCAL_PITCHES` in `activity_advisor.py` words a suggestion the local way (nyama choma in Kenya, a braai in South Africa, an asado in Argentina).
+
+Limits worth knowing:
+
+- The country lists and favourites are hand-written judgement calls, by country, not by city. Edit them in `locality.py` where they are wrong for a place you know.
+- The sea check does not see lakes or rivers, so lakeside towns such as Kisumu are treated as inland for beach days and sailing. Swimming and fishing are offered everywhere.
+- Nothing checks for actual facilities: a football pitch, a pool or a hiking trail is assumed to be within reach.
+
 ## Caching
 
 - In-memory, per process; cleared when the server restarts
 - TTL of 10 minutes by default (`CACHE_TTL_SECONDS`)
-- Keys: `weather:{lat}:{lon}` and `geo:{location}`
+- Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}` and `suggest:{query}`
 - `/api/forecast` and `/api/wellbeing` share the same cached weather for a location
 
 ## Database

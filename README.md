@@ -39,6 +39,7 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
 - **Activity check** - ask whether the weather somewhere suits a run, a picnic, a swim, stargazing and more, and get a go, maybe or skip with the reasons
 - **Surprise me** - a random activity the current weather suits, different on every visit and every tap
+- **Local fit** - suggestions match the place as well as the weather: no beach days inland or skiing in the tropics, sports only where they are commonly played, and local favourites first
 - **Stay curious** - questions about the weather in other places, one tap away
 - **Location suggestions** - matching places appear as you type in either location field
 - **Weather-aware design** - the page's background follows the weather and day or night
@@ -81,7 +82,7 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
 | GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
 | GET | `/api/locations?q=...` | Places matching what has been typed so far |
-| GET | `/api/activities` | The activities a subscriber can choose from |
+| GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
 | POST | `/api/subscribe` | Subscribe an email address to daily alerts, or update its subscription |
 | POST | `/api/unsubscribe/{token}` | Stop the alerts for a subscription |
 | POST | `/api/unsubscribe-link` | Email a subscriber their unsubscribe link |
