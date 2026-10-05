@@ -1,6 +1,10 @@
 const API_BASE = '';  // Use same domain as frontend
 
 const POPULAR_CITIES = ['Nairobi', 'Mombasa', 'Kisumu', 'Lagos', 'London', 'Tokyo', 'New York'];
+const POPULAR_ACTIVITIES = [
+    'Go for a run', 'Have a picnic', 'Go swimming', 'Ride a bike', 'Fly a kite',
+    'Stargaze', 'Have a barbecue', 'Go skiing', 'Read a book',
+];
 const LAST_LOCATION_KEY = 'moodforecast:lastLocation';
 
 // Line icons, drawn on a 24x24 grid
@@ -68,6 +72,9 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 
 let searchToken = 0;  // Guards against a slow earlier search overwriting a newer one
 let hasResults = false;
+let currentLocation = '';  // The place the results on screen are for
+let lastActivity = '';     // Re-asked when the place changes
+let activityToken = 0;
 
 // Read the API's error message, whatever shape it comes in
 async function errorMessage(response, fallback) {
@@ -120,6 +127,9 @@ async function handleSearch(location) {
         displayWellbeing(wellbeingData);
 
         el('cropLocationInput').value = wellbeingData.location;
+        currentLocation = location;
+        el('activityPlace').textContent = wellbeingData.location;
+        if (lastActivity) askActivity(lastActivity);
         el('results').classList.remove('hidden');
         hasResults = true;
         replayReveal();
@@ -328,11 +338,83 @@ function displayCuriosity(prompts) {
     el('curiositySection').classList.toggle('hidden', prompts.length === 0);
 }
 
-// Search a suggested place and bring the results back into view
-function searchPlace(place) {
+// Search a suggested place, by default bringing the results back into view
+function searchPlace(place, scrollToTop = true) {
     el('locationInput').value = place;
-    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+    if (scrollToTop) window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
     return handleSearch(place);
+}
+
+// Ask whether the weather at the current place suits an activity
+async function askActivity(question) {
+    question = (question || '').trim();
+    const error = el('activityError');
+    if (!question) {
+        showNotice(error, 'Type something you would like to do.', true);
+        return;
+    }
+    if (!currentLocation) return;
+
+    lastActivity = question;
+    const token = ++activityToken;
+    error.classList.add('hidden');
+    el('activityButton').disabled = true;
+
+    try {
+        const data = await fetchJson(
+            `/api/activity/${encodeURIComponent(currentLocation)}?activity=${encodeURIComponent(question)}`,
+            'Could not check that activity.'
+        );
+        if (token !== activityToken) return;
+        displayActivity(data);
+    } catch (e) {
+        if (token !== activityToken) return;
+        el('activityResult').classList.add('hidden');
+        showNotice(error, e.message, true);
+    } finally {
+        if (token === activityToken) el('activityButton').disabled = false;
+    }
+}
+
+function displayActivity(data) {
+    const verdict = {
+        go: ['Go for it', 'high'],
+        maybe: ['With a little care', 'low'],
+        skip: ['Not right now', 'verylow'],
+    }[data.verdict] || ['', 'medium'];
+    setBadge(el('activityVerdict'), verdict[0], verdict[1]);
+    el('activityHeadline').textContent = data.headline;
+
+    const reasons = el('activityReasons');
+    reasons.innerHTML = '';
+    data.reasons.forEach((reason) => {
+        const li = document.createElement('li');
+        li.textContent = reason;
+        reasons.appendChild(li);
+    });
+
+    const suggestion = el('activitySuggestion');
+    suggestion.textContent = data.suggestion || '';
+    suggestion.classList.toggle('hidden', !data.suggestion);
+
+    // Other places to try the same question
+    el('activityCuriosity').textContent = data.curiosity.question;
+    const places = el('activityPlaces');
+    places.innerHTML = '';
+    data.curiosity.places.forEach((place) => {
+        places.appendChild(chipButton(place, () => searchPlace(place, false)));
+    });
+
+    el('activityResult').classList.remove('hidden');
+}
+
+function chipButton(text, onClick) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = text;
+    chip.addEventListener('click', onClick);
+    return chip;
 }
 
 function factorRow(label, value, isBaseline) {
@@ -460,7 +542,7 @@ function showError(message) {
 }
 
 function highlightChip(location) {
-    document.querySelectorAll('.chip').forEach((chip) => {
+    document.querySelectorAll('#cityChips .chip').forEach((chip) => {
         chip.classList.toggle('is-active', chip.textContent.toLowerCase() === location.toLowerCase());
     });
 }
@@ -468,15 +550,18 @@ function highlightChip(location) {
 function buildChips() {
     const wrap = el('cityChips');
     POPULAR_CITIES.forEach((city) => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip';
-        chip.textContent = city;
-        chip.addEventListener('click', () => {
+        wrap.appendChild(chipButton(city, () => {
             el('locationInput').value = city;
             handleSearch(city);
-        });
-        wrap.appendChild(chip);
+        }));
+    });
+
+    const activities = el('activityChips');
+    POPULAR_ACTIVITIES.forEach((activity) => {
+        activities.appendChild(chipButton(activity, () => {
+            el('activityInput').value = activity;
+            askActivity(activity);
+        }));
     });
 }
 
@@ -488,6 +573,10 @@ function init() {
     el('searchForm').addEventListener('submit', (event) => {
         event.preventDefault();
         handleSearch(el('locationInput').value);
+    });
+    el('activityForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        askActivity(el('activityInput').value);
     });
     el('subscribeForm').addEventListener('submit', handleSubscribe);
 

@@ -139,6 +139,35 @@
                 </section>
             </div>
 
+            <!-- Activity check -->
+            <section class="card activity-card reveal" aria-labelledby="activityHeading">
+                <div class="card-head">
+                    <h2 class="card-title" id="activityHeading">Thinking of doing something?</h2>
+                    <p class="card-note">Ask whether the weather in <span id="activityPlace">this place</span> suits it.</p>
+                </div>
+                <form class="activity-form" id="activityForm">
+                    <label class="visually-hidden" for="activityInput">Activity</label>
+                    <input
+                        type="text"
+                        id="activityInput"
+                        placeholder="e.g. Can I go for a run?"
+                        maxlength="120"
+                        autocomplete="off"
+                    >
+                    <button type="submit" id="activityButton">Ask</button>
+                </form>
+                <div class="chips" id="activityChips" aria-label="Popular activities"></div>
+                <div id="activityError" class="notice notice-error hidden" role="alert"></div>
+                <div id="activityResult" class="activity-result hidden" aria-live="polite">
+                    <span class="badge" id="activityVerdict"></span>
+                    <p class="activity-headline" id="activityHeadline"></p>
+                    <ul class="activity-reasons" id="activityReasons"></ul>
+                    <p class="activity-suggestion hidden" id="activitySuggestion"></p>
+                    <p class="card-note" id="activityCuriosity"></p>
+                    <div class="chips" id="activityPlaces"></div>
+                </div>
+            </section>
+
             <!-- Forecast -->
             <section id="forecastSection" class="card forecast-card reveal hidden" aria-labelledby="forecastHeading">
                 <div class="card-head">

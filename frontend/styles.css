@@ -198,6 +198,7 @@ body {
 }
 
 .search button,
+.activity-form button,
 .subscribe-button {
     padding: 11px 22px;
     border: none;
@@ -212,16 +213,19 @@ body {
 }
 
 .search button:hover,
+.activity-form button:hover,
 .subscribe-button:hover {
     transform: translateY(-1px);
 }
 
 .search button:active,
+.activity-form button:active,
 .subscribe-button:active {
     transform: translateY(0);
 }
 
 .search button:disabled,
+.activity-form button:disabled,
 .subscribe-button:disabled {
     opacity: 0.55;
     cursor: progress;
@@ -795,6 +799,59 @@ body {
     color: var(--ink);
 }
 
+/* Activity check */
+.activity-form {
+    display: flex;
+    gap: 10px;
+}
+
+.activity-form input {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-card .chips {
+    justify-content: flex-start;
+    margin: 12px 0 0;
+}
+
+.activity-card .notice {
+    margin-top: 14px;
+}
+
+.activity-result {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--card-line);
+}
+
+.activity-headline {
+    margin-top: 12px;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.activity-reasons {
+    list-style: none;
+    margin-top: 8px;
+}
+
+.activity-reasons li,
+.activity-suggestion {
+    padding: 3px 0;
+    font-size: 14px;
+    color: var(--ink-2);
+}
+
+.activity-suggestion {
+    margin-top: 6px;
+    color: var(--ink);
+}
+
+.activity-result .card-note {
+    margin-top: 16px;
+}
+
 /* Curiosity */
 .curiosity-list {
     list-style: none;
@@ -856,6 +913,7 @@ body {
     font-weight: 400;
 }
 
+.activity-form input,
 .form-group input,
 .form-group select {
     width: 100%;
@@ -873,10 +931,12 @@ body {
     color: #0c1122;
 }
 
+.activity-form input::placeholder,
 .form-group input::placeholder {
     color: var(--ink-3);
 }
 
+.activity-form input:focus,
 .form-group input:focus,
 .form-group select:focus {
     outline: none;
