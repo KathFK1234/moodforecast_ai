@@ -19,6 +19,7 @@ class Activity(NamedTuple):
     dry_only: bool = False  # Wet ground, rock or wheels make it risky, so rain and snow rule it out
     day_only: bool = False  # Not safe in the dark, so night rules it out
     max_wind_kph: int = 0   # Wind at or above this rules it out; 0 keeps the usual limits
+    fire: bool = False      # Involves an open flame, so hot, dry air calls for care
 
 
 class ActivityCuriosity(TypedDict):
@@ -80,7 +81,28 @@ ACTIVITIES = (
     Activity(
         "a barbecue", "leisure",
         ("barbecue", "bbq", "braai", "nyama choma", "asado", "cookout", "grill"),
-        night_ok=True, prompt="Have a barbecue",
+        night_ok=True, max_wind_kph=45, fire=True, prompt="Have a barbecue",
+    ),
+    Activity(
+        "a bonfire", "leisure",
+        ("bonfire", "campfire", "fire pit", "firepit", "smores", "s'mores"),
+        night_ok=True, max_wind_kph=30, fire=True, prompt="Light a bonfire",
+    ),
+    Activity(
+        "eating outdoors", "leisure",
+        ("eat outside", "eat outdoors", "eating outside", "eating outdoors", "outdoor dining",
+         "al fresco", "terrace", "rooftop", "beer garden", "sundowner", "sundowners"),
+        night_ok=True, prompt="Eat outdoors",
+    ),
+    Activity(
+        "sightseeing", "leisure",
+        ("sightseeing", "sights", "walking tour", "city tour", "landmarks"),
+        prompt="Go sightseeing",
+    ),
+    Activity(
+        "birdwatching", "leisure",
+        ("birdwatching", "bird watching", "birding", "birds", "binoculars"),
+        day_only=True, prompt="Go birdwatching",
     ),
     Activity("gardening", "leisure", ("garden", "gardening", "planting"), prompt="Do some gardening"),
     Activity(
@@ -207,6 +229,10 @@ PITCHES = {
     "golf": "A few holes, or a bucket of balls at the range.",
     "a picnic": "A blanket, some snacks and somewhere green.",
     "a barbecue": "Fire up the grill — it tastes better with company.",
+    "a bonfire": "Gather some wood, some friends and something to toast.",
+    "eating outdoors": "Find a table in the open air — food tastes better out there.",
+    "sightseeing": "Be a tourist in your own town — find one sight you've never seen.",
+    "birdwatching": "Early is best — binoculars, patience, and see how many you can name.",
     "gardening": "Repot, weed or plant something you can eat later.",
     "photography": "Give yourself a theme — doors, shadows, reflections — and find ten.",
     "fishing": "Patience, a line and a flask of something warm.",
@@ -432,6 +458,10 @@ def _weather_issues(
         issues.append((2, f"Winds of {wind} km/h are strong enough to be hazardous."))
     elif wind_kph >= 35:
         issues.append((1, f"It's blustery at {wind} km/h — hold on to your hat."))
+
+    # Open flames in hot, dry air
+    if activity.fire and temperature_c >= 28 and humidity < 30:
+        issues.append((1, f"It's hot and dry ({round(humidity)}% humidity) — check for fire bans and keep water close."))
 
     # Darkness
     if not is_day and activity.day_only:

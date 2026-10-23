@@ -173,9 +173,10 @@ curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
 Some activities have rules of their own on top:
 
 - Wet surfaces (rain, drizzle, snow) rule out skateboarding, roller skating and rock climbing.
-- Rock climbing, horse riding, kayaking and water parks need daylight.
+- Rock climbing, horse riding, kayaking, water parks and birdwatching need daylight.
 - Rock climbing, kayaking (canoeing, paddleboarding, rowing) and boat trips have lower wind limits.
 - Kayaking is judged on how cold a capsize would be, so below 5°C it is a skip.
+- Barbecues and bonfires have lower wind limits, and in hot, dry air (28°C or more, under 30% humidity) they get a fire ban warning.
 
 A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
 

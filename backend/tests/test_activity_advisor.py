@@ -43,6 +43,11 @@ class TestFindActivity:
         ("go canoeing", "kayaking"),
         ("a dhow ride", "a boat trip"),
         ("boat trip to the island", "a boat trip"),
+        ("campfire tonight?", "a bonfire"),
+        ("dinner on the terrace", "eating outdoors"),
+        ("sundowners by the lake", "eating outdoors"),
+        ("see the sights in the old town", "sightseeing"),
+        ("go birding", "birdwatching"),
     ])
     def test_recognises_activities_in_free_text(self, question, expected):
         assert find_activity(question).name == expected
@@ -167,6 +172,33 @@ class TestVerdicts:
         assert advise("boat trip", wind=35)["verdict"] == "maybe"
         assert advise("boat trip", wind=50)["verdict"] == "skip"
         assert advise("boat trip", condition="Rain")["verdict"] == "skip"
+    
+    def test_fires_need_light_wind(self):
+        assert advise("bonfire", wind=10, is_day=False)["verdict"] == "go"
+        assert advise("bonfire", wind=24)["verdict"] == "maybe"
+        assert advise("bonfire", wind=32)["verdict"] == "skip"
+        assert advise("barbecue", wind=35)["verdict"] == "maybe"
+        assert advise("barbecue", wind=48)["verdict"] == "skip"
+    
+    def test_fires_in_hot_dry_air_come_with_a_fire_ban_warning(self):
+        for question in ["bonfire", "barbecue"]:
+            advice = check_activity(question, "Nairobi, KE", "Clear", 31, 20, 5, True)
+            assert advice["verdict"] == "maybe"
+            assert "fire bans" in advice["reasons"][0]
+            assert check_activity(question, "Nairobi, KE", "Clear", 31, 60, 5, True)["verdict"] == "go"
+        # Nothing to burn, nothing to warn about
+        assert check_activity("picnic", "Nairobi, KE", "Clear", 31, 20, 5, True)["verdict"] == "go"
+    
+    def test_eating_outdoors_suits_a_mild_evening_but_not_rain(self):
+        assert advise("al fresco", is_day=False)["verdict"] == "go"
+        assert advise("al fresco", temp=6)["verdict"] == "maybe"
+        assert advise("al fresco", condition="Rain")["verdict"] == "skip"
+    
+    def test_birdwatching_needs_daylight_and_sightseeing_dislikes_rain(self):
+        assert advise("birdwatching")["verdict"] == "go"
+        assert advise("birdwatching", is_day=False)["verdict"] == "skip"
+        assert advise("sightseeing")["verdict"] == "go"
+        assert advise("sightseeing", condition="Heavy Rain")["verdict"] == "skip"
     
     def test_darkness_is_a_caveat_unless_the_activity_suits_the_night(self):
         assert advise("run", is_day=False)["verdict"] == "maybe"
