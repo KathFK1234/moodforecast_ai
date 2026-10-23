@@ -11,7 +11,7 @@ from app.services.locality import LOCAL_FAVOURITES, Place, is_late_night, is_loc
 class Activity(NamedTuple):
     """Something the user might want to do, and the words they might use for it."""
     name: str               # Reads naturally after "conditions for ..."
-    category: str           # active, leisure, water, snow, sky, wind or indoor
+    category: str           # active, leisure, water, paddle, snow, sky, wind or indoor
     aliases: tuple[str, ...]
     night_ok: bool = False  # Just as good after dark
     needs: str = ""         # What the place must offer: coast, warm_coast, surf, snow, or a sport (see locality)
@@ -102,6 +102,22 @@ ACTIVITIES = (
         "snorkelling", "water",
         ("snorkel", "snorkelling", "snorkeling", "scuba", "diving"),
         needs="warm_coast", prompt="Go snorkelling",
+    ),
+    Activity(
+        "a water park", "water",
+        ("water park", "waterpark", "water slide", "water slides", "splash pad"),
+        day_only=True, prompt="Go to a water park",
+    ),
+    Activity(
+        "kayaking", "paddle",
+        ("kayak", "kayaking", "canoe", "canoeing", "paddleboard", "paddleboarding",
+         "paddle board", "paddle boarding", "rowing", "row a boat"),
+        day_only=True, max_wind_kph=30, prompt="Go kayaking",
+    ),
+    Activity(
+        "a boat trip", "leisure",
+        ("boat", "boat trip", "boat ride", "cruise", "ferry", "dhow"),
+        max_wind_kph=45, prompt="Take a boat trip",
     ),
     Activity(
         "snow sports", "snow",
@@ -199,6 +215,9 @@ PITCHES = {
     "a beach day": "Towel, sunscreen, something to read — the sea does the rest.",
     "surfing": "Check the break, wax the board and paddle out.",
     "snorkelling": "Mask on, face down — there's a whole world under there.",
+    "a water park": "Slides, splashes and a lazy river — sunscreen first.",
+    "kayaking": "Hire a kayak, canoe or paddleboard and keep close to the shore.",
+    "a boat trip": "Let someone else do the steering and watch the shore go by.",
     "snow sports": "Skis, a sled or a snowball — your call.",
     "stargazing": "Find a dark spot and see what you can name.",
     "kite flying": "Find an open field and let the wind do the work.",
@@ -245,6 +264,7 @@ CURIOSITY_PLACES = {
     "active": curiosity.WORLD_PLACES,
     "leisure": curiosity.WORLD_PLACES,
     "water": curiosity.BEACH_PLACES,
+    "paddle": curiosity.WORLD_PLACES,
     "snow": curiosity.SNOW_PLACES,
     "sky": curiosity.DARK_SKY_PLACES,
     "wind": curiosity.WINDY_PLACES,
@@ -338,7 +358,7 @@ def _weather_issues(
     # Precipitation and visibility
     if activity.dry_only and (rain or snow or "drizzle" in condition_lower):
         issues.append((2, f"It's {condition_lower} — wet surfaces make {activity.name} slippery and risky. Wait for it to dry."))
-    elif rain and category == "active":
+    elif rain and category in ("active", "paddle"):
         issues.append((1, "It's raining — dress for it and watch for slippery ground."))
     elif rain and category == "water":
         issues.append((1, "It's raining — fine once you're in the water, less fun on the shore."))
@@ -368,6 +388,14 @@ def _weather_issues(
         sea = place.sea_temp_c if place is not None and activity.needs else None
         if sea is not None and sea < 17:
             issues.append((1, f"The sea is {round(sea)}°C — a wetsuit will make all the difference."))
+    elif category == "paddle":
+        # Falling in is part of the sport, so the water's chill matters as much as the air's
+        if temperature_c < 5:
+            issues.append((2, f"At {temp}°C a capsize would mean dangerously cold water — wait for a milder day."))
+        elif temperature_c < 12:
+            issues.append((1, f"It's {temp}°C — dress for falling in, not just for the air, and stay near the shore."))
+        elif temperature_c > 35:
+            issues.append((1, f"It's {temp}°C — paddle early or late, cover up and carry plenty of water."))
     elif category == "active":
         if temperature_c > 35:
             issues.append((2, f"{temp}°C is heat-stress territory for anything energetic."))

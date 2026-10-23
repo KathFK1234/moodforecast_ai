@@ -38,6 +38,11 @@ class TestFindActivity:
         ("outdoor yoga", "an outdoor workout"),
         ("yoga", "an indoor workout"),
         ("bike riding", "cycling"),
+        ("take the kids to the water park", "a water park"),
+        ("paddleboarding on the lake", "kayaking"),
+        ("go canoeing", "kayaking"),
+        ("a dhow ride", "a boat trip"),
+        ("boat trip to the island", "a boat trip"),
     ])
     def test_recognises_activities_in_free_text(self, question, expected):
         assert find_activity(question).name == expected
@@ -140,6 +145,28 @@ class TestVerdicts:
         for question in ["volleyball", "frisbee", "outdoor workout", "horse riding"]:
             assert advise(question, temp=38)["verdict"] == "skip"
             assert advise(question, temp=32)["verdict"] == "maybe"
+    
+    def test_paddling_needs_calm_water_daylight_and_mild_air(self):
+        assert advise("kayak")["verdict"] == "go"
+        assert advise("kayak", condition="Light Rain")["verdict"] == "maybe"
+        assert advise("kayak", wind=24)["verdict"] == "maybe"
+        assert advise("kayak", wind=32)["verdict"] == "skip"
+        assert advise("kayak", is_day=False)["verdict"] == "skip"
+        assert advise("kayak", temp=9)["verdict"] == "maybe"
+        cold = advise("kayak", temp=3)
+        assert cold["verdict"] == "skip"
+        assert "capsize" in cold["reasons"][0]
+    
+    def test_water_park_follows_the_swimming_rules_by_day(self):
+        assert advise("water park", temp=30)["verdict"] == "go"
+        assert advise("water park", temp=12)["verdict"] == "skip"
+        assert advise("water park", temp=30, is_day=False)["verdict"] == "skip"
+    
+    def test_boat_trips_have_a_lower_wind_limit(self):
+        assert advise("boat trip", wind=20)["verdict"] == "go"
+        assert advise("boat trip", wind=35)["verdict"] == "maybe"
+        assert advise("boat trip", wind=50)["verdict"] == "skip"
+        assert advise("boat trip", condition="Rain")["verdict"] == "skip"
     
     def test_darkness_is_a_caveat_unless_the_activity_suits_the_night(self):
         assert advise("run", is_day=False)["verdict"] == "maybe"
