@@ -378,11 +378,11 @@ Advice is checked against the place as well as the weather, so an inland city is
 | ---- | ------ | -------- |
 | Open sea within about 20 km, and its temperature | Open-Meteo marine API (`get_sea` in `weather.py`) | A beach day, sailing, surfing, snorkelling (which also needs the sea at 20°C or more) |
 | Latitude and elevation | Open-Meteo forecast | Snow sports: a skiing country, and at least 36° from the equator or 1,000 m up. Falling snow makes them possible anywhere |
-| Country | Geocoder | Sports that are only common in some countries: cricket, baseball, rugby, golf, surfing |
+| Country | Geocoder | Sports that are only common in some countries: cricket, baseball, rugby, golf, surfing, netball, kabaddi, sepak takraw, Gaelic football, Aussie rules. Safaris: only in East and Southern Africa |
 
 Each activity in `activity_advisor.py` declares what it needs (`needs`). The rules are applied two ways:
 
-- **Asked about** (`/api/activity`, a subscriber's chosen activity): something the place can't offer is a `skip`; a sport that isn't common there is a `maybe`. Anything unknown, such as a failed sea lookup, gets the benefit of the doubt.
+- **Asked about** (`/api/activity`, a subscriber's chosen activity): something the place can't offer (the sea inland, slopes away from snow country, a safari outside wildlife country) is a `skip`; a sport that isn't common there is a `maybe`. Anything unknown, such as a failed sea lookup, gets the benefit of the doubt.
 - **Suggested unprompted** (`/api/random-activity`, `/api/activities/{location}`, the daily email's random pick): only what is confirmed practical is offered, so the unknown is left out.
 
 `LOCAL_FAVOURITES` lists activities that are especially popular in a country; random picks choose them three times as often. `LOCAL_PITCHES` in `activity_advisor.py` words a suggestion the local way (nyama choma in Kenya, a braai in South Africa, an asado in Argentina).
@@ -390,8 +390,8 @@ Each activity in `activity_advisor.py` declares what it needs (`needs`). The rul
 Limits worth knowing:
 
 - The country lists and favourites are hand-written judgement calls, by country, not by city. Edit them in `locality.py` where they are wrong for a place you know.
-- The sea check does not see lakes or rivers, so lakeside towns such as Kisumu are treated as inland for beach days and sailing. Swimming and fishing are offered everywhere.
-- Nothing checks for actual facilities: a football pitch, a pool or a hiking trail is assumed to be within reach.
+- The sea check does not see lakes or rivers, so lakeside towns such as Kisumu are treated as inland for beach days and sailing. Swimming, fishing, kayaking and boat trips are offered everywhere.
+- Nothing checks for actual facilities: a football pitch, a pool, a climbing crag, a stable or a hiking trail is assumed to be within reach.
 
 ## Caching
 

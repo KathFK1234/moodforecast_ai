@@ -61,6 +61,15 @@ class TestFindActivity:
         ("practise the guitar", "music"),
         ("learn something new", "learning something new"),
         ("visit family", "time with friends"),
+        ("a game drive", "a safari"),
+        ("netball practice", "netball"),
+        ("kabaddi", "kabaddi"),
+        ("takraw", "sepak takraw"),
+        ("hurling", "Gaelic football"),
+        ("Gaelic football", "Gaelic football"),
+        ("kick an AFL ball", "Aussie rules"),
+        ("snowshoeing", "snow sports"),
+        ("tobogganing", "snow sports"),
     ])
 
     def test_recognises_activities_in_free_text(self, question, expected):
@@ -421,6 +430,26 @@ class TestLocalFit:
             assert suggestion.startswith("Something that does work in Nairobi right now: ")
             assert any(f": {name}. " in suggestion for name in practical)
     
+    def test_safaris_need_wildlife_country(self):
+        assert advise_at(NAIROBI, "safari")["verdict"] == "go"
+        assert advise_at(NAIROBI, "safari", is_day=False)["verdict"] == "skip"
+        london = Place(name="London", country="GB", lat=51.5, elevation=16, coastal=False)
+        advice = advise_at(london, "game drive")
+        assert advice["verdict"] == "skip"
+        assert advice["reasons"] == [
+            "Safaris aren't on offer around London — they need wildlife country, such as East or Southern Africa."
+        ]
+        assert advice["suggestion"].startswith("Something that does work in London right now: ")
+    
+    def test_regional_sports_get_a_caveat_away_from_home(self):
+        assert advise_at(MUMBAI, "kabaddi")["verdict"] == "go"
+        advice = advise_at(NAIROBI, "kabaddi")
+        assert advice["verdict"] == "maybe"
+        assert "Kabaddi isn't widely played around Nairobi" in advice["reasons"][0]
+        dublin = Place(name="Dublin", country="IE", lat=53.35, elevation=8, coastal=True)
+        assert advise_at(dublin, "hurling")["verdict"] == "go"
+        assert advise_at(NAIROBI, "hurling")["reasons"][0].startswith("Gaelic football isn't widely played")
+    
     def test_unknown_facts_get_the_benefit_of_the_doubt_when_asked(self):
         assert advise_at(UNKNOWN, "beach")["verdict"] == "go"
         assert advise_at(UNKNOWN, "cricket")["verdict"] == "go"
@@ -431,14 +460,17 @@ class TestLocalActivities:
     
     def test_inland_kenya(self):
         names = [a.name for a in local_activities(NAIROBI)]
-        for absent in ["a beach day", "surfing", "snorkelling", "sailing", "snow sports", "cricket", "baseball", "golf"]:
+        for absent in [
+            "a beach day", "surfing", "snorkelling", "sailing", "snow sports", "cricket", "baseball", "golf",
+            "kabaddi", "netball", "sepak takraw", "Gaelic football", "Aussie rules",
+        ]:
             assert absent not in names
-        for present in ["running", "football", "a barbecue", "hiking", "rugby", "swimming", "reading"]:
+        for present in ["running", "football", "a barbecue", "hiking", "rugby", "swimming", "reading", "a safari"]:
             assert present in names
     
     def test_local_favourites_come_first(self):
         names = [a.name for a in local_activities(NAIROBI)]
-        assert set(names[:5]) == {"running", "football", "a barbecue", "hiking", "rugby"}
+        assert set(names[:6]) == {"running", "football", "a barbecue", "hiking", "rugby", "a safari"}
     
     def test_coast_adds_sea_activities(self):
         names = {a.name for a in local_activities(MOMBASA)}
@@ -455,6 +487,11 @@ class TestLocalActivities:
         names = {a.name for a in local_activities(CAPE_TOWN)}
         assert "surfing" in names
         assert "snorkelling" not in names
+    
+    def test_regional_activities_are_offered_at_home(self):
+        assert "kabaddi" in {a.name for a in local_activities(MUMBAI)}
+        assert "a safari" in {a.name for a in local_activities(CAPE_TOWN)}
+        assert "a safari" not in {a.name for a in local_activities(INNSBRUCK)}
     
     def test_alps_offer_snow_sports(self):
         assert "snow sports" in {a.name for a in local_activities(INNSBRUCK)}

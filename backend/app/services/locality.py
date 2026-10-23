@@ -83,12 +83,22 @@ SURF_COUNTRIES = frozenset({
     "AU", "NZ", "US", "MX", "CR", "NI", "SV", "PA", "PE", "CL", "EC", "BR", "PT", "ES", "FR",
     "GB", "IE", "MA", "SN", "ZA", "ID", "PH", "LK", "MV", "JP", "FJ",
 })
+NETBALL_COUNTRIES = frozenset({
+    "GB", "AU", "NZ", "ZA", "JM", "TT", "BB", "MW", "UG", "ZW", "FJ", "SG", "MY", "TO", "WS",
+})
 SPORT_COUNTRIES = {
     "cricket": CRICKET_COUNTRIES,
     "baseball": BASEBALL_COUNTRIES,
     "rugby": RUGBY_COUNTRIES,
     "golf": GOLF_COUNTRIES,
+    "netball": NETBALL_COUNTRIES,
+    "kabaddi": frozenset({"IN", "PK", "BD", "NP", "LK", "IR"}),
+    "sepak takraw": frozenset({"TH", "MY", "LA", "MM", "ID", "VN", "PH", "SG", "KH", "BN"}),
+    "gaelic": frozenset({"IE"}),
+    "aussie rules": frozenset({"AU"}),
 }
+# Where wildlife safaris are run: East and Southern Africa
+SAFARI_COUNTRIES = frozenset({"KE", "TZ", "UG", "RW", "ZA", "BW", "NA", "ZM", "ZW", "MW", "MZ"})
 # Needs that also require the sea; surfing needs a surfing country as well
 COAST_NEEDS = ("coast", "warm_coast", "surf")
 
@@ -97,10 +107,11 @@ WARM_SEA_C = 20
 
 # Activities people in a country are especially likely to do, favoured in random picks
 LOCAL_FAVOURITES = {
-    "KE": ("running", "football", "a barbecue", "hiking", "rugby"),
+    "KE": ("running", "football", "a barbecue", "hiking", "rugby", "a safari"),
     "ET": ("running", "football"),
     "UG": ("football", "a barbecue"),
-    "TZ": ("football", "a barbecue"),
+    "TZ": ("football", "a barbecue", "a safari"),
+    "BW": ("a safari",),
     "RW": ("football", "cycling", "hiking"),
     "NG": ("football",),
     "GH": ("football",),
@@ -109,7 +120,7 @@ LOCAL_FAVOURITES = {
     "MA": ("football",),
     "ZA": ("a barbecue", "rugby", "cricket", "hiking", "surfing"),
     "GB": ("football", "a walk", "cricket", "gardening"),
-    "IE": ("rugby", "a walk", "golf"),
+    "IE": ("rugby", "a walk", "golf", "Gaelic football"),
     "FR": ("cycling", "football", "a picnic"),
     "IT": ("football", "cycling"),
     "ES": ("football", "a beach day"),
@@ -128,14 +139,17 @@ LOCAL_FAVOURITES = {
     "MX": ("football", "baseball"),
     "BR": ("football", "a beach day", "a barbecue"),
     "AR": ("football", "a barbecue"),
-    "IN": ("cricket",),
-    "PK": ("cricket",),
+    "IN": ("cricket", "kabaddi"),
+    "PK": ("cricket", "kabaddi"),
     "BD": ("cricket",),
     "LK": ("cricket",),
     "JP": ("baseball", "hiking", "karaoke"),
     "KR": ("hiking", "baseball", "karaoke"),
     "PH": ("basketball", "karaoke"),
-    "AU": ("cricket", "surfing", "a barbecue", "a beach day"),
+    "AU": ("cricket", "surfing", "a barbecue", "a beach day", "Aussie rules"),
+    "TH": ("sepak takraw",),
+    "MY": ("sepak takraw", "netball"),
+    "JM": ("netball", "cricket"),
     "NZ": ("rugby", "hiking"),
 }
 
@@ -151,8 +165,8 @@ def local_issue(needs: str, activity: str, place: Place, snowing: bool = False) 
     """
     What makes an activity impractical at a place, as (severity, reason), or None.
     
-    `needs` is the activity's requirement: coast, warm_coast, surf, snow, or a
-    sport in SPORT_COUNTRIES. Severity 2 means it can't be done here; 1 means it is
+    `needs` is the activity's requirement: coast, warm_coast, surf, snow, safari,
+    or a sport in SPORT_COUNTRIES. Severity 2 means it can't be done here; 1 means it is
     not commonly done, so it takes more effort. Anything unknown about the
     place is given the benefit of the doubt.
     """
@@ -168,6 +182,9 @@ def local_issue(needs: str, activity: str, place: Place, snowing: bool = False) 
     elif needs == "snow":
         if not snowing and place.country and not _near_slopes(place):
             return (2, f"{activity.capitalize()} aren't something people do around {where} — there are no slopes or reliable snow nearby.")
+    elif needs == "safari":
+        if place.country and place.country not in SAFARI_COUNTRIES:
+            return (2, f"Safaris aren't on offer around {where} — they need wildlife country, such as East or Southern Africa.")
     elif needs in SPORT_COUNTRIES:
         if place.country and place.country not in SPORT_COUNTRIES[needs]:
             return (1, f"{activity.capitalize()} isn't widely played around {where}, so finding a game or somewhere to play may take some effort.")
@@ -190,6 +207,8 @@ def is_local(needs: str, place: Place, snowing: bool = False) -> bool:
         return needs == "coast" or place.sea_temp_c is None or place.sea_temp_c >= WARM_SEA_C
     if needs == "snow":
         return snowing or _near_slopes(place)
+    if needs == "safari":
+        return place.country in SAFARI_COUNTRIES
     if needs in SPORT_COUNTRIES:
         return place.country in SPORT_COUNTRIES[needs]
     return True

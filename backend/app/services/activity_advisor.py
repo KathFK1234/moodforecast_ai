@@ -14,7 +14,7 @@ class Activity(NamedTuple):
     category: str           # active, leisure, water, paddle, snow, sky, wind or indoor
     aliases: tuple[str, ...]
     night_ok: bool = False  # Just as good after dark
-    needs: str = ""         # What the place must offer: coast, warm_coast, surf, snow, or a sport (see locality)
+    needs: str = ""         # What the place must offer: coast, warm_coast, surf, snow, safari, or a sport (see locality)
     prompt: str = ""        # How someone would ask about it, e.g. "Go for a run"
     dry_only: bool = False  # Wet ground, rock or wheels make it risky, so rain and snow rule it out
     day_only: bool = False  # Not safe in the dark, so night rules it out
@@ -77,7 +77,25 @@ ACTIVITIES = (
         ("outdoor workout", "outdoor yoga", "outdoor gym", "calisthenics", "bootcamp", "boot camp", "tai chi"),
         prompt="Work out outdoors",
     ),
+    Activity("netball", "active", ("netball",), needs="netball", prompt="Play netball"),
+    Activity("kabaddi", "active", ("kabaddi",), needs="kabaddi", prompt="Play kabaddi"),
+    Activity(
+        "sepak takraw", "active", ("sepak takraw", "takraw", "sepak raga"),
+        needs="sepak takraw", prompt="Play sepak takraw",
+    ),
+    Activity(
+        "Gaelic football", "active", ("gaelic football", "gaelic", "gaa", "hurling", "camogie"),
+        needs="gaelic", prompt="Play Gaelic football",
+    ),
+    Activity(
+        "Aussie rules", "active", ("aussie rules", "afl", "australian rules"),
+        needs="aussie rules", prompt="Play Aussie rules",
+    ),
     Activity("golf", "leisure", ("golf",), needs="golf", prompt="Play golf"),
+    Activity(
+        "a safari", "leisure", ("safari", "safaris", "game drive", "game park"),
+        needs="safari", day_only=True, prompt="Go on a safari",
+    ),
     Activity("a picnic", "leisure", ("picnic",), prompt="Have a picnic"),
     Activity(
         "a barbecue", "leisure",
@@ -144,7 +162,8 @@ ACTIVITIES = (
     ),
     Activity(
         "snow sports", "snow",
-        ("ski", "skiing", "snowboard", "snowboarding", "sled", "sledding", "snowman", "snowball"),
+        ("ski", "skiing", "snowboard", "snowboarding", "sled", "sledding", "snowman", "snowball",
+         "snowshoe", "snowshoeing", "cross-country skiing", "toboggan", "tobogganing"),
         needs="snow", prompt="Go skiing",
     ),
     Activity(
@@ -274,6 +293,12 @@ PITCHES = {
     "rock climbing": "Check your gear, pick a route and climb with a partner.",
     "horse riding": "Book a hack at a stable — the view's better from up there.",
     "an outdoor workout": "A park bench, a patch of grass and twenty minutes.",
+    "netball": "Seven a side, no running with the ball — find a court.",
+    "kabaddi": "Take a breath, chant and raid — round up two teams.",
+    "sepak takraw": "A rattan ball, a net and no hands allowed.",
+    "Gaelic football": "Grab a size 5 and a few friends — or a hurl and a sliotar.",
+    "Aussie rules": "Find an oval and a footy and have a kick to kick.",
+    "a safari": "Go early or late, when the animals are moving — binoculars ready.",
     "golf": "A few holes, or a bucket of balls at the range.",
     "a picnic": "A blanket, some snacks and somewhere green.",
     "a barbecue": "Fire up the grill — it tastes better with company.",
@@ -319,6 +344,7 @@ PITCHES = {
 
 # Pitches in the local idiom, by (activity, country)
 LOCAL_PITCHES = {
+    ("a safari", "KE"): "Kenya's parks are never far — go early, when the animals are moving.",
     ("a barbecue", "KE"): "Fire it up — nyama choma tastes better with company.",
     ("a barbecue", "TZ"): "Fire it up — nyama choma tastes better with company.",
     ("a barbecue", "UG"): "Get the muchomo going and call some friends.",
@@ -362,7 +388,7 @@ def find_activity(text: str) -> Activity | None:
     """Find the activity a question is about, e.g. "Can I go for a run?" -> running."""
     text_lower = text.strip().lower()
     for activity in ACTIVITIES:
-        if text_lower == activity.name:
+        if text_lower == activity.name.lower():
             return activity
     for alias, activity in _ALIASES:
         if re.search(rf"\b{re.escape(alias)}\b", text_lower):
