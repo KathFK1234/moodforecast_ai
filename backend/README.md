@@ -168,7 +168,7 @@ curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
 }
 ```
 
-`verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight. A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
+`verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight. Some activities have rules of their own on top: wet surfaces rule out skateboarding, roller skating and rock climbing, rock climbing has a lower wind limit, and climbing and horse riding need daylight. A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
 
 The place is judged before the weather (see [Local Fit](#local-fit)). Asking about something the place can't offer is a `skip` with the reason and a local alternative:
 

@@ -28,6 +28,16 @@ class TestFindActivity:
         ("catch some waves and surf", "surfing"),
         ("look at the stars", "stargazing"),
         ("fly a kite", "kite flying"),
+        ("beach volleyball this afternoon?", "volleyball"),
+        ("throw a frisbee", "frisbee"),
+        ("down at the skate park", "skateboarding"),
+        ("go rollerblading", "roller skating"),
+        ("can we go climbing", "rock climbing"),
+        ("ride a horse", "horse riding"),
+        ("tai chi in the park", "an outdoor workout"),
+        ("outdoor yoga", "an outdoor workout"),
+        ("yoga", "an indoor workout"),
+        ("bike riding", "cycling"),
     ])
     def test_recognises_activities_in_free_text(self, question, expected):
         assert find_activity(question).name == expected
@@ -100,6 +110,36 @@ class TestVerdicts:
     def test_strong_wind_affects_other_outdoor_plans(self):
         assert advise("picnic", wind=40)["verdict"] == "maybe"
         assert advise("picnic", wind=65)["verdict"] == "skip"
+    
+    def test_wet_surfaces_rule_out_wheels_and_rock(self):
+        for question in ["skateboard", "rollerblade", "rock climbing"]:
+            assert advise(question)["verdict"] == "go"
+            for condition in ["Light Rain", "Light Drizzle", "Light Snow"]:
+                advice = advise(question, condition=condition, temp=2)
+                assert advice["verdict"] == "skip"
+                assert "slippery" in advice["reasons"][0]
+        # Other active plans just get the usual caveat
+        assert advise("run", condition="Light Drizzle")["verdict"] == "maybe"
+    
+    def test_climbing_has_its_own_wind_limit(self):
+        assert advise("climbing", wind=20)["verdict"] == "go"
+        assert advise("climbing", wind=35)["verdict"] == "maybe"
+        advice = advise("climbing", wind=48)
+        assert advice["verdict"] == "skip"
+        assert advice["reasons"] == ["Winds of 48 km/h are too strong for rock climbing to be safe."]
+    
+    def test_some_activities_need_daylight(self):
+        for question in ["rock climbing", "horse riding"]:
+            advice = advise(question, is_day=False)
+            assert advice["verdict"] == "skip"
+            assert "needs daylight" in advice["reasons"][0]
+        # Most only get a caveat after dark
+        assert advise("volleyball", is_day=False)["verdict"] == "maybe"
+    
+    def test_new_active_plans_follow_the_heat_rules(self):
+        for question in ["volleyball", "frisbee", "outdoor workout", "horse riding"]:
+            assert advise(question, temp=38)["verdict"] == "skip"
+            assert advise(question, temp=32)["verdict"] == "maybe"
     
     def test_darkness_is_a_caveat_unless_the_activity_suits_the_night(self):
         assert advise("run", is_day=False)["verdict"] == "maybe"

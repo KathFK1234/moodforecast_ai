@@ -16,6 +16,9 @@ class Activity(NamedTuple):
     night_ok: bool = False  # Just as good after dark
     needs: str = ""         # What the place must offer: coast, warm_coast, surf, snow, or a sport (see locality)
     prompt: str = ""        # How someone would ask about it, e.g. "Go for a run"
+    dry_only: bool = False  # Wet ground, rock or wheels make it risky, so rain and snow rule it out
+    day_only: bool = False  # Not safe in the dark, so night rules it out
+    max_wind_kph: int = 0   # Wind at or above this rules it out; 0 keeps the usual limits
 
 
 class ActivityCuriosity(TypedDict):
@@ -46,6 +49,32 @@ ACTIVITIES = (
     Activity("cricket", "active", ("cricket",), needs="cricket", prompt="Play cricket"),
     Activity("baseball", "active", ("baseball", "softball"), needs="baseball", prompt="Play baseball"),
     Activity("rugby", "active", ("rugby",), needs="rugby", prompt="Play rugby"),
+    Activity("volleyball", "active", ("volleyball", "beach volleyball"), prompt="Play volleyball"),
+    Activity("frisbee", "active", ("frisbee", "ultimate frisbee", "disc golf"), prompt="Throw a frisbee"),
+    Activity(
+        "skateboarding", "active", ("skateboard", "skateboarding", "skatepark", "skate park"),
+        dry_only=True, prompt="Go skateboarding",
+    ),
+    Activity(
+        "roller skating", "active",
+        ("skate", "skating", "roller skate", "roller skates", "roller skating",
+         "rollerblade", "rollerblades", "rollerblading", "inline skating"),
+        dry_only=True, prompt="Go roller skating",
+    ),
+    Activity(
+        "rock climbing", "active", ("climb", "climbing", "rock climbing", "abseil", "abseiling"),
+        dry_only=True, day_only=True, max_wind_kph=45, prompt="Go rock climbing",
+    ),
+    Activity(
+        "horse riding", "active",
+        ("horse", "horses", "horse riding", "horseback", "horseback riding", "pony", "equestrian"),
+        day_only=True, prompt="Go horse riding",
+    ),
+    Activity(
+        "an outdoor workout", "active",
+        ("outdoor workout", "outdoor yoga", "outdoor gym", "calisthenics", "bootcamp", "boot camp", "tai chi"),
+        prompt="Work out outdoors",
+    ),
     Activity("golf", "leisure", ("golf",), needs="golf", prompt="Play golf"),
     Activity("a picnic", "leisure", ("picnic",), prompt="Have a picnic"),
     Activity(
@@ -152,6 +181,13 @@ PITCHES = {
     "cricket": "A bat, a ball and a few friends is a match.",
     "baseball": "Play catch, or find a diamond and a few innings.",
     "rugby": "Touch rugby counts — grab a ball and some space.",
+    "volleyball": "A net, a ball and enough people for two sides.",
+    "frisbee": "Find a field and see how far you can throw it — then catch it.",
+    "skateboarding": "Find a smooth stretch or the local skatepark and roll.",
+    "roller skating": "Find a smooth path and glide — pads and helmet on.",
+    "rock climbing": "Check your gear, pick a route and climb with a partner.",
+    "horse riding": "Book a hack at a stable — the view's better from up there.",
+    "an outdoor workout": "A park bench, a patch of grass and twenty minutes.",
     "golf": "A few holes, or a bucket of balls at the range.",
     "a picnic": "A blanket, some snacks and somewhere green.",
     "a barbecue": "Fire up the grill — it tastes better with company.",
@@ -300,7 +336,9 @@ def _weather_issues(
         return issues
 
     # Precipitation and visibility
-    if rain and category == "active":
+    if activity.dry_only and (rain or snow or "drizzle" in condition_lower):
+        issues.append((2, f"It's {condition_lower} — wet surfaces make {activity.name} slippery and risky. Wait for it to dry."))
+    elif rain and category == "active":
         issues.append((1, "It's raining — dress for it and watch for slippery ground."))
     elif rain and category == "water":
         issues.append((1, "It's raining — fine once you're in the water, less fun on the shore."))
@@ -348,7 +386,12 @@ def _weather_issues(
             issues.append((1, f"At {temp}°C it's chilly for staying in one spot — bring warm layers."))
 
     # Wind
-    if category == "wind":
+    if activity.max_wind_kph:
+        if wind_kph >= activity.max_wind_kph:
+            issues.append((2, f"Winds of {wind} km/h are too strong for {activity.name} to be safe."))
+        elif wind_kph >= activity.max_wind_kph * 0.7:
+            issues.append((1, f"It's blowing {wind} km/h — that makes {activity.name} harder, so take extra care."))
+    elif category == "wind":
         if wind_kph >= 50:
             issues.append((2, f"Winds of {wind} km/h are too strong to handle safely."))
         elif wind_kph >= 35:
@@ -363,7 +406,9 @@ def _weather_issues(
         issues.append((1, f"It's blustery at {wind} km/h — hold on to your hat."))
 
     # Darkness
-    if not is_day and not activity.night_ok:
+    if not is_day and activity.day_only:
+        issues.append((2, f"It's dark — {activity.name} needs daylight to be safe. Save it for the morning."))
+    elif not is_day and not activity.night_ok:
         if category == "water":
             issues.append((1, "It's dark out — stick to a lit pool rather than open water."))
         elif category == "active":
