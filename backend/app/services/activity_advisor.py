@@ -266,6 +266,11 @@ SKIP_HEADLINES = (
     "{place} isn't playing along for {name} right now.",
 )
 HEADLINES = {"go": GO_HEADLINES, "maybe": MAYBE_HEADLINES, "skip": SKIP_HEADLINES}
+# For a skip because of the place rather than the weather, which waiting won't change
+PLACE_SKIP_HEADLINES = (
+    "{place} can't really offer {name}.",
+    "{place} isn't the place for {name}, I'm afraid.",
+)
 
 RANDOM_HEADLINES = (
     "Today's pick for {place}: {name}.",
@@ -741,8 +746,13 @@ def _advise(
     if activity.note:
         reasons.append(activity.note)
 
+    snowing = "snow" in condition.lower()
+    local = local_issue(activity.needs, activity.name, place, snowing) if place is not None and activity.needs else None
+    ruled_out_here = local is not None and local[0] == 2
+    headlines = PLACE_SKIP_HEADLINES if ruled_out_here else HEADLINES[verdict]
+
     suggestion = None
-    if verdict == "skip" and place is not None and not is_local(activity.needs, place, "snow" in condition.lower()):
+    if ruled_out_here:
         # The place rules it out, not the weather: offer something that works here
         instead = _pick(condition, temperature_c, humidity, wind_kph, is_day, rng, activity.name, place)
         suggestion = f"Something that does work in {place_name} right now: {instead.name}. {_pitch(instead, place)}"
@@ -762,7 +772,7 @@ def _advise(
         "activity": activity.name,
         "recognised": recognised,
         "verdict": verdict,
-        "headline": rng.choice(HEADLINES[verdict]).format(name=activity.name, place=place_name),
+        "headline": rng.choice(headlines).format(name=activity.name, place=place_name),
         "reasons": reasons,
         "suggestion": suggestion,
         "curiosity": {

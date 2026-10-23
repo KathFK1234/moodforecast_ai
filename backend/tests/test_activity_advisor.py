@@ -430,6 +430,25 @@ class TestLocalFit:
             assert suggestion.startswith("Something that does work in Nairobi right now: ")
             assert any(f": {name}. " in suggestion for name in practical)
     
+    def test_place_refusal_headline_does_not_blame_the_moment(self):
+        for seed in range(20):
+            headline = advise_at(NAIROBI, "surf", seed=seed)["headline"]
+            assert headline in {
+                h.format(place="Nairobi", name="surfing") for h in activity_advisor.PLACE_SKIP_HEADLINES
+            }
+        # A weather skip keeps the weather headlines
+        rain = advise_at(MOMBASA, "beach", condition="Thunderstorm")
+        assert rain["headline"] in {
+            h.format(place="Mombasa", name="a beach day") for h in activity_advisor.SKIP_HEADLINES
+        }
+        assert rain["suggestion"] in activity_advisor.INDOOR_SWAPS
+    
+    def test_weather_skip_at_an_unchecked_coast_offers_an_indoor_swap(self):
+        """An unknown coast is not a refusal by the place, so the usual indoor swap is offered."""
+        advice = advise_at(UNKNOWN, "beach", condition="Thunderstorm")
+        assert advice["verdict"] == "skip"
+        assert advice["suggestion"] in activity_advisor.INDOOR_SWAPS
+    
     def test_safaris_need_wildlife_country(self):
         assert advise_at(NAIROBI, "safari")["verdict"] == "go"
         assert advise_at(NAIROBI, "safari", is_day=False)["verdict"] == "skip"
