@@ -37,9 +37,9 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Why this score** - the factors that raised or lowered the score, and by how much
 - **7-day mood outlook** - expected mood for each day of the forecast
 - **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
-- **Activity check** - ask whether the weather somewhere suits a run, a picnic, a swim, stargazing and more, and get a go, maybe or skip with the reasons
+- **Activity check** - ask whether the weather somewhere suits any of about 65 activities, from a run, a picnic or kayaking to a bonfire, stargazing, a safari or an escape room, and get a go, maybe or skip with the reasons. Safety rules are built in: nothing outdoors in a thunderstorm or freezing rain, heat and cold warnings, no skateboarding or climbing on wet surfaces, wind limits for climbing, paddling and fires, and daylight for riding, climbing and paddling
 - **Surprise me** - a random activity the current weather suits, different on every visit and every tap
-- **Local fit** - suggestions match the place as well as the weather: no beach days inland or skiing in the tropics, sports only where they are commonly played, and local favourites first
+- **Local fit** - suggestions match the place as well as the weather: no beach days inland, skiing in the tropics or safaris outside wildlife country, sports such as cricket, kabaddi or Gaelic football only where they are commonly played, and local favourites first
 - **Stay curious** - questions about the weather in other places, one tap away
 - **Location suggestions** - matching places appear as you type in either location field
 - **Weather-aware design** - the page's background follows the weather and day or night
