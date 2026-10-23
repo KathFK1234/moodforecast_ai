@@ -128,6 +128,8 @@ class ActivityChoice(BaseModel):
     """An activity that is practical at a location."""
     name: str
     prompt: str = Field(..., description="How someone would ask about it, e.g. 'Go for a run'")
+    group: str = Field(..., description="Kind of activity, e.g. 'Sport and exercise' or 'Indoors'")
+    favourite: bool = Field(False, description="Especially popular in the location's country")
 
 
 class ActivityCuriosity(BaseModel):

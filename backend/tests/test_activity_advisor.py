@@ -351,6 +351,13 @@ class TestRandomActivity:
     def test_every_activity_has_a_pitch(self):
         assert set(activity_advisor.PITCHES) == {a.name for a in ACTIVITIES}
     
+    def test_every_activity_has_a_group(self):
+        assert {activity_advisor.group_of(a) for a in ACTIVITIES} == set(activity_advisor.GROUPS)
+        by_name = {a.name: activity_advisor.group_of(a) for a in ACTIVITIES}
+        assert by_name["sailing"] == "On the water"
+        assert by_name["kite flying"] == "Out and about"
+        assert by_name["kayaking"] == "On the water"
+    
     def test_every_activity_has_a_prompt(self):
         assert all(a.prompt for a in ACTIVITIES)
     

@@ -3,7 +3,8 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from app.services.weather import get_weather_client
-from app.services.activity_advisor import ACTIVITIES, check_activity, local_activities, random_activity
+from app.services.activity_advisor import ACTIVITIES, check_activity, group_of, local_activities, random_activity
+from app.services.locality import LOCAL_FAVOURITES
 from app.models.schemas import ActivityChoice, ActivityResponse
 from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, local_weather
 
@@ -22,14 +23,23 @@ async def list_local_activities(location: str) -> list[ActivityChoice]:
     """
     The activities that are practical at a location, local favourites first.
     
+    Each comes with its group (Sport and exercise, Out and about, On the water,
+    Snow or Indoors) and whether it is a local favourite.
+    
     Leaves out what the place can't offer (sea activities inland, snow sports
     away from snow country) and sports that aren't commonly played there.
     """
     try:
         client = get_weather_client()
         _, weather, place = await local_weather(client, location)
+        favourites = LOCAL_FAVOURITES.get(place.country, ())
         return [
-            ActivityChoice(name=activity.name, prompt=activity.prompt)
+            ActivityChoice(
+                name=activity.name,
+                prompt=activity.prompt,
+                group=group_of(activity),
+                favourite=activity.name in favourites,
+            )
             for activity in local_activities(place, weather.condition)
         ]
     

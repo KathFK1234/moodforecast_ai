@@ -999,6 +999,7 @@ body {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.form-group select optgroup,
 .form-group select option {
     color: #0c1122;
 }

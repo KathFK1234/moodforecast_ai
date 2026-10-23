@@ -476,7 +476,16 @@ def test_local_activities_endpoint(mock_weather):
     response = client.get("/api/activities/Nairobi")
     assert response.status_code == 200
     choices = response.json()
-    assert choices[0] == {"name": "running", "prompt": "Go for a run"}
+    assert choices[0] == {
+        "name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": True
+    }
+    # Kenya's favourites come first and are flagged; the rest are not
+    favourites = [choice["name"] for choice in choices if choice["favourite"]]
+    assert favourites == [choice["name"] for choice in choices[:len(favourites)]]
+    assert "a safari" in favourites
+    assert {choice["group"] for choice in choices} == {
+        "Sport and exercise", "Out and about", "On the water", "Indoors"
+    }
     names = [choice["name"] for choice in choices]
     assert "surfing" not in names
     assert "snow sports" not in names

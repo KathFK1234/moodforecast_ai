@@ -222,7 +222,7 @@ The names of every activity the advisor knows: `["running", "a walk", "cycling",
 
 ### GET /api/activities/{location}
 
-The activities that are practical at a location, local favourites first. The page uses it for the quick picks and for the subscription form's activity list.
+The activities that are practical at a location, local favourites first. Each has a `group` (Sport and exercise, Out and about, On the water, Snow or Indoors) and `favourite`, which is `true` when it is especially popular in the location's country. The page uses it for the quick picks and for the subscription form's activity list, where favourites are listed first under "Popular here" and the rest by group.
 
 ```bash
 curl http://localhost:8000/api/activities/Nairobi
@@ -230,9 +230,10 @@ curl http://localhost:8000/api/activities/Nairobi
 
 ```json
 [
-  {"name": "running", "prompt": "Go for a run"},
-  {"name": "hiking", "prompt": "Go hiking"},
-  {"name": "football", "prompt": "Play football"}
+  {"name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": true},
+  {"name": "hiking", "prompt": "Go hiking", "group": "Sport and exercise", "favourite": true},
+  ...
+  {"name": "a nap", "prompt": "Take a nap", "group": "Indoors", "favourite": false}
 ]
 ```
 

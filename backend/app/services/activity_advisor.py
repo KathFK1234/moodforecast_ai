@@ -5,7 +5,7 @@ import re
 from typing import NamedTuple, TypedDict
 
 from app.services import curiosity
-from app.services.locality import LOCAL_FAVOURITES, Place, is_late_night, is_local, local_issue
+from app.services.locality import COAST_NEEDS, LOCAL_FAVOURITES, Place, is_late_night, is_local, local_issue
 
 
 class Activity(NamedTuple):
@@ -377,6 +377,19 @@ INDOOR_SWAPS = (
     "Try a museum, a café or the library until conditions improve.",
 )
 
+# How activities are grouped in lists such as the subscription form, in display order
+GROUPS = ("Sport and exercise", "Out and about", "On the water", "Snow", "Indoors")
+_CATEGORY_GROUPS = {
+    "active": "Sport and exercise",
+    "leisure": "Out and about",
+    "sky": "Out and about",
+    "wind": "Out and about",
+    "water": "On the water",
+    "paddle": "On the water",
+    "snow": "Snow",
+    "indoor": "Indoors",
+}
+
 CURIOSITY_PLACES = {
     "active": curiosity.WORLD_PLACES,
     "leisure": curiosity.WORLD_PLACES,
@@ -387,6 +400,13 @@ CURIOSITY_PLACES = {
     "wind": curiosity.WINDY_PLACES,
     "indoor": curiosity.WORLD_PLACES,
 }
+
+
+def group_of(activity: Activity) -> str:
+    """The list group an activity belongs to; anything that needs the sea is on the water."""
+    if activity.needs in COAST_NEEDS:
+        return "On the water"
+    return _CATEGORY_GROUPS[activity.category]
 
 
 def find_activity(text: str) -> Activity | None:

@@ -817,8 +817,8 @@ async function showLocalActivities(location) {
 
 // A few local favourites, then a different handful of the rest on each visit
 function renderActivityChips(choices) {
-    const favourites = choices.slice(0, 3);
-    const rest = choices.slice(3).sort(() => Math.random() - 0.5);
+    const favourites = choices.filter((choice) => choice.favourite).slice(0, 3);
+    const rest = choices.filter((choice) => !favourites.includes(choice)).sort(() => Math.random() - 0.5);
     const chips = el('activityChips');
     chips.innerHTML = '';
     favourites.concat(rest).slice(0, ACTIVITY_CHIP_COUNT).forEach((choice) => {
@@ -829,16 +829,29 @@ function renderActivityChips(choices) {
     });
 }
 
-// Offer only what can be done at the subscription's location, keeping the current choice if it still fits
+// Offer only what can be done at the subscription's location, keeping the current choice if it still fits.
+// Local favourites come first, then the rest grouped by kind.
 function fillActivityChoices(choices) {
     const select = el('activitySelect');
     const chosen = select.value;
-    while (select.options.length > 1) select.remove(1);
+    while (select.children.length > 1) select.lastChild.remove();
+    const groups = new Map([['Popular here', []]]);
     choices.forEach((choice) => {
-        const option = document.createElement('option');
-        option.value = choice.name;
-        option.textContent = choice.name.charAt(0).toUpperCase() + choice.name.slice(1);
-        select.appendChild(option);
+        const group = choice.favourite ? 'Popular here' : (choice.group || 'More');
+        if (!groups.has(group)) groups.set(group, []);
+        groups.get(group).push(choice);
+    });
+    groups.forEach((members, label) => {
+        if (!members.length) return;
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = label;
+        members.forEach((choice) => {
+            const option = document.createElement('option');
+            option.value = choice.name;
+            option.textContent = choice.name.charAt(0).toUpperCase() + choice.name.slice(1);
+            optgroup.appendChild(option);
+        });
+        select.appendChild(optgroup);
     });
     select.value = choices.some((choice) => choice.name === chosen) ? chosen : '';
 }
