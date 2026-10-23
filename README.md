@@ -2,6 +2,8 @@
 
 Weather and mood forecasting in one page. MoodForecast AI takes live weather for any location, scores how those conditions are likely to affect mood and energy, and gives practical wellbeing recommendations.
 
+Live: https://moodforecastai-production.up.railway.app (deployed on Railway from `main`, see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)).
+
 ## Quick Start
 
 ```bash
