@@ -57,3 +57,6 @@ celerybeat-schedule
 
 # Local settings
 local_settings.py
+
+# Local session notes
+context.md
