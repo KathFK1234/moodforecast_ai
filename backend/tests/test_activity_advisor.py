@@ -57,6 +57,14 @@ class TestVerdicts:
         for question in ["run", "picnic", "swim", "ski", "stargaze", "kite"]:
             assert advise(question, condition="Thunderstorm")["verdict"] == "skip"
     
+    def test_freezing_rain_or_drizzle_rules_out_anything_outdoors(self):
+        for condition in ["Freezing Rain", "Freezing Drizzle"]:
+            for question in ["run", "walk", "cycling", "picnic", "swim", "ski", "kite"]:
+                advice = advise(question, condition=condition, temp=-1)
+                assert advice["verdict"] == "skip"
+                assert "ice" in advice["reasons"][0]
+            assert advise("read a book", condition=condition, temp=-1)["verdict"] == "go"
+    
     def test_rain_is_a_caveat_for_a_run_but_spoils_a_picnic(self):
         assert advise("run", condition="Light Rain")["verdict"] == "maybe"
         assert advise("picnic", condition="Light Rain")["verdict"] == "skip"

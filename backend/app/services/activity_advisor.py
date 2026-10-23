@@ -283,6 +283,9 @@ def _weather_issues(
 
     if storm:
         return [(2, "There's a thunderstorm about — stay off open ground until it passes.")]
+    # Freezing rain or drizzle glazes paths, roads and pitches in ice
+    if "freezing" in condition_lower:
+        return [(2, f"{condition.capitalize()} is coating everything in ice — stay off paths and roads until it thaws.")]
 
     # Sky: all that matters is darkness and cloud
     if category == "sky":
