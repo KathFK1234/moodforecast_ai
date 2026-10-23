@@ -48,8 +48,32 @@ class TestFindActivity:
         ("sundowners by the lake", "eating outdoors"),
         ("see the sights in the old town", "sightseeing"),
         ("go birding", "birdwatching"),
+        ("bowling night", "bowling"),
+        ("ice skating at the rink", "ice skating"),
+        ("bouldering", "indoor climbing"),
+        ("climbing", "rock climbing"),
+        ("painting or drawing", "arts and crafts"),
+        ("a bit of mindfulness", "meditation"),
+        ("sing karaoke", "karaoke"),
+        ("try an escape room", "an escape room"),
+        ("hot tub and sauna", "a sauna"),
+        ("a concert tonight", "live music"),
+        ("practise the guitar", "music"),
+        ("learn something new", "learning something new"),
+        ("visit family", "time with friends"),
     ])
+
     def test_recognises_activities_in_free_text(self, question, expected):
+        assert find_activity(question).name == expected
+    
+    @pytest.mark.parametrize("question,expected", [
+        ("learn to surf", "surfing"),
+        ("learn to swim", "swimming"),
+        ("yoga class", "an indoor workout"),
+        ("a picnic with friends", "a picnic"),
+        ("roller skating", "roller skating"),
+    ])
+    def test_new_words_do_not_steal_existing_activities(self, question, expected):
         assert find_activity(question).name == expected
     
     def test_matches_whole_words_only(self):
@@ -207,6 +231,12 @@ class TestVerdicts:
     def test_indoor_activities_are_always_a_go(self):
         for condition, temp in [("Thunderstorm", 5), ("Clear", 40), ("Heavy Snow", -10)]:
             assert advise("read a book", condition=condition, temp=temp)["verdict"] == "go"
+    
+    def test_ice_skating_always_comes_with_its_safety_note(self):
+        for condition, temp in [("Clear", -8), ("Snow", -3), ("Clear", 25)]:
+            advice = advise("ice skating", condition=condition, temp=temp)
+            assert advice["verdict"] == "go"
+            assert advice["reasons"][-1].startswith("Stick to a rink")
     
     def test_every_activity_gets_an_answer_in_any_weather(self):
         for activity in ACTIVITIES:
@@ -493,6 +523,11 @@ class TestLateNightPicks:
         # Stargazing drops out when the sky is covered
         assert "stargazing" not in self.picks(2, "Overcast")
         assert "stargazing" in self.picks(2)
+    
+    def test_late_night_picks_are_known_quiet_activities(self):
+        names = {a.name for a in ACTIVITIES}
+        assert set(activity_advisor.LATE_NIGHT_PICKS) <= names
+        assert {"meditation", "arts and crafts"} <= self.picks(1)
     
     def test_evening_still_gets_evening_activities(self):
         assert "a barbecue" in self.picks(20)

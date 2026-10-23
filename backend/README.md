@@ -177,6 +177,7 @@ Some activities have rules of their own on top:
 - Rock climbing, kayaking (canoeing, paddleboarding, rowing) and boat trips have lower wind limits.
 - Kayaking is judged on how cold a capsize would be, so below 5°C it is a skip.
 - Barbecues and bonfires have lower wind limits, and in hot, dry air (28°C or more, under 30% humidity) they get a fire ban warning.
+- Ice skating is judged as a rink, so it is always a go, and the answer always reminds you that ice on a pond or lake is only safe once it has been checked.
 
 A question that matches none of the known activities is answered for general time outdoors, with `recognised` set to `false`.
 

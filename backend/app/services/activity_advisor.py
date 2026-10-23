@@ -20,6 +20,7 @@ class Activity(NamedTuple):
     day_only: bool = False  # Not safe in the dark, so night rules it out
     max_wind_kph: int = 0   # Wind at or above this rules it out; 0 keeps the usual limits
     fire: bool = False      # Involves an open flame, so hot, dry air calls for care
+    note: str = ""          # A safety point that always goes with the answer
 
 
 class ActivityCuriosity(TypedDict):
@@ -174,6 +175,53 @@ ACTIVITIES = (
         prompt="Visit a museum or café",
     ),
     Activity("a nap", "indoor", ("nap", "sleep"), prompt="Take a nap"),
+    Activity("bowling", "indoor", ("bowling", "tenpin", "ten pin"), prompt="Go bowling"),
+    Activity(
+        "ice skating", "indoor", ("ice skating", "ice skate", "ice rink", "skating rink"),
+        note="Stick to a rink — ice on a pond or lake is only safe once it has been checked.",
+        prompt="Go ice skating",
+    ),
+    Activity(
+        "indoor climbing", "indoor",
+        ("indoor climbing", "climbing wall", "climbing gym", "bouldering"), prompt="Go bouldering",
+    ),
+    Activity(
+        "arts and crafts", "indoor",
+        ("art", "arts", "craft", "crafts", "paint", "painting", "draw", "drawing", "sketch", "sketching",
+         "knit", "knitting", "crochet", "pottery"),
+        prompt="Make some art",
+    ),
+    Activity(
+        "meditation", "indoor",
+        ("meditate", "meditation", "mindfulness", "breathing exercises", "journal", "journaling"),
+        prompt="Meditate",
+    ),
+    Activity("karaoke", "indoor", ("karaoke", "sing", "singing"), prompt="Sing karaoke"),
+    Activity("an escape room", "indoor", ("escape room", "escape rooms"), prompt="Try an escape room"),
+    Activity(
+        "a sauna", "indoor", ("sauna", "steam room", "spa", "hot tub", "massage"),
+        prompt="Relax in a sauna or spa",
+    ),
+    Activity(
+        "live music", "indoor",
+        ("live music", "concert", "gig", "theatre", "theater", "comedy show", "stand-up"),
+        prompt="See a show",
+    ),
+    Activity(
+        "music", "indoor",
+        ("play music", "guitar", "piano", "instrument", "jam session", "make music"),
+        prompt="Play some music",
+    ),
+    Activity(
+        "learning something new", "indoor",
+        ("learn something", "learn something new", "online course", "study", "studying", "learn a language"),
+        prompt="Learn something new",
+    ),
+    Activity(
+        "time with friends", "indoor",
+        ("visit friends", "visiting friends", "visit family", "catch up with friends", "sleepover"),
+        prompt="See friends or family",
+    ),
 )
 
 # Longest alias first, so "board game" wins over a shorter word inside it
@@ -255,6 +303,18 @@ PITCHES = {
     "an indoor workout": "Twenty minutes, your favourite playlist, done.",
     "an indoor outing": "A museum, a café or a library corner you haven't tried.",
     "a nap": "Twenty minutes. Set an alarm. No guilt.",
+    "bowling": "Two games, loser picks the snacks.",
+    "ice skating": "Hold the rail for a lap or two — then let go.",
+    "indoor climbing": "Chalk up and work out the route before you start.",
+    "arts and crafts": "No talent required — paint, draw or make something just for you.",
+    "meditation": "Ten quiet minutes. Breathe in for four, out for six.",
+    "karaoke": "Pick the song you'd never sing sober — or sober, your call.",
+    "an escape room": "Round up your cleverest friends and beat the clock.",
+    "a sauna": "Heat, rest, repeat — and drink plenty of water.",
+    "live music": "Check what's on tonight and go and see someone new.",
+    "music": "Dust off the instrument — or start learning one.",
+    "learning something new": "Pick something you've always wondered about and give it an hour.",
+    "time with friends": "Message someone you haven't seen in a while and make a plan.",
 }
 
 # Pitches in the local idiom, by (activity, country)
@@ -276,7 +336,7 @@ LOCAL_PITCHES = {
 }
 
 # The only things suggested unprompted in the small hours
-LATE_NIGHT_PICKS = ("stargazing", "reading", "a movie", "games")
+LATE_NIGHT_PICKS = ("stargazing", "reading", "a movie", "games", "meditation", "arts and crafts")
 
 # Offered when the answer is no. All indoors, so they hold in any weather.
 INDOOR_SWAPS = (
@@ -652,6 +712,8 @@ def _advise(
     reasons = [reason for _, reason in issues]
     if not reasons:
         reasons.append(_good_news(activity, condition, temperature_c, wind_kph, is_day, place))
+    if activity.note:
+        reasons.append(activity.note)
 
     suggestion = None
     if verdict == "skip" and place is not None and not is_local(activity.needs, place, "snow" in condition.lower()):
