@@ -131,6 +131,8 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | Timeout (504) | Upstream service is slow - retry shortly |
 | Frontend shows old content | `backend/app/static/` was not updated from `frontend/`; browser cache |
 | Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |
+| Subscribing says "Email alerts aren't available right now" (503) | `SMTP_HOST` and `MAIL_FROM` are not set; requests can't be confirmed without email, so none are taken |
+| A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
 | Subscribing works but no email arrives | `SMTP_HOST` and `MAIL_FROM` are set; the logs for `Could not send email`; the recipient's spam folder; whether the host allows outbound SMTP |
 | Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
