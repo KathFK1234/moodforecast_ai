@@ -30,11 +30,25 @@ class Subscriber(SQLModel, table=True):
     last_sent_on: str | None = Field(default=None, description="Local date of the last daily alert, YYYY-MM-DD")
 
 
+def engine_url(url: str) -> str:
+    """
+    The database URL with the PostgreSQL driver named.
+    
+    A bare postgresql:// URL (as Railway provides) means psycopg 3 to
+    SQLAlchemy 2.1, but psycopg2 is the driver installed, so name it.
+    The older postgres:// spelling is accepted too.
+    """
+    for scheme in ("postgresql://", "postgres://"):
+        if url.startswith(scheme):
+            return "postgresql+psycopg2://" + url.removeprefix(scheme)
+    return url
+
+
 @lru_cache
 def get_engine():
     """Get the shared database engine, created from settings on first use."""
     return create_engine(
-        settings.database_url,
+        engine_url(settings.database_url),
         echo=settings.environment == "development"
     )
 
