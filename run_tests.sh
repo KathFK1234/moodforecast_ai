@@ -92,15 +92,22 @@ local_activities=$(curl -s $BASE_URL/api/activities/Nairobi | grep -o '"prompt"'
 suggestions=$(curl -s "$BASE_URL/api/locations?q=nai" | grep -o '"label"' | head -1)
 [ -n "$suggestions" ] && pass "Location suggestions working" || fail "Location suggestions not working"
 
-# Subscribe, then unsubscribe so the test address is not left on the alert list
-subscription=$(curl -s -X POST $BASE_URL/api/subscribe \
+# Subscribe: a request waits for its emailed link to be confirmed, so nothing is left on the
+# alert list. Without email configured the endpoint says so (503), which is expected here.
+subscribe_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE_URL/api/subscribe \
   -H "Content-Type: application/json" \
   -d '{"email":"smoke-test@example.com","location":"Nairobi"}')
-[ -n "$(echo "$subscription" | grep -o '"subscriber_id"')" ] && pass "Subscribe endpoint working" || fail "Subscribe endpoint not working"
+case "$subscribe_status" in
+    202) pass "Subscribe endpoint working (confirmation email requested)" ;;
+    503) skip "Subscribe endpoint answers, but email isn't configured (SMTP_HOST, MAIL_FROM)" ;;
+    *) fail "Subscribe endpoint not working (HTTP $subscribe_status)" ;;
+esac
 
-token=$(echo "$subscription" | grep -oP '"unsubscribe_token":"\K[^"]+')
-unsubscribed=$([ -n "$token" ] && curl -s -X POST "$BASE_URL/api/unsubscribe/$token" | grep -o '"unsubscribed"')
-[ -n "$unsubscribed" ] && pass "Unsubscribe endpoint working" || fail "Unsubscribe endpoint not working"
+confirm_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/confirm/not-a-real-token")
+[ "$confirm_status" = "404" ] && pass "Confirm endpoint working" || fail "Confirm endpoint not working (HTTP $confirm_status)"
+
+unsubscribe_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/api/unsubscribe/not-a-real-token")
+[ "$unsubscribe_status" = "404" ] && pass "Unsubscribe endpoint working" || fail "Unsubscribe endpoint not working (HTTP $unsubscribe_status)"
 
 # Documentation
 docs=$(curl -s $BASE_URL/docs | grep -o 'swagger')

@@ -44,6 +44,37 @@ def engine_url(url: str) -> str:
     return url
 
 
+def utc_now() -> datetime:
+    """The time now, in UTC."""
+    return datetime.now(timezone.utc)
+
+
+def as_utc(moment: datetime) -> datetime:
+    """A stored time as UTC; databases without time zones hand it back naive."""
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+class PendingSubscription(SQLModel, table=True):
+    """
+    A subscription, or a change to one, waiting for its email address to be confirmed.
+    
+    Nothing but the confirmation email goes to an address until the link in it
+    is followed, so nobody can sign someone else up or change their alerts.
+    """
+    __tablename__ = "alert_pending"
+    
+    token: str = Field(..., primary_key=True, description="Secret in the confirmation link")
+    email: str = Field(..., index=True, description="Lowercase")
+    location: str = Field(..., description="As the subscriber typed it")
+    place: str = Field(..., description="Resolved display name, e.g. 'Nairobi, KE'")
+    lat: float
+    lon: float
+    utc_offset_seconds: int = Field(default=0)
+    activity: str | None = Field(default=None)
+    language: str = Field("en")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 @lru_cache
 def get_engine():
     """Get the shared database engine, created from settings on first use."""

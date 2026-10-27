@@ -158,14 +158,20 @@ class ActivityResponse(BaseModel):
 
 
 class SubscribeResponse(BaseModel):
-    """Subscription response."""
-    subscriber_id: str
+    """Subscription request response: nothing starts until the emailed link is followed."""
     email: str
     location: str = Field(..., description="Resolved display name")
     activity: str | None = None
-    status: str = Field("subscribed", description="subscribed, or updated if the email was already subscribed")
-    unsubscribe_token: str = Field(..., description="Pass to POST /api/unsubscribe/{token} to stop the alerts")
-    confirmation_sent: bool = Field(False, description="Whether a confirmation email went out")
+    status: str = Field("pending", description="Always pending: waiting for the email address to be confirmed")
+    confirmation_sent: bool = Field(..., description="Whether the email with the confirmation link went out")
+
+
+class ConfirmResponse(BaseModel):
+    """A confirmed subscription."""
+    email: str
+    location: str = Field(..., description="Resolved display name")
+    activity: str | None = None
+    status: str = Field(..., description="subscribed, or updated if the email was already subscribed")
 
 
 class UnsubscribeLinkRequest(BaseModel):

@@ -656,16 +656,15 @@ async function handleSubscribe(event) {
         if (!res.ok) throw new Error(await errorMessage(res, 'Subscription failed. Please try again.'));
 
         const data = await res.json();
+        if (!data.confirmation_sent) {
+            throw new Error("We couldn't send the confirmation email just now. Please try again in a few minutes.");
+        }
         const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
-        const confirmation = data.confirmation_sent
-            ? 'Check your inbox for a confirmation.'
-            : "We couldn't send a confirmation email just now, so alerts may not reach you yet.";
         showNotice(
             msg,
-            `${data.status === 'updated' ? 'Updated' : 'Subscribed'}. ${data.email} will get a daily email for ${data.location} with ${about}. ${confirmation}`,
+            `Almost there: we've emailed a link to ${data.email}. Daily alerts for ${data.location} with ${about} start once you confirm.`,
             false
         );
-        rememberSubscription({ email: data.email, location: data.location, token: data.unsubscribe_token });
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
@@ -741,7 +740,8 @@ async function handleOptOut(event) {
     btn.disabled = true;
     try {
         const saved = savedSubscription();
-        if (saved && saved.email === email.toLowerCase()) {
+        // Only subscriptions saved before email confirmation have a token here
+        if (saved && saved.token && saved.email === email.toLowerCase()) {
             const data = await postUnsubscribe(saved.token);
             rememberSubscription(null);
             el('subscribeMessage').classList.add('hidden');  // The "Subscribed" confirmation no longer holds
@@ -769,9 +769,44 @@ async function handleOptOut(event) {
     }
 }
 
+// Opened from a confirmation email: ask before confirming, so a mail scanner
+// opening the link can't confirm for someone
+function showConfirmPrompt(token) {
+    const banner = el('emailLinkBanner');
+    const text = document.createElement('span');
+    text.textContent = 'Start your daily MoodForecast emails?';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'banner-button';
+    confirm.textContent = 'Yes, start my alerts';
+    confirm.addEventListener('click', async () => {
+        confirm.disabled = true;
+        try {
+            let res;
+            try {
+                res = await fetch(`${API_BASE}/api/confirm/${encodeURIComponent(token)}`, { method: 'POST' });
+            } catch (e) {
+                throw new Error('Could not reach the server. Check your connection and try again.');
+            }
+            if (!res.ok) throw new Error(await errorMessage(res, 'Could not confirm. Please try again.'));
+            const data = await res.json();
+            banner.className = 'notice notice-success';
+            banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due.`;
+            rememberSubscription({ email: data.email, location: data.location });
+            // Drop the token from the address bar so a reload doesn't ask again
+            window.history.replaceState(null, '', window.location.pathname);
+        } catch (error) {
+            banner.className = 'notice notice-error';
+            banner.textContent = error.message;
+        }
+    });
+    banner.append(text, confirm);
+    banner.classList.remove('hidden');
+}
+
 // Opened from an email's unsubscribe link: ask before unsubscribing
 function showUnsubscribePrompt(token) {
-    const banner = el('unsubscribeBanner');
+    const banner = el('emailLinkBanner');
     const text = document.createElement('span');
     text.textContent = 'Stop the daily MoodForecast emails?';
     const confirm = document.createElement('button');
@@ -953,6 +988,7 @@ function init() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('unsubscribe')) showUnsubscribePrompt(params.get('unsubscribe'));
+    else if (params.get('confirm')) showConfirmPrompt(params.get('confirm'));
 
     // Start from ?q= in the link, then the last place searched, then the default
     let initial = el('locationInput').value;

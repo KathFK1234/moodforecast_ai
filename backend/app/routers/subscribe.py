@@ -1,13 +1,14 @@
-"""Subscribe router - POST /api/subscribe, /api/unsubscribe/{token} and /api/unsubscribe-link"""
+"""Subscribe router - POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
 import logging
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
-from app.models.db import Subscriber, get_engine
+from app.models.db import PendingSubscription, Subscriber, as_utc, get_engine, utc_now
 from app.models.schemas import (
+    ConfirmResponse,
     SubscribeRequest,
     SubscribeResponse,
     UnsubscribeLinkRequest,
@@ -24,20 +25,28 @@ router = APIRouter(prefix="/api", tags=["subscribe"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/subscribe", status_code=201)
+# How long a confirmation link works
+CONFIRM_HOURS = 48
+
+EMAIL_UNAVAILABLE_MESSAGE = "Email alerts aren't available right now. Please try again later."
+
+
+@router.post("/subscribe", status_code=202)
 async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     """
-    Register an email address for daily alerts about a location.
+    Ask for daily alerts about a location, or for a change to existing ones.
     
-    Stores: email, location, activity, language. The location must be one the
-    geocoder can find, and the activity one that can be done there. Subscribing again with the same email updates the
-    existing subscription instead of adding another.
+    Nothing starts or changes until the email address is confirmed: this
+    stores the request and emails a link to POST /api/confirm/{token}, valid
+    for CONFIRM_HOURS. The location must be one the geocoder can find, and the
+    activity one that can be done there.
     
-    Sends a confirmation email if email is configured; the subscription is
-    stored either way, and `confirmation_sent` says which happened.
-    
-    Returns subscriber ID, confirmation, and the token that unsubscribes.
+    Returns 503 if email is not configured, since the request could never be
+    confirmed. `confirmation_sent` says whether the email went out.
     """
+    if not mailer.is_configured():
+        raise HTTPException(status_code=503, detail=EMAIL_UNAVAILABLE_MESSAGE)
+    
     try:
         client = get_weather_client()
         lat, lon, place = await resolve_location(client, request.location)
@@ -50,51 +59,34 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             if issue and issue[0] == 2:
                 raise HTTPException(status_code=422, detail=f"{issue[1]} Pick another activity.")
         
-        # Save to database
-        engine = get_engine()
-        with Session(engine) as session:
-            subscriber = session.exec(
-                select(Subscriber).where(Subscriber.email == request.email)
-            ).first()
-            status = "updated" if subscriber and subscriber.active else "subscribed"
-            if subscriber is None:
-                subscriber = Subscriber(
-                    id=str(uuid.uuid4()),
-                    email=request.email,
-                    token=secrets.token_urlsafe(24),
-                    location=request.location,
-                    place=place,
-                    lat=lat,
-                    lon=lon
-                )
-            
-            subscriber.location = request.location
-            subscriber.place = place
-            subscriber.lat = lat
-            subscriber.lon = lon
-            subscriber.utc_offset_seconds = forecast.get("utc_offset_seconds", 0)
-            subscriber.activity = request.activity
-            subscriber.language = request.language
-            subscriber.active = True
-            # The confirmation covers today if the alert hour has already passed,
-            # so the first daily alert arrives the next morning
-            now = datetime.now(timezone.utc)
-            if subscriber.last_sent_on is None and alerts.is_due(subscriber, now):
-                subscriber.last_sent_on = alerts.local_date(subscriber.utc_offset_seconds, now)
-            
-            session.add(subscriber)
+        pending = PendingSubscription(
+            token=secrets.token_urlsafe(24),
+            email=request.email,
+            location=request.location,
+            place=place,
+            lat=lat,
+            lon=lon,
+            utc_offset_seconds=forecast.get("utc_offset_seconds", 0),
+            activity=request.activity,
+            language=request.language,
+        )
+        with Session(get_engine()) as session:
+            # Requests nobody confirmed in time are dropped
+            cutoff = utc_now() - timedelta(hours=CONFIRM_HOURS)
+            for expired in session.exec(select(PendingSubscription).where(PendingSubscription.created_at < cutoff)):
+                session.delete(expired)
+            session.add(pending)
             session.commit()
-            session.refresh(subscriber)
+            session.refresh(pending)
         
-        confirmation_sent = await alerts.send_once(subscriber, alerts.welcome_email(subscriber), "welcome")
+        confirmation_sent = await alerts.send_once(
+            pending.email, alerts.confirm_email(pending, CONFIRM_HOURS), "confirm"
+        )
         
         return SubscribeResponse(
-            subscriber_id=subscriber.id,
-            email=subscriber.email,
-            location=subscriber.place,
-            activity=subscriber.activity,
-            status=status,
-            unsubscribe_token=subscriber.token,
+            email=pending.email,
+            location=pending.place,
+            activity=pending.activity,
             confirmation_sent=confirmation_sent
         )
     
@@ -109,6 +101,68 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     except Exception:
         logger.exception("Unexpected error")
         raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+
+
+@router.post("/confirm/{token}")
+async def confirm(token: str) -> ConfirmResponse:
+    """
+    Confirm a subscription request with the token from its email.
+    
+    Starts the alerts, or applies the change to an existing subscription, and
+    sends the welcome email with the unsubscribe link. Other requests waiting
+    for the same address are dropped. Returns 404 for an unknown, used or
+    expired token.
+    """
+    with Session(get_engine()) as session:
+        pending = session.get(PendingSubscription, token)
+        if pending is None or as_utc(pending.created_at) < utc_now() - timedelta(hours=CONFIRM_HOURS):
+            raise HTTPException(
+                status_code=404,
+                detail="This confirmation link has expired or has already been used. Subscribe again to get a new one."
+            )
+        
+        subscriber = session.exec(
+            select(Subscriber).where(Subscriber.email == pending.email)
+        ).first()
+        status = "updated" if subscriber and subscriber.active else "subscribed"
+        if subscriber is None:
+            subscriber = Subscriber(
+                id=str(uuid.uuid4()),
+                email=pending.email,
+                token=secrets.token_urlsafe(24),
+                location=pending.location,
+                place=pending.place,
+                lat=pending.lat,
+                lon=pending.lon
+            )
+        
+        subscriber.location = pending.location
+        subscriber.place = pending.place
+        subscriber.lat = pending.lat
+        subscriber.lon = pending.lon
+        subscriber.utc_offset_seconds = pending.utc_offset_seconds
+        subscriber.activity = pending.activity
+        subscriber.language = pending.language
+        subscriber.active = True
+        # The welcome email covers today if the alert hour has already passed,
+        # so the first daily alert arrives the next morning
+        now = datetime.now(timezone.utc)
+        if subscriber.last_sent_on is None and alerts.is_due(subscriber, now):
+            subscriber.last_sent_on = alerts.local_date(subscriber.utc_offset_seconds, now)
+        session.add(subscriber)
+        
+        for request in session.exec(select(PendingSubscription).where(PendingSubscription.email == pending.email)):
+            session.delete(request)
+        session.commit()
+        session.refresh(subscriber)
+    
+    await alerts.send(subscriber, alerts.welcome_email(subscriber))
+    return ConfirmResponse(
+        email=subscriber.email,
+        location=subscriber.place,
+        activity=subscriber.activity,
+        status=status
+    )
 
 
 @router.post("/unsubscribe/{token}")
@@ -155,6 +209,8 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeL
         ).first()
     
     if subscriber is not None:
-        await alerts.send_once(subscriber, alerts.unsubscribe_link_email(subscriber), "unsubscribe-link")
+        await alerts.send_once(
+            subscriber.email, alerts.unsubscribe_link_email(subscriber), "unsubscribe-link", subscriber.token
+        )
     
     return UnsubscribeLinkResponse()

@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from urllib.parse import quote
 from sqlmodel import Session, select
 from app.config import settings
-from app.models.db import Subscriber, create_tables, get_engine
+from app.models.db import PendingSubscription, Subscriber, create_tables, get_engine
 from app.services import mailer
 from app.services.activity_advisor import check_activity, random_activity
 from app.services.cache import TTLCache
@@ -52,9 +52,15 @@ def unsubscribe_headers(token: str) -> dict[str, str]:
     }
 
 
-def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str, footer: str) -> Email:
-    """Lay an email out as plain text and as simple HTML, ending with the unsubscribe link."""
-    link = unsubscribe_url(token)
+def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str | None, footer: str) -> Email:
+    """
+    Lay an email out as plain text and as simple HTML.
+    
+    With a subscriber's `token` it ends with their unsubscribe link; without
+    one (a confirmation request, before there is a subscription) the footer
+    stands alone.
+    """
+    link = unsubscribe_url(token) if token else None
     
     text_parts = []
     body = ""
@@ -70,7 +76,8 @@ def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str
                 f'<a href="{html.escape(url)}" style="color:#3987e5">{html.escape(label)}</a>'
             )
         body += f'<p style="margin:0 0 14px;line-height:1.55">{content}</p>'
-    text = "\n\n".join([heading, *text_parts, f"{footer}\nUnsubscribe: {link}"])
+    text = "\n\n".join([heading, *text_parts, f"{footer}\nUnsubscribe: {link}" if link else footer])
+    footer_link = f' <a href="{html.escape(link)}" style="color:#3987e5">Unsubscribe</a>' if link else ""
     page = (
         '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#1b2233;'
         'max-width:520px;margin:0 auto;padding:24px">'
@@ -78,10 +85,35 @@ def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str
         f"{body}"
         '<p style="margin:24px 0 0;padding-top:14px;border-top:1px solid #dde2ee;'
         'font-size:12px;color:#6b7590;line-height:1.5">'
-        f'{html.escape(footer)} <a href="{html.escape(link)}" style="color:#3987e5">Unsubscribe</a>'
+        f"{html.escape(footer)}{footer_link}"
         "</p></div>"
     )
     return Email(subject, text, page)
+
+
+def confirm_url(token: str) -> str:
+    """Link that opens the site and asks to confirm a subscription."""
+    return f"{settings.public_url.rstrip('/')}/?confirm={token}"
+
+
+def confirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
+    """Sent when someone asks for alerts: nothing else is sent until its link is followed."""
+    if pending.activity:
+        about = f"how the weather suits {pending.activity}"
+    else:
+        about = "a new activity to try, picked to suit the weather"
+    return _compose(
+        subject=f"Confirm your MoodForecast alerts for {pending.place}",
+        heading="Confirm your daily alerts",
+        paragraphs=[
+            f"Someone, hopefully you, asked for a daily email with the weather in {pending.place}, "
+            f"how it is likely to affect mood and energy, and {about}.",
+            ("Nothing will be sent until you confirm.", "Confirm my alerts", confirm_url(pending.token)),
+            f"The link works for {valid_hours} hours.",
+        ],
+        token=None,
+        footer="Didn't ask for this? Ignore this email and nothing more will be sent.",
+    )
 
 
 def welcome_email(subscriber: Subscriber) -> Email:
@@ -91,7 +123,7 @@ def welcome_email(subscriber: Subscriber) -> Email:
     else:
         about = "a new activity to try, picked to suit the weather"
     return _compose(
-        subject=f"You're subscribed to MoodForecast for {subscriber.place}",
+        subject=f"You're subscribed to MoodForecast for {subscriber.place}",  # Sent once confirmed
         heading=f"Daily alerts for {subscriber.place} are on",
         paragraphs=[
             f"Each day you'll get the weather in {subscriber.place}, how it is likely "
@@ -117,27 +149,33 @@ def unsubscribe_link_email(subscriber: Subscriber) -> Email:
     )
 
 
-async def send_once(subscriber: Subscriber, email: Email, kind: str) -> bool:
+async def send_once(to: str, email: Email, kind: str, token: str | None = None) -> bool:
     """
     Send an email that anyone can trigger by typing an address into the site,
     at most once per address per cache lifetime (10 minutes by default).
     
     Stops the subscribe and unsubscribe forms being used to flood someone's
     inbox. Returns True if the email was sent now or is already on its way
-    from a moment ago.
+    from a moment ago. `token` is the subscriber's, for the unsubscribe
+    headers, if there is one.
     """
-    cache_key = f"{kind}:{subscriber.email}"
+    cache_key = f"{kind}:{to}"
     if _recently_sent.get(cache_key):
         return True
-    sent = await send(subscriber, email)
+    sent = await send_to(to, email, token)
     if sent:
         _recently_sent.set(cache_key, True)
     return sent
 
 
 async def send(subscriber: Subscriber, email: Email) -> bool:
+    """Send a composed email to a subscriber, with their unsubscribe headers."""
+    return await send_to(subscriber.email, email, subscriber.token)
+
+
+async def send_to(to: str, email: Email, token: str | None = None) -> bool:
     """
-    Send a composed email to a subscriber.
+    Send a composed email, with unsubscribe headers when there is a subscriber `token`.
     
     Returns False, without raising, if email isn't configured or sending fails -
     a subscription should not fail because of a mail problem.
@@ -146,8 +184,8 @@ async def send(subscriber: Subscriber, email: Email) -> bool:
         return False
     try:
         await mailer.send_email_async(
-            subscriber.email, email.subject, email.text, email.html,
-            unsubscribe_headers(subscriber.token)
+            to, email.subject, email.text, email.html,
+            unsubscribe_headers(token) if token else None
         )
         return True
     except mailer.MailError as e:

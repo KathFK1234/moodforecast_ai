@@ -1052,7 +1052,7 @@ body {
     color: #e3efff;
 }
 
-#unsubscribeBanner {
+#emailLinkBanner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;

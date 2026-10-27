@@ -149,7 +149,7 @@ curl -v https://YOUR_DOMAIN/api/forecast/Nairobi
 - [ ] Mood score and recommendations show
 - [ ] Typing in a location field suggests places
 - [ ] The activity card shows a pick, and "Surprise me" changes it
-- [ ] Subscribing sends a confirmation email, and its unsubscribe link works
+- [ ] Subscribing sends a confirmation email; its link starts the alerts, and the welcome email's unsubscribe link works
 - [ ] No errors in the browser console or the Railway logs
 
 ## References

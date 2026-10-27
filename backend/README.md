@@ -242,7 +242,7 @@ curl http://localhost:8000/api/activities/Nairobi
 
 ### POST /api/subscribe
 
-Subscribes an email address to daily alerts for a location. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is still accepted and stored, but the page no longer asks for it: emails are written in English only.
+Asks for daily alerts for a location, or for a change to an existing subscription. Nothing starts or changes until the address is confirmed: the request is stored and an email with a link to `PUBLIC_URL/?confirm=<token>` is sent, valid for 48 hours. Returns 202. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is still accepted and stored, but the page no longer asks for it: emails are written in English only.
 
 ```bash
 curl -X POST http://localhost:8000/api/subscribe \
@@ -252,21 +252,23 @@ curl -X POST http://localhost:8000/api/subscribe \
 
 ```json
 {
-  "subscriber_id": "550e8400-e29b-41d4-a716-446655440000",
   "email": "amina@example.com",
   "location": "Nairobi, KE",
   "activity": "running",
-  "status": "subscribed",
-  "unsubscribe_token": "dpBmuKD_4mX-H5PNjM9cc0IiXxA022Yb",
+  "status": "pending",
   "confirmation_sent": true
 }
 ```
 
-The location must be one the geocoder can find, and the activity one that can be done there: surfing in an inland town is refused with the reason (both 422). Subscribing again with the same email updates that subscription and returns `"status": "updated"`. `confirmation_sent` is `false` when email is not configured or the confirmation could not be sent; the subscription is stored either way.
+The location must be one the geocoder can find, and the activity one that can be done there: surfing in an inland town is refused with the reason (both 422). `confirmation_sent` is `false` if the email could not be sent. Without email configured the request is refused with 503, since it could never be confirmed. The response never includes a subscriber's token, so typing someone's address in can't be used to unsubscribe them or change their alerts.
+
+### POST /api/confirm/{token}
+
+Confirms a request with the token from its email: starts the alerts, or applies the change to an existing subscription (`"status": "subscribed"` or `"updated"`), and sends the welcome email with the unsubscribe link. Other requests waiting for the same address are dropped. Returns `{"email", "location", "activity", "status"}`, or 404 for an unknown, used or expired token. The page opened from the email asks before calling it, so a mail scanner opening the link doesn't confirm. Subscriptions made before confirmation was introduced carry on unchanged.
 
 ### POST /api/unsubscribe/{token}
 
-Stops the alerts for the subscription the token belongs to. The token is the `unsubscribe_token` from subscribing, and is in the link in every email. Returns `{"email": "...", "status": "unsubscribed"}`, or 404 for an unknown token. Subscribing again with the same email turns the alerts back on.
+Stops the alerts for the subscription the token belongs to. The token is in the link in every email sent to a subscriber. Returns `{"email": "...", "status": "unsubscribed"}`, or 404 for an unknown token. Subscribing again with the same email, and confirming, turns the alerts back on.
 
 ### POST /api/unsubscribe-link
 
@@ -432,9 +434,9 @@ Three emails exist, all composed in `app/services/alerts.py` as plain text with 
 - **Daily alert** - current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
-The confirmation and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default).
+The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default).
 
-Every email ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
+Every email to a subscriber ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
 
 The daily send runs inside the web process: a background task started with the app checks every 15 minutes for subscribers where it is past `ALERT_HOUR` local time and today's alert has not gone out. A subscriber is marked as sent only after their email is accepted, so a failed send is retried on the next check. Someone who subscribes after `ALERT_HOUR` gets their first alert the next morning. Because the task runs in every process, run a single instance of the app, or each one will send its own copy.
 

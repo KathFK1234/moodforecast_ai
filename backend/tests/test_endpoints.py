@@ -1,14 +1,15 @@
 """Integration tests for API endpoints with mocked weather client."""
 
+import re
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
-from app.models.db import Subscriber
-from app.services import mailer
+from app.models.db import PendingSubscription, Subscriber
+from app.services import alerts, mailer
 from app.services.cache import cache
 
 
@@ -91,41 +92,70 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
-def test_subscribe_endpoint_valid(mock_weather):
-    """POST /api/subscribe with valid data should return 201."""
-    response = client.post("/api/subscribe", json={
-        "email": "amina@example.com",
-        "location": "Nairobi",
-        "activity": "running",
-        "language": "en"
-    })
-    assert response.status_code == 201
-    data = response.json()
-    
-    assert "subscriber_id" in data
-    assert data["email"] == "amina@example.com"
-    assert data["location"] == "Nairobi, KE"
-    assert data["activity"] == "running"
-    assert data["status"] == "subscribed"
+def confirm_token(outbox):
+    """The token in the last confirmation link emailed."""
+    text = outbox[-1][1].get_body(("plain",)).get_content()
+    return re.search(r"\?confirm=([\w-]+)", text).group(1)
 
 
-def test_subscribe_persists_subscriber(mock_weather):
-    """POST /api/subscribe should store the subscriber in the database."""
+def subscribe_and_confirm(outbox, **request):
+    """Ask for alerts, then follow the emailed link, as a subscriber would."""
+    alerts._recently_sent.clear()  # Each request in a test gets its own email
+    response = client.post("/api/subscribe", json=request)
+    assert response.status_code == 202
+    return client.post(f"/api/confirm/{confirm_token(outbox)}")
+
+
+def test_subscribe_asks_for_confirmation_first(mock_weather, outbox):
+    """Nothing is subscribed until the emailed link is followed."""
     engine = memory_engine()
-    
     with patch('app.routers.subscribe.get_engine', return_value=engine):
         response = client.post("/api/subscribe", json={
-            "email": "amina@example.com",
-            "location": "nairobi",
-            "language": "sw"
+            "email": "amina@example.com", "location": "Nairobi", "activity": "running"
         })
-    assert response.status_code == 201
+    assert response.status_code == 202
+    assert response.json() == {
+        "email": "amina@example.com", "location": "Nairobi, KE", "activity": "running",
+        "status": "pending", "confirmation_sent": True,
+    }
+    with Session(engine) as session:
+        assert session.exec(select(Subscriber)).all() == []
+        assert len(session.exec(select(PendingSubscription)).all()) == 1
+    
+    assert len(outbox) == 1
+    message = outbox[0][1]
+    assert message["To"] == "amina@example.com"
+    assert message["Subject"] == "Confirm your MoodForecast alerts for Nairobi, KE"
+    link = f"https://moodforecast.test/?confirm={confirm_token(outbox)}"
+    text = message.get_body(("plain",)).get_content()
+    assert link in text
+    assert link in message.get_body(("html",)).get_content()
+    assert "how the weather suits running" in text
+    assert "48 hours" in text
+    # Not subscribed yet, so nothing to unsubscribe from
+    assert "unsubscribe" not in text.lower()
+    assert message["List-Unsubscribe"] is None
+
+
+def test_subscribe_never_reveals_a_subscribers_token(mock_weather, outbox):
+    """Typing someone's address in must not hand over their unsubscribe link."""
+    subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert set(response.json()) == {"email", "location", "activity", "status", "confirmation_sent"}
+
+
+def test_confirming_starts_the_alerts(mock_weather, outbox):
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        response = subscribe_and_confirm(outbox, email="amina@example.com", location="nairobi", language="sw")
+    assert response.status_code == 200
+    assert response.json() == {
+        "email": "amina@example.com", "location": "Nairobi, KE", "activity": None, "status": "subscribed"
+    }
     
     with Session(engine) as session:
-        subscribers = session.exec(select(Subscriber)).all()
-    assert len(subscribers) == 1
-    subscriber = subscribers[0]
-    assert subscriber.id == response.json()["subscriber_id"]
+        subscriber = session.exec(select(Subscriber)).one()
+        assert session.exec(select(PendingSubscription)).all() == []
     assert subscriber.email == "amina@example.com"
     assert subscriber.location == "nairobi"
     assert subscriber.place == "Nairobi, KE"
@@ -135,27 +165,72 @@ def test_subscribe_persists_subscriber(mock_weather):
     assert subscriber.language == "sw"
     assert subscriber.active is True
     assert subscriber.token
-    assert subscriber.created_at is not None
-
-
-def test_subscribing_again_updates_the_subscription(mock_weather):
-    """The same email should not be stored twice."""
-    engine = memory_engine()
     
+    # Then the welcome email, with the unsubscribe link
+    message = outbox[-1][1]
+    assert message["Subject"] == "You're subscribed to MoodForecast for Nairobi, KE"
+    link = f"https://moodforecast.test/?unsubscribe={subscriber.token}"
+    text = message.get_body(("plain",)).get_content()
+    assert "a new activity to try" in text
+    assert "around 07:00" in text
+    assert link in text
+    assert link in message.get_body(("html",)).get_content()
+    assert message["List-Unsubscribe"] == f"<https://moodforecast.test/api/unsubscribe/{subscriber.token}>"
+    assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+
+def test_a_confirmation_link_works_once(mock_weather, outbox):
+    client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    token = confirm_token(outbox)
+    assert client.post(f"/api/confirm/{token}").status_code == 200
+    again = client.post(f"/api/confirm/{token}")
+    assert again.status_code == 404
+    assert "expired or has already been used" in again.json()["detail"]
+
+
+def test_a_confirmation_link_expires(mock_weather, outbox):
+    engine = memory_engine()
     with patch('app.routers.subscribe.get_engine', return_value=engine):
-        first = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
-        second = client.post("/api/subscribe", json={
+        client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        with Session(engine) as session:
+            pending = session.exec(select(PendingSubscription)).one()
+            pending.created_at -= timedelta(hours=49)
+            session.add(pending)
+            session.commit()
+        assert client.post(f"/api/confirm/{confirm_token(outbox)}").status_code == 404
+        # A new request clears out ones nobody confirmed in time
+        alerts._recently_sent.clear()
+        client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
+        with Session(engine) as session:
+            assert [p.email for p in session.exec(select(PendingSubscription))] == ["ben@example.com"]
+
+
+def test_unknown_confirmation_token(mock_weather):
+    assert client.post("/api/confirm/not-a-real-token").status_code == 404
+
+
+def test_changes_need_confirming_too(mock_weather, outbox):
+    """Nobody can change someone else's alerts by typing their address in."""
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+        with Session(engine) as session:
+            token = session.exec(select(Subscriber)).one().token
+        
+        alerts._recently_sent.clear()
+        client.post("/api/subscribe", json={
             "email": " Amina@Example.com ", "location": "Nairobi", "activity": "a picnic"
         })
-    assert first.json()["status"] == "subscribed"
-    assert second.status_code == 201
-    assert second.json()["status"] == "updated"
-    assert second.json()["subscriber_id"] == first.json()["subscriber_id"]
-    
+        with Session(engine) as session:
+            assert session.exec(select(Subscriber)).one().activity is None
+        
+        response = client.post(f"/api/confirm/{confirm_token(outbox)}")
+    assert response.json()["status"] == "updated"
+    assert response.json()["activity"] == "a picnic"
     with Session(engine) as session:
-        subscribers = session.exec(select(Subscriber)).all()
-    assert len(subscribers) == 1
-    assert subscribers[0].activity == "a picnic"
+        subscriber = session.exec(select(Subscriber)).one()
+    assert subscriber.activity == "a picnic"
+    assert subscriber.token == token
 
 
 @pytest.mark.parametrize("email", ["invalid", "amina@", "@example.com", "amina@example", "a b@example.com", ""])
@@ -165,12 +240,12 @@ def test_subscribe_rejects_malformed_email(mock_weather, email):
     assert response.status_code == 422
 
 
-def test_subscribe_understands_activities_in_free_text(mock_weather):
+def test_subscribe_understands_activities_in_free_text(mock_weather, outbox):
     """The activity is stored under the advisor's name for it."""
     response = client.post("/api/subscribe", json={
         "email": "amina@example.com", "location": "Nairobi", "activity": "Go for a run"
     })
-    assert response.status_code == 201
+    assert response.status_code == 202
     assert response.json()["activity"] == "running"
 
 
@@ -187,7 +262,7 @@ def test_subscribe_rejects_blank_location(mock_weather):
     assert response.status_code == 422
 
 
-def test_subscribe_rejects_unknown_location(mock_weather):
+def test_subscribe_rejects_unknown_location(mock_weather, outbox):
     """An alert can't be sent for a place the geocoder can't find."""
     mock_weather.get_location_by_name.return_value = {
         "error": "Location 'UnknownPlace123' not found",
@@ -197,16 +272,17 @@ def test_subscribe_rejects_unknown_location(mock_weather):
     response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "UnknownPlace123"})
     assert response.status_code == 422
     assert "not found" in response.json()["detail"]
+    assert outbox == []
 
 
-def test_unsubscribe(mock_weather):
+def test_unsubscribe(mock_weather, outbox):
     """POST /api/unsubscribe/{token} should stop the alerts, and subscribing again restarts them."""
     engine = memory_engine()
     
     with patch('app.routers.subscribe.get_engine', return_value=engine):
-        token = client.post(
-            "/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"}
-        ).json()["unsubscribe_token"]
+        subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+        with Session(engine) as session:
+            token = session.exec(select(Subscriber)).one().token
         
         response = client.post(f"/api/unsubscribe/{token}")
         assert response.status_code == 200
@@ -217,11 +293,12 @@ def test_unsubscribe(mock_weather):
         # Unsubscribing twice is harmless
         assert client.post(f"/api/unsubscribe/{token}").status_code == 200
         
-        again = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        again = subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
         assert again.json()["status"] == "subscribed"
-        assert again.json()["unsubscribe_token"] == token
         with Session(engine) as session:
-            assert session.exec(select(Subscriber)).one().active is True
+            subscriber = session.exec(select(Subscriber)).one()
+            assert subscriber.active is True
+            assert subscriber.token == token
 
 
 def test_unsubscribe_unknown_token(mock_weather):
@@ -229,8 +306,8 @@ def test_unsubscribe_unknown_token(mock_weather):
     assert response.status_code == 404
 
 
-def test_first_daily_alert_waits_for_the_next_morning(mock_weather):
-    """Subscribing after the alert hour should not trigger an alert the same day."""
+def test_first_daily_alert_waits_for_the_next_morning(mock_weather, outbox):
+    """Confirming after the alert hour should not trigger an alert the same day."""
     engine = memory_engine()
     # The mocked location is UTC+3: 12:00 UTC is 15:00 there, 02:00 UTC is 05:00
     afternoon = datetime(2026, 10, 5, 12, 0, tzinfo=timezone.utc)
@@ -239,45 +316,26 @@ def test_first_daily_alert_waits_for_the_next_morning(mock_weather):
     with patch('app.routers.subscribe.get_engine', return_value=engine), \
          patch('app.routers.subscribe.datetime') as clock:
         clock.now.return_value = afternoon
-        client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
         clock.now.return_value = before_dawn
-        client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
+        subscribe_and_confirm(outbox, email="ben@example.com", location="Nairobi")
     
     with Session(engine) as session:
         by_email = {s.email: s for s in session.exec(select(Subscriber)).all()}
     assert by_email["amina@example.com"].last_sent_on == "2026-10-05"
-    # Subscribed before the alert hour, so today's alert is still to come
+    # Confirmed before the alert hour, so today's alert is still to come
     assert by_email["ben@example.com"].last_sent_on is None
 
 
-def test_subscribe_without_email_configured_still_subscribes(mock_weather):
-    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
-    assert response.status_code == 201
-    assert response.json()["confirmation_sent"] is False
-
-
-def test_subscribe_sends_a_confirmation_email(mock_weather, outbox):
-    response = client.post("/api/subscribe", json={
-        "email": "amina@example.com", "location": "Nairobi", "activity": "a picnic"
-    })
-    assert response.status_code == 201
-    data = response.json()
-    assert data["confirmation_sent"] is True
-    
-    assert len(outbox) == 1
-    message = outbox[0][1]
-    assert message["To"] == "amina@example.com"
-    assert message["Subject"] == "You're subscribed to MoodForecast for Nairobi, KE"
-    link = f"https://moodforecast.test/?unsubscribe={data['unsubscribe_token']}"
-    text = message.get_body(("plain",)).get_content()
-    assert "how the weather suits a picnic" in text
-    assert "around 07:00" in text
-    assert link in text
-    assert link in message.get_body(("html",)).get_content()
-    assert message["List-Unsubscribe"] == (
-        f"<https://moodforecast.test/api/unsubscribe/{data['unsubscribe_token']}>"
-    )
-    assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+def test_subscribe_needs_email_configured(mock_weather):
+    """Without email the request could never be confirmed, so say so instead of storing it."""
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Email alerts aren't available right now. Please try again later."
+    with Session(engine) as session:
+        assert session.exec(select(PendingSubscription)).all() == []
 
 
 def test_subscribe_survives_a_mail_failure(mock_weather, outbox, monkeypatch):
@@ -286,7 +344,7 @@ def test_subscribe_survives_a_mail_failure(mock_weather, outbox, monkeypatch):
     
     monkeypatch.setattr(mailer.smtplib, "SMTP", unreachable)
     response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
-    assert response.status_code == 201
+    assert response.status_code == 202
     assert response.json()["confirmation_sent"] is False
 
 
@@ -294,17 +352,20 @@ def test_unsubscribe_link_is_emailed_to_subscribers_only(mock_weather, outbox):
     engine = memory_engine()
     
     with patch('app.routers.subscribe.get_engine', return_value=engine):
-        token = client.post(
-            "/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"}
-        ).json()["unsubscribe_token"]
+        subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+        # Asked for, but never confirmed
+        client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
+        with Session(engine) as session:
+            token = session.exec(select(Subscriber)).one().token
         outbox.clear()
         
         subscribed = client.post("/api/unsubscribe-link", json={"email": "Amina@example.com"})
         stranger = client.post("/api/unsubscribe-link", json={"email": "nobody@example.com"})
+        pending = client.post("/api/unsubscribe-link", json={"email": "ben@example.com"})
     
-    # Same answer for both, so the endpoint doesn't reveal who is subscribed
-    assert subscribed.status_code == stranger.status_code == 202
-    assert subscribed.json() == stranger.json() == {"status": "sent_if_subscribed"}
+    # Same answer for all, so the endpoint doesn't reveal who is subscribed
+    assert subscribed.status_code == stranger.status_code == pending.status_code == 202
+    assert subscribed.json() == stranger.json() == pending.json() == {"status": "sent_if_subscribed"}
     
     assert len(outbox) == 1
     message = outbox[0][1]
@@ -316,10 +377,11 @@ def test_repeat_requests_do_not_flood_an_inbox(mock_weather, outbox):
     """Typing someone's address into the forms again and again sends each email once."""
     for _ in range(5):
         response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
-        assert response.status_code == 201
+        assert response.status_code == 202
         assert response.json()["confirmation_sent"] is True
-    assert [message["Subject"] for _, message in outbox] == ["You're subscribed to MoodForecast for Nairobi, KE"]
+    assert [message["Subject"] for _, message in outbox] == ["Confirm your MoodForecast alerts for Nairobi, KE"]
     
+    client.post(f"/api/confirm/{confirm_token(outbox)}")
     outbox.clear()
     for _ in range(5):
         assert client.post("/api/unsubscribe-link", json={"email": "amina@example.com"}).status_code == 202
@@ -516,7 +578,7 @@ def test_local_checks_survive_a_failed_sea_lookup(mock_weather):
     assert "a beach day" not in names
 
 
-def test_subscribe_rejects_an_activity_the_place_cannot_offer(mock_weather):
+def test_subscribe_rejects_an_activity_the_place_cannot_offer(mock_weather, outbox):
     response = client.post("/api/subscribe", json={
         "email": "amina@example.com", "location": "Nairobi", "activity": "surfing"
     })
@@ -528,7 +590,7 @@ def test_subscribe_rejects_an_activity_the_place_cannot_offer(mock_weather):
     response = client.post("/api/subscribe", json={
         "email": "amina@example.com", "location": "Nairobi", "activity": "cricket"
     })
-    assert response.status_code == 201
+    assert response.status_code == 202
 
 
 def test_locations_endpoint():
