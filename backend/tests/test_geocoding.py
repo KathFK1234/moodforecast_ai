@@ -9,10 +9,12 @@ from app.services.cache import cache
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
-    """Start every test with an empty cache."""
+def clear_cache(monkeypatch):
+    """Start every test with an empty cache and no wait for Nominatim."""
     cache.clear()
     geocoding._suggested.clear()
+    monkeypatch.setattr(geocoding, "NOMINATIM_INTERVAL", 0.0)
+    monkeypatch.setattr(geocoding, "_next_nominatim_slot", 0.0)
     yield
     cache.clear()
     geocoding._suggested.clear()
@@ -287,3 +289,41 @@ async def test_unknown_places_are_not_remembered(monkeypatch):
     mock_nominatim(monkeypatch, handler)
     assert "error" in await geocoding.get_coordinates("Zzyzx")
     assert "zzyzx" not in geocoding._suggested
+
+
+@pytest.mark.asyncio
+async def test_nominatim_gets_at_most_one_request_per_interval(monkeypatch):
+    """Nominatim's usage policy: one request per second from the whole app."""
+    monkeypatch.setattr(geocoding, "NOMINATIM_INTERVAL", 0.05)
+    started = []
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "github.com/KathFK1234/moodforecast_ai" in request.headers["User-Agent"]
+        started.append(asyncio.get_running_loop().time())
+        return httpx.Response(200, json=[{"lat": "1", "lon": "2", "address": {"country_code": "ke"}}])
+    
+    mock_nominatim(monkeypatch, handler)
+    await asyncio.gather(*(geocoding.get_coordinates(f"Town {n}") for n in range(4)))
+    started.sort()
+    assert len(started) == 4
+    assert all(later - earlier >= 0.045 for earlier, later in zip(started, started[1:]))
+
+
+@pytest.mark.asyncio
+async def test_lookups_that_would_wait_too_long_use_the_fallback(monkeypatch):
+    monkeypatch.setattr(geocoding, "NOMINATIM_INTERVAL", 10.0)
+    hosts = []
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        hosts.append(request.url.host)
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(200, json=[{"lat": "1", "lon": "2", "address": {"country_code": "ke"}}])
+        return httpx.Response(200, json={"results": [
+            {"name": "Eldoret", "latitude": 0.52, "longitude": 35.27, "country_code": "KE"}
+        ]})
+    
+    mock_nominatim(monkeypatch, handler)
+    await geocoding.get_coordinates("Kisumu")
+    result = await geocoding.get_coordinates("Eldoret")
+    assert hosts == ["nominatim.openstreetmap.org", "geocoding-api.open-meteo.com"]
+    assert result["lat"] == pytest.approx(0.52)

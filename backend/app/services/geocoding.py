@@ -1,6 +1,7 @@
 """Geocoding service - Convert location names to coordinates."""
 
 import asyncio
+import time
 import httpx
 from app.services.cache import cache
 
@@ -40,6 +41,26 @@ MAX_SUGGESTED = 2000
 # A search asks for the forecast and the wellbeing score at the same moment, and
 # Nominatim allows one request per second.
 _pending: dict[str, asyncio.Future] = {}
+
+
+# Nominatim's usage policy allows one request per second from the whole app.
+# Each request takes the next free slot; if that is too far off, the lookup
+# counts as unavailable and the Open-Meteo geocoder is used instead.
+NOMINATIM_INTERVAL = 1.0
+NOMINATIM_MAX_WAIT = 3.0
+NOMINATIM_USER_AGENT = "MoodForecastAI/1.0 (+https://github.com/KathFK1234/moodforecast_ai)"
+_next_nominatim_slot = 0.0
+
+
+async def _wait_for_nominatim() -> None:
+    """Wait for the next free Nominatim slot. Raises RuntimeError if it is too far away."""
+    global _next_nominatim_slot
+    now = time.monotonic()
+    slot = max(now, _next_nominatim_slot)
+    if slot - now > NOMINATIM_MAX_WAIT:
+        raise RuntimeError("Geocoding service busy")
+    _next_nominatim_slot = slot + NOMINATIM_INTERVAL
+    await asyncio.sleep(slot - now)
 
 
 def _remember(name: str, result: dict) -> None:
@@ -183,8 +204,10 @@ async def _search_nominatim(query: str) -> list[dict]:
     """
     Look a place up on Nominatim. Returns the best match, or an empty list.
     
-    Raises TimeoutError / RuntimeError if the lookup fails.
+    Raises TimeoutError / RuntimeError if the lookup fails, or if Nominatim
+    is too busy with this app's other lookups to take it within a few seconds.
     """
+    await _wait_for_nominatim()
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -197,7 +220,7 @@ async def _search_nominatim(query: str) -> list[dict]:
                     # Names as an English speaker would search for them: Sapporo, not 札幌市
                     "accept-language": "en",
                 },
-                headers={"User-Agent": "MoodForecastAI/1.0"},
+                headers={"User-Agent": NOMINATIM_USER_AGENT},
                 timeout=5.0
             )
             response.raise_for_status()

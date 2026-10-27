@@ -118,6 +118,8 @@ All are optional.
 
 The free hosted Open-Meteo API is for non-commercial use, at about 10,000 calls per day. Results are cached per location, so normal use stays well below that. For commercial use, self-host Open-Meteo or use their paid plan and point `WEATHER_API_URL` at it.
 
+Place lookups use Nominatim, whose usage policy allows one request per second. The app keeps to that across all visitors; a lookup that would have to wait more than a few seconds uses Open-Meteo's geocoder instead.
+
 ## Troubleshooting
 
 | Issue | What to check |
