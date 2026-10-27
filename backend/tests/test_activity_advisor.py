@@ -85,6 +85,13 @@ class TestFindActivity:
     def test_new_words_do_not_steal_existing_activities(self, question, expected):
         assert find_activity(question).name == expected
     
+    def test_every_name_and_quick_pick_prompt_finds_its_activity(self):
+        """Quick picks send the prompt, and subscriptions store the name."""
+        for activity in ACTIVITIES:
+            assert find_activity(activity.name) is activity
+            assert find_activity(activity.prompt) is activity
+            assert find_activity(f" {activity.prompt.upper()} ") is activity
+    
     def test_matches_whole_words_only(self):
         """'run' should not be found inside 'brunch'."""
         assert find_activity("brunch") is None
