@@ -6,14 +6,14 @@ from app.services.weather import get_weather_client
 from app.services.mood_engine import BASELINE_SCORE, build_summary, score_mood
 from app.services.curiosity import curiosity_prompts
 from app.models.schemas import WellbeingResponse
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, build_weather, resolve_location
+from app.routers.common import LocationPath, TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["wellbeing"])
 logger = logging.getLogger(__name__)
 
 
 @router.get("/wellbeing/{location}")
-async def get_wellbeing(location: str) -> WellbeingResponse:
+async def get_wellbeing(location: LocationPath) -> WellbeingResponse:
     """
     Get mood and wellbeing score for a location.
     

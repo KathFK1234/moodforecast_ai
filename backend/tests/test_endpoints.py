@@ -641,3 +641,19 @@ def test_cors_lets_other_sites_read_but_not_write():
     # A failed preflight stops the browser sending the POST
     assert preflight.status_code == 400
     assert "POST" not in preflight.headers["access-control-allow-methods"]
+
+
+@pytest.mark.parametrize("path", [
+    "/api/forecast/{}", "/api/wellbeing/{}", "/api/activities/{}",
+    "/api/random-activity/{}", "/api/activity/{}?activity=run",
+])
+def test_overlong_locations_are_refused(mock_weather, path):
+    assert client.get(path.format("x" * 121)).status_code == 422
+    assert client.get(path.format("Nairobi")).status_code == 200
+
+
+def test_subscribe_refuses_an_overlong_location_or_unknown_language(mock_weather):
+    long = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "x" * 121})
+    assert long.status_code == 422
+    odd = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi", "language": "xx"})
+    assert odd.status_code == 422

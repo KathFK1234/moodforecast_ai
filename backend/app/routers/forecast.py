@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.services.weather import get_weather_client
 from app.services.mood_engine import calculate_mood_score, classify_mood_label
 from app.models.schemas import DailyForecast, ForecastResponse
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, build_weather, resolve_location
+from app.routers.common import LocationPath, TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, build_weather, resolve_location
 
 router = APIRouter(prefix="/api", tags=["forecast"])
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ DEFAULT_HUMIDITY = 50
 
 
 @router.get("/forecast/{location}")
-async def get_forecast(location: str) -> ForecastResponse:
+async def get_forecast(location: LocationPath) -> ForecastResponse:
     """
     Get weather forecast for a location.
     

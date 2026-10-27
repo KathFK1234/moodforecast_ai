@@ -6,7 +6,7 @@ from app.services.weather import get_weather_client
 from app.services.activity_advisor import ACTIVITIES, check_activity, group_of, local_activities, random_activity
 from app.services.locality import LOCAL_FAVOURITES
 from app.models.schemas import ActivityChoice, ActivityResponse
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, local_weather
+from app.routers.common import LocationPath, TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, local_weather
 
 router = APIRouter(prefix="/api", tags=["activity"])
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ async def list_activities() -> list[str]:
 
 
 @router.get("/activities/{location}")
-async def list_local_activities(location: str) -> list[ActivityChoice]:
+async def list_local_activities(location: LocationPath) -> list[ActivityChoice]:
     """
     The activities that are practical at a location, local favourites first.
     
@@ -58,7 +58,7 @@ async def list_local_activities(location: str) -> list[ActivityChoice]:
 
 @router.get("/activity/{location}")
 async def get_activity_advice(
-    location: str,
+    location: LocationPath,
     activity: str = Query(
         ..., min_length=1, max_length=120,
         description="What you would like to do, e.g. 'run' or 'Can I have a picnic?'"
@@ -107,7 +107,7 @@ async def get_activity_advice(
 
 @router.get("/random-activity/{location}")
 async def get_random_activity(
-    location: str,
+    location: LocationPath,
     exclude: str = Query("", max_length=40, description="An activity name to leave out, to get a different pick")
 ) -> ActivityResponse:
     """

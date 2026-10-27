@@ -1,11 +1,15 @@
 """Pydantic request and response models."""
 
 import re
+from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 from app.services.activity_advisor import find_activity
 
 
 EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+# Longer than any real place name with its region and country
+MAX_LOCATION_LENGTH = 120
 
 
 def normalise_email(value: str) -> str:
@@ -21,9 +25,11 @@ def normalise_email(value: str) -> str:
 class SubscribeRequest(BaseModel):
     """Daily alert subscription request."""
     email: str = Field(..., description="Where to send the daily alert")
-    location: str = Field(..., description="City name or lat/lon coordinates")
-    activity: str | None = Field(None, description="Activity to report on each day; omit for a random pick")
-    language: str = Field("en", description="en or sw")
+    location: str = Field(..., max_length=MAX_LOCATION_LENGTH, description="City name or lat/lon coordinates")
+    activity: str | None = Field(
+        None, max_length=120, description="Activity to report on each day; omit for a random pick"
+    )
+    language: Literal["en", "sw"] = Field("en", description="en or sw")
     
     @field_validator("email")
     @classmethod

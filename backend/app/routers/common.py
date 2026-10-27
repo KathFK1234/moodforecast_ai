@@ -1,11 +1,14 @@
 """Helpers shared by the forecast and wellbeing routers."""
 
-from typing import Any
-from fastapi import HTTPException
-from app.models.schemas import WeatherData
+from typing import Annotated, Any
+from fastapi import HTTPException, Path
+from app.models.schemas import MAX_LOCATION_LENGTH, WeatherData
 from app.services.locality import Place, build_place
 from app.services.weather import WeatherClient
 
+
+# A location in a URL, e.g. /api/forecast/{location}
+LocationPath = Annotated[str, Path(max_length=MAX_LOCATION_LENGTH, description="City or town, e.g. 'Kisumu, Kenya'")]
 
 # Shown to visitors when the weather or place lookup fails, so they say what to do next
 TIMEOUT_MESSAGE = "The weather service is taking too long to answer. Please try again in a moment."
