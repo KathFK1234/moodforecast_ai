@@ -670,7 +670,7 @@ async function handleSubscribe(event) {
         const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
         showNotice(
             msg,
-            `Almost there: we've emailed a link to ${data.email}. Daily alerts for ${data.location} with ${about} start once you confirm.`,
+            `Almost there: we've emailed a link to ${data.email}. Once you confirm, you'll get a daily email for ${data.location} with ${about}.`,
             false
         );
     } catch (error) {
