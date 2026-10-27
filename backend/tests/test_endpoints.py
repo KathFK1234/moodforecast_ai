@@ -615,3 +615,19 @@ def test_frontend_is_revalidated_not_blindly_cached():
         unchanged = client.get(path, headers={"If-None-Match": response.headers["etag"]})
         assert unchanged.status_code == 304
         assert unchanged.headers["cache-control"] == "no-cache"
+
+
+def test_cors_lets_other_sites_read_but_not_write():
+    """Other sites can read the public GET endpoints, without credentials, and can't POST."""
+    response = client.get("/health", headers={"Origin": "https://other.example"})
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "access-control-allow-credentials" not in response.headers
+    
+    preflight = client.options("/api/subscribe", headers={
+        "Origin": "https://other.example",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    })
+    # A failed preflight stops the browser sending the POST
+    assert preflight.status_code == 400
+    assert "POST" not in preflight.headers["access-control-allow-methods"]

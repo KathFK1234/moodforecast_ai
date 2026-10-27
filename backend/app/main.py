@@ -65,13 +65,13 @@ def create_app() -> FastAPI:
         lifespan=lifespan
     )
     
-    # CORS
+    # CORS: the page is served from this app, so other sites only need to read
+    # the public GET endpoints. They can't subscribe, unsubscribe or send cookies.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,
+        allow_methods=["GET"],
     )
     
     # Include routers
