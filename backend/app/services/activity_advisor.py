@@ -390,6 +390,20 @@ _CATEGORY_GROUPS = {
     "indoor": "Indoors",
 }
 
+# Places to compare for activities only some countries offer, by what they need
+NEEDS_CURIOSITY_PLACES = {
+    "safari": curiosity.SAFARI_PLACES,
+    "cricket": curiosity.CRICKET_PLACES,
+    "baseball": curiosity.BASEBALL_PLACES,
+    "rugby": curiosity.RUGBY_PLACES,
+    "golf": curiosity.GOLF_PLACES,
+    "netball": curiosity.NETBALL_PLACES,
+    "kabaddi": curiosity.KABADDI_PLACES,
+    "sepak takraw": curiosity.TAKRAW_PLACES,
+    "gaelic": curiosity.GAELIC_PLACES,
+    "aussie rules": curiosity.AUSSIE_RULES_PLACES,
+}
+
 CURIOSITY_PLACES = {
     "active": curiosity.WORLD_PLACES,
     "leisure": curiosity.WORLD_PLACES,
@@ -798,7 +812,8 @@ def _advise(
         "curiosity": {
             "question": curiosity_question,
             "places": curiosity.pick_places(
-                CURIOSITY_PLACES[activity.category], f"{location} {searched_as}", 3, rng
+                NEEDS_CURIOSITY_PLACES.get(activity.needs, CURIOSITY_PLACES[activity.category]),
+                f"{location} {searched_as}", 3, rng
             ),
         },
     }

@@ -28,6 +28,18 @@ DARK_SKY_PLACES = (
 )
 WINDY_PLACES = ("Wellington", "Cape Town", "Chicago", "Tarifa", "Punta Arenas", "Edinburgh")
 
+# Where activities that only some countries offer are part of everyday life
+SAFARI_PLACES = ("Nairobi", "Arusha", "Maun", "Livingstone", "Windhoek", "Kampala")
+CRICKET_PLACES = ("Mumbai", "Lahore", "Colombo", "Melbourne", "Kingston", "London")
+BASEBALL_PLACES = ("New York", "Tokyo", "Havana", "Santo Domingo", "Seoul", "Taipei")
+RUGBY_PLACES = ("Auckland", "Cape Town", "Cardiff", "Dublin", "Buenos Aires", "Suva")
+GOLF_PLACES = ("St Andrews", "Dublin", "Melbourne", "Marbella", "Cape Town", "Myrtle Beach")
+NETBALL_PLACES = ("Auckland", "Melbourne", "Johannesburg", "Kingston", "Lilongwe", "Birmingham")
+KABADDI_PLACES = ("Mumbai", "Delhi", "Lahore", "Dhaka", "Kathmandu", "Chennai")
+TAKRAW_PLACES = ("Bangkok", "Kuala Lumpur", "Jakarta", "Hanoi", "Manila", "Vientiane")
+GAELIC_PLACES = ("Dublin", "Galway", "Cork", "Limerick", "Kilkenny", "Killarney")
+AUSSIE_RULES_PLACES = ("Melbourne", "Adelaide", "Perth", "Brisbane", "Sydney", "Hobart")
+
 HOT_QUESTIONS = (
     "Feeling the heat? See how chilly {place} is right now.",
     "Hot here — how many layers would you need in {place}?",

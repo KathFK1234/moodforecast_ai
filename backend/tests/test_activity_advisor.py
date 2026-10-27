@@ -7,7 +7,7 @@ from app.services import activity_advisor
 from app.services.activity_advisor import (
     ACTIVITIES, check_activity, find_activity, local_activities, random_activity
 )
-from app.services.locality import Place
+from app.services.locality import SPORT_COUNTRIES, Place
 
 
 def advise(question, condition="Clear", temp=22, humidity=50, wind=10, is_day=True, location="Nairobi, KE"):
@@ -282,6 +282,21 @@ class TestAdvice:
         assert len(advice["curiosity"]["places"]) == 3
         assert all(p in activity_advisor.curiosity.SNOW_PLACES for p in advice["curiosity"]["places"])
         assert "snow sports" in advice["curiosity"]["question"]
+    
+    def test_curiosity_for_regional_activities_points_where_they_are_done(self):
+        for question, places in [
+            ("safari", activity_advisor.curiosity.SAFARI_PLACES),
+            ("kabaddi", activity_advisor.curiosity.KABADDI_PLACES),
+            ("hurling", activity_advisor.curiosity.GAELIC_PLACES),
+            ("cricket", activity_advisor.curiosity.CRICKET_PLACES),
+        ]:
+            for seed in range(10):
+                advice = check_activity(question, "Reykjavik, IS", "Clear", 15, 50, 10, rng=random.Random(seed))
+                assert set(advice["curiosity"]["places"]) <= set(places)
+    
+    def test_every_regional_need_has_places_to_compare(self):
+        sport_needs = set(SPORT_COUNTRIES) | {"safari"}
+        assert sport_needs <= set(activity_advisor.NEEDS_CURIOSITY_PLACES)
     
     def test_curiosity_leaves_out_the_current_location(self):
         for seed in range(30):
