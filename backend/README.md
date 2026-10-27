@@ -62,6 +62,9 @@ tests/
   test_geocoding.py      # Geocoding tests (mocked HTTP)
   test_activity_advisor.py  # Activity rules and random picks (no I/O)
   test_curiosity.py      # Curiosity prompts (no I/O)
+  test_locality.py       # Place facts: country, coast, late night (no I/O)
+  test_cache.py          # In-memory cache: expiry and size limit
+  test_db.py             # Database URL handling (Postgres driver)
   test_mailer.py         # Mailer tests (fake SMTP)
   test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
   test_static_sync.py    # static/ matches ../frontend
