@@ -2,7 +2,7 @@
 
 import pytest
 from app.config import settings
-from app.services import geocoding, mailer
+from app.services import alerts, geocoding, mailer
 from app.services.cache import cache
 
 
@@ -36,9 +36,11 @@ class FakeSMTP:
 def empty_cache():
     """Start every test with an empty cache, so one test's lookups and sends don't affect the next."""
     cache.clear()
+    alerts._recently_sent.clear()
     geocoding._suggested.clear()
     yield
     cache.clear()
+    alerts._recently_sent.clear()
     geocoding._suggested.clear()
 
 

@@ -13,7 +13,7 @@ from app.config import settings
 from app.models.db import Subscriber, create_tables, get_engine
 from app.services import mailer
 from app.services.activity_advisor import check_activity, random_activity
-from app.services.cache import cache
+from app.services.cache import TTLCache
 from app.services.curiosity import curiosity_prompts
 from app.services.locality import build_place
 from app.services.mood_engine import build_summary, score_mood
@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 # How often the background loop looks for subscribers whose alert is due
 CHECK_INTERVAL_SECONDS = 900
+
+# Emails anyone can trigger from the site's forms, recently sent, by kind and address.
+# Kept apart from the shared cache so a burst of searches can't push these out early.
+_recently_sent = TTLCache(settings.cache_ttl_seconds)
 
 # A paragraph is plain text, or (text, link label, link url)
 Paragraph = str | tuple[str, str, str]
@@ -122,12 +126,12 @@ async def send_once(subscriber: Subscriber, email: Email, kind: str) -> bool:
     inbox. Returns True if the email was sent now or is already on its way
     from a moment ago.
     """
-    cache_key = f"mail:{kind}:{subscriber.email}"
-    if cache.get(cache_key):
+    cache_key = f"{kind}:{subscriber.email}"
+    if _recently_sent.get(cache_key):
         return True
     sent = await send(subscriber, email)
     if sent:
-        cache.set(cache_key, True)
+        _recently_sent.set(cache_key, True)
     return sent
 
 

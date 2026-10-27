@@ -9,6 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.main import app
 from app.models.db import Subscriber
 from app.services import mailer
+from app.services.cache import cache
 
 
 client = TestClient(app)
@@ -327,6 +328,15 @@ def test_repeat_requests_do_not_flood_an_inbox(mock_weather, outbox):
     # A different address is not held back
     client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
     assert outbox[-1][1]["To"] == "ben@example.com"
+
+
+def test_a_burst_of_searches_does_not_lift_the_inbox_guard(mock_weather, outbox):
+    """Filling the shared cache must not let the same email be sent again early."""
+    client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    for n in range(cache.max_entries + 10):
+        cache.set(f"suggest:place {n}", [])
+    client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert len(outbox) == 1
 
 
 def test_unsubscribe_link_needs_email_configured(mock_weather):
