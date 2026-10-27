@@ -129,6 +129,14 @@ class TestRecommendationGeneration:
         assert recs[0] in mood_engine.HOT_SUN_IDEAS
         assert recs[1] in mood_engine.HOT_IDEAS
     
+    def test_cold_sun_skips_picnics(self):
+        """Below 10°C a clear day should get the daylight without sitting about outside."""
+        for seed in range(20):
+            recs = generate_recommendations(60, "Clear", -5, 50, rng=random.Random(seed))
+            assert recs[0] in mood_engine.COLD_SUN_IDEAS
+        assert not any("picnic" in idea.lower() for idea in mood_engine.COLD_SUN_IDEAS)
+        assert generate_recommendations(75, "Clear", 12, 50)[0] in mood_engine.CLEAR_DAY_IDEAS
+    
     def test_rainy_recommendations(self):
         """Rainy weather should suggest something from the rain pool."""
         recs = generate_recommendations(50, "Rainy", 18, 70)

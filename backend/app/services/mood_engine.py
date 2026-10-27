@@ -151,6 +151,14 @@ CLEAR_DAY_IDEAS = (
     "Explore somewhere new: a market, a trail or a street you've never walked down.",
 )
 
+# Bright but cold: get the daylight, but nothing that means sitting still outside
+COLD_SUN_IDEAS = (
+    "Crisp and bright — wrap up warm and catch the sunshine on a brisk walk.",
+    "Cold but sunny: ten minutes of daylight on your face is worth the extra layer.",
+    "Sit by the sunniest window with a hot drink and soak up the light.",
+    "Wrap up and get some winter light — a quick walk, then something warm indoors.",
+)
+
 HOT_SUN_IDEAS = (
     "Blazing out there — if you can get to a pool or the sea, a swim is the best move today.",
     "Save outdoor plans for early morning or after sunset, and find a shady spot in between.",
@@ -327,8 +335,13 @@ def generate_recommendations(
     elif "rain" in condition_lower:
         recommendations.append(pick(RAIN_IDEAS))
     elif "sunny" in condition_lower or "clear" in condition_lower:
-        # Too hot for a run or a picnic in full sun
-        recommendations.append(pick(HOT_SUN_IDEAS if temperature_c > 30 else CLEAR_DAY_IDEAS))
+        # Too hot for a run or a picnic in full sun, and too cold for a picnic or a park bench
+        if temperature_c > 30:
+            recommendations.append(pick(HOT_SUN_IDEAS))
+        elif temperature_c < 10:
+            recommendations.append(pick(COLD_SUN_IDEAS))
+        else:
+            recommendations.append(pick(CLEAR_DAY_IDEAS))
     elif "cloudy" in condition_lower or "overcast" in condition_lower:
         recommendations.append(pick(CLOUDY_IDEAS))
     elif "snow" in condition_lower:
