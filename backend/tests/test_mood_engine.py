@@ -134,6 +134,14 @@ class TestRecommendationGeneration:
         recs = generate_recommendations(50, "Rainy", 18, 70)
         assert recs[0] in mood_engine.RAIN_IDEAS
     
+    def test_freezing_rain_never_suggests_going_out(self):
+        """Freezing rain and drizzle ice the paths, so no wet walks or misty strolls."""
+        for condition in ["Freezing Rain", "Freezing Drizzle"]:
+            for seed in range(20):
+                recs = generate_recommendations(40, condition, -1, 90, rng=random.Random(seed))
+                assert recs[0] in mood_engine.ICE_IDEAS
+        assert not any("walk" in idea for idea in mood_engine.ICE_IDEAS)
+    
     def test_storm_and_snow_have_their_own_ideas(self):
         assert generate_recommendations(40, "Thunderstorm", 18, 70)[0] in mood_engine.STORM_IDEAS
         assert generate_recommendations(40, "Snow Showers", 0, 70)[0] in mood_engine.SNOW_IDEAS

@@ -169,6 +169,14 @@ RAIN_IDEAS = (
     "Tidy one drawer, shelf or corner. Small indoor wins feel great on grey days.",
 )
 
+# Freezing rain or drizzle: paths turn to ice, so nothing here suggests going out
+ICE_IDEAS = (
+    "Freezing rain is icing the paths — stay in if you can, and if you must go out, take it slowly.",
+    "Icy out there: a good day for a warm drink, a film and not going anywhere.",
+    "Bake or slow-cook something and let the kitchen warm the house while the ice does its thing.",
+    "Stay off the ice — a puzzle, a book or a long call with a friend will keep you better company.",
+)
+
 STORM_IDEAS = (
     "Stay in and get cosy — blanket, hot drink and a film you've seen a hundred times.",
     "Storm outside, calm inside: try an indoor yoga or stretching session.",
@@ -314,6 +322,8 @@ def generate_recommendations(
             recommendations.append(pick(NIGHT_IDEAS))
     elif "storm" in condition_lower or "thunder" in condition_lower:
         recommendations.append(pick(STORM_IDEAS))
+    elif "freezing" in condition_lower:
+        recommendations.append(pick(ICE_IDEAS))
     elif "rain" in condition_lower:
         recommendations.append(pick(RAIN_IDEAS))
     elif "sunny" in condition_lower or "clear" in condition_lower:
