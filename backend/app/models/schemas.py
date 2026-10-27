@@ -162,7 +162,10 @@ class SubscribeResponse(BaseModel):
     email: str
     location: str = Field(..., description="Resolved display name")
     activity: str | None = None
-    status: str = Field("pending", description="Always pending: waiting for the email address to be confirmed")
+    status: str = Field(
+        "pending",
+        description="pending (waiting for the emailed link), or already_sent if a link went to this address minutes ago"
+    )
     confirmation_sent: bool = Field(..., description="Whether the email with the confirmation link went out")
 
 

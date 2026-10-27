@@ -149,6 +149,11 @@ def unsubscribe_link_email(subscriber: Subscriber) -> Email:
     )
 
 
+def recently_sent(to: str, kind: str) -> bool:
+    """Whether send_once sent this kind of email to this address within the last cache lifetime."""
+    return bool(_recently_sent.get(f"{kind}:{to}"))
+
+
 async def send_once(to: str, email: Email, kind: str, token: str | None = None) -> bool:
     """
     Send an email that anyone can trigger by typing an address into the site,

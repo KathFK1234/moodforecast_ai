@@ -375,10 +375,13 @@ def test_unsubscribe_link_is_emailed_to_subscribers_only(mock_weather, outbox):
 
 def test_repeat_requests_do_not_flood_an_inbox(mock_weather, outbox):
     """Typing someone's address into the forms again and again sends each email once."""
+    statuses = []
     for _ in range(5):
         response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
         assert response.status_code == 202
         assert response.json()["confirmation_sent"] is True
+        statuses.append(response.json()["status"])
+    assert statuses == ["pending"] + ["already_sent"] * 4
     assert [message["Subject"] for _, message in outbox] == ["Confirm your MoodForecast alerts for Nairobi, KE"]
     
     client.post(f"/api/confirm/{confirm_token(outbox)}")
@@ -390,6 +393,20 @@ def test_repeat_requests_do_not_flood_an_inbox(mock_weather, outbox):
     # A different address is not held back
     client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
     assert outbox[-1][1]["To"] == "ben@example.com"
+
+
+def test_a_quick_second_request_does_not_replace_the_emailed_one(mock_weather, outbox):
+    """The link already sent applies the details it was sent for; a change has to wait for a new link."""
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+        second = client.post("/api/subscribe", json={
+            "email": "amina@example.com", "location": "Nairobi", "activity": "a picnic"
+        })
+        assert second.json()["status"] == "already_sent"
+        with Session(engine) as session:
+            assert [p.activity for p in session.exec(select(PendingSubscription))] == [None]
+        assert client.post(f"/api/confirm/{confirm_token(outbox)}").json()["activity"] is None
 
 
 def test_a_burst_of_searches_does_not_lift_the_inbox_guard(mock_weather, outbox):

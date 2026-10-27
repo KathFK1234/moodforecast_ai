@@ -42,7 +42,9 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     activity one that can be done there.
     
     Returns 503 if email is not configured, since the request could never be
-    confirmed. `confirmation_sent` says whether the email went out.
+    confirmed. `confirmation_sent` says whether the email went out. If a link
+    went to the address in the last few minutes, no new request is stored or
+    sent and `status` is "already_sent".
     """
     if not mailer.is_configured():
         raise HTTPException(status_code=503, detail=EMAIL_UNAVAILABLE_MESSAGE)
@@ -58,6 +60,17 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             issue = local_issue(find_activity(request.activity).needs, request.activity, local_place)
             if issue and issue[0] == 2:
                 raise HTTPException(status_code=422, detail=f"{issue[1]} Pick another activity.")
+        
+        # A link went out minutes ago and no new one will until the guard
+        # lifts, so say so rather than store details the emailed link won't apply
+        if alerts.recently_sent(request.email, "confirm"):
+            return SubscribeResponse(
+                email=request.email,
+                location=place,
+                activity=request.activity,
+                status="already_sent",
+                confirmation_sent=True
+            )
         
         pending = PendingSubscription(
             token=secrets.token_urlsafe(24),

@@ -656,6 +656,14 @@ async function handleSubscribe(event) {
         if (!res.ok) throw new Error(await errorMessage(res, 'Subscription failed. Please try again.'));
 
         const data = await res.json();
+        if (data.status === 'already_sent') {
+            showNotice(
+                msg,
+                `We emailed a confirmation link to ${data.email} a few minutes ago. Use that one, or try again in 10 minutes to change the details.`,
+                false
+            );
+            return;
+        }
         if (!data.confirmation_sent) {
             throw new Error("We couldn't send the confirmation email just now. Please try again in a few minutes.");
         }
