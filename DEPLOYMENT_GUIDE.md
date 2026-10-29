@@ -33,6 +33,8 @@ source venv/bin/activate
 pytest tests/ -q
 ```
 
+GitHub Actions runs the same tests on every push to `main` and every pull request (`.github/workflows/tests.yml`), on Python 3.11 with the exact versions in `constraints.txt`. Railway deploys on push regardless; turning on "Wait for CI" in the Railway service settings makes it deploy only after the tests pass.
+
 If you changed anything in `frontend/`, copy it into the deployed location first:
 
 ```bash
