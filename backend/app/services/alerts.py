@@ -317,7 +317,7 @@ def is_due(subscriber: Subscriber, now_utc: datetime) -> bool:
 
 async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) -> int:
     """
-    Email every active subscriber whose daily alert is due.
+    Email every active, confirmed subscriber whose daily alert is due.
     
     A subscriber is marked as sent only once their email has gone out, so a
     failure is retried on the next run. `force` sends to every active,

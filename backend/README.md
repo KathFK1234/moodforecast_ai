@@ -418,7 +418,7 @@ Limits worth knowing:
 Tables are created on startup, and columns added to `alert_subscriber` since it first went live (`confirmed`, `confirm_requested_at`) are added to an existing table then too. SQLite is used by default; set `DATABASE_URL` to a PostgreSQL URL for production.
 
 ```bash
-sqlite3 moodforecast.db "SELECT email, place, activity, active, last_sent_on FROM alert_subscriber;"
+sqlite3 moodforecast.db "SELECT email, place, activity, active, confirmed, last_sent_on FROM alert_subscriber;"
 ```
 
 Subscribers are in `alert_subscriber`. A database created before email alerts also has a `subscriber` table of phone numbers; it is no longer read or written.
