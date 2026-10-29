@@ -87,7 +87,8 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/locations?q=...` | Places matching what has been typed so far |
 | GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
 | GET | `/api/alerts` | Whether daily email alerts can be signed up for (email is configured) |
-| POST | `/api/subscribe` | Subscribe an email address to daily alerts, or update its subscription |
+| POST | `/api/subscribe` | Ask for daily alerts, or a change to them; emails a confirmation link and nothing starts until it is followed |
+| POST | `/api/confirm/{token}` | Confirm a request from its emailed link: starts or changes the alerts |
 | POST | `/api/unsubscribe/{token}` | Stop the alerts for a subscription |
 | POST | `/api/unsubscribe-link` | Email a subscriber their unsubscribe link |
 | GET | `/health` | Health check |
