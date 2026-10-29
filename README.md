@@ -86,6 +86,7 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
 | GET | `/api/locations?q=...` | Places matching what has been typed so far |
 | GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
+| GET | `/api/alerts` | Whether daily email alerts can be signed up for (email is configured) |
 | POST | `/api/subscribe` | Subscribe an email address to daily alerts, or update its subscription |
 | POST | `/api/unsubscribe/{token}` | Stop the alerts for a subscription |
 | POST | `/api/unsubscribe-link` | Email a subscriber their unsubscribe link |

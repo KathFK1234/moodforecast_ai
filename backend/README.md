@@ -241,6 +241,10 @@ curl http://localhost:8000/api/activities/Nairobi
 ]
 ```
 
+### GET /api/alerts
+
+`{"available": true}` when email is configured, so alerts can be signed up for; `false` otherwise. The page uses it to disable the subscribe form, with a note, instead of letting someone fill it in only to be refused.
+
 ### POST /api/subscribe
 
 Asks for daily alerts for a location, or for a change to an existing subscription. Nothing starts or changes until the address is confirmed: the request is stored and an email with a link to `PUBLIC_URL/?confirm=<token>` is sent, valid for 48 hours. Returns 202. Requires `email` and `location`. `activity` is optional: one of the names from `/api/activities` (free text such as "go for a run" is understood too), or omitted for a random pick each day. `language` (`en` or `sw`) is still accepted and stored, but the page no longer asks for it: emails are written in English only.

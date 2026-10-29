@@ -999,6 +999,12 @@ body {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.form-group input:disabled,
+.form-group select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .form-group select optgroup,
 .form-group select option {
     color: #0c1122;

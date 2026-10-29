@@ -1,4 +1,4 @@
-"""Subscribe router - POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
+"""Subscribe router - GET /api/alerts; POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
 import logging
 import secrets
@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from app.models.db import PendingSubscription, Subscriber, as_utc, get_engine, utc_now
 from app.models.schemas import (
+    AlertsStatus,
     ConfirmResponse,
     SubscribeRequest,
     SubscribeResponse,
@@ -29,6 +30,12 @@ logger = logging.getLogger(__name__)
 CONFIRM_HOURS = 48
 
 EMAIL_UNAVAILABLE_MESSAGE = "Email alerts aren't available right now. Please try again later."
+
+
+@router.get("/alerts")
+async def alerts_status() -> AlertsStatus:
+    """Whether daily email alerts can be signed up for, so the page can say so before anyone fills in the form."""
+    return AlertsStatus(available=mailer.is_configured())
 
 
 @router.post("/subscribe", status_code=202)

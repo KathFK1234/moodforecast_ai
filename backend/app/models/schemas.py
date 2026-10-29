@@ -169,6 +169,11 @@ class SubscribeResponse(BaseModel):
     confirmation_sent: bool = Field(..., description="Whether the email with the confirmation link went out")
 
 
+class AlertsStatus(BaseModel):
+    """Whether daily email alerts can be signed up for."""
+    available: bool = Field(..., description="False when email isn't configured, so subscribing would be refused")
+
+
 class ConfirmResponse(BaseModel):
     """A confirmed subscription."""
     email: str

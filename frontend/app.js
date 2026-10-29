@@ -899,6 +899,22 @@ function fillActivityChoices(choices) {
     select.value = choices.some((choice) => choice.name === chosen) ? chosen : '';
 }
 
+// Without email the subscription could never be confirmed, so say so before anyone fills the form in
+async function checkAlertsAvailable() {
+    try {
+        const status = await fetchJson('/api/alerts', '');
+        if (status.available) return;
+    } catch (e) {
+        return;  // Unknown - leave the form usable; subscribing gives its own answer
+    }
+    el('subscribeForm').querySelectorAll('input, select, button').forEach((control) => {
+        control.disabled = true;
+    });
+    const msg = el('subscribeMessage');
+    msg.className = 'notice notice-info';
+    msg.textContent = "Daily email alerts aren't available at the moment. Please check back soon.";
+}
+
 // The subscription's location was changed by hand: refresh its activity choices
 async function loadActivityChoices(location) {
     location = (location || '').trim();
@@ -993,6 +1009,7 @@ function init() {
     el('optOutToggle').addEventListener('click', toggleOptOut);
     el('optOutForm').addEventListener('submit', handleOptOut);
     showSubscription(savedSubscription());
+    checkAlertsAvailable();
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('unsubscribe')) showUnsubscribePrompt(params.get('unsubscribe'));

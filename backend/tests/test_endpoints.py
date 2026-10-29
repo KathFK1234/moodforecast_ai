@@ -327,6 +327,14 @@ def test_first_daily_alert_waits_for_the_next_morning(mock_weather, outbox):
     assert by_email["ben@example.com"].last_sent_on is None
 
 
+def test_alerts_status_says_whether_email_is_configured(outbox):
+    assert client.get("/api/alerts").json() == {"available": True}
+
+
+def test_alerts_status_without_email():
+    assert client.get("/api/alerts").json() == {"available": False}
+
+
 def test_subscribe_needs_email_configured(mock_weather):
     """Without email the request could never be confirmed, so say so instead of storing it."""
     engine = memory_engine()
