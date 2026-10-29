@@ -426,7 +426,7 @@ Subscribers are in `alert_subscriber`. A database created before email alerts al
 
 ## Email Alerts
 
-Email is sent by `app/services/mailer.py`: through Brevo's HTTPS API when `BREVO_API_KEY` is set, otherwise over SMTP with the `SMTP_*` variables, always from `MAIL_FROM`. If Brevo refuses the `List-Unsubscribe` headers, the email is sent again without them (the unsubscribe link in the body still works). Until `MAIL_FROM` and one of `BREVO_API_KEY` or `SMTP_HOST` are set nothing is sent: subscribing is refused with a 503 (the page disables its form), and the startup log says daily alerts are off.
+Email is sent by `app/services/mailer.py`: through Brevo's HTTPS API when `BREVO_API_KEY` is set, otherwise over SMTP with the `SMTP_*` variables, always from `MAIL_FROM`. If Brevo refuses an email that carries the `List-Unsubscribe` headers, it is tried once more without them (the unsubscribe link in the body still works), and the log gives Brevo's reason. Until `MAIL_FROM` and one of `BREVO_API_KEY` or `SMTP_HOST` are set nothing is sent: subscribing is refused with a 503 (the page disables its form), and the startup log says daily alerts are off.
 
 ```bash
 python -m app.services.mailer you@example.com   # send one test message
