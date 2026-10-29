@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
-from app.models.db import Subscriber
+from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
 
 
@@ -35,7 +35,7 @@ def make_subscriber(**overrides) -> Subscriber:
     fields = dict(
         id="sub-1", email="amina@example.com", token="tok-1",
         location="nairobi", place="Nairobi, KE", lat=-1.2921, lon=36.8219,
-        utc_offset_seconds=10800,
+        utc_offset_seconds=10800, confirmed=True,
     )
     fields.update(overrides)
     return Subscriber(**fields)
@@ -219,3 +219,67 @@ class TestSendDueAlerts:
         with patch("app.services.alerts.get_engine", return_value=engine):
             await alerts.send_due_alerts(MORNING)
         assert stored(engine).utc_offset_seconds == 10800
+
+
+class TestEarlierSubscribers:
+    """Subscribers from before confirmation get no alerts until they confirm, and are asked once."""
+    
+    def test_an_unconfirmed_subscriber_is_never_due(self):
+        assert not alerts.is_due(make_subscriber(confirmed=False), MORNING)
+    
+    @pytest.mark.asyncio
+    async def test_no_alerts_go_to_them_even_when_forced(self, engine, weather, outbox):
+        add(engine, make_subscriber(confirmed=False))
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert await alerts.send_due_alerts(MORNING, force=True) == 0
+        assert outbox == []
+    
+    @pytest.mark.asyncio
+    async def test_each_is_asked_to_confirm_once(self, engine, outbox):
+        add(
+            engine,
+            make_subscriber(confirmed=False, activity="running"),
+            make_subscriber(id="sub-2", email="ben@example.com", token="tok-2"),  # Already confirmed
+            make_subscriber(id="sub-3", email="cy@example.com", token="tok-3", confirmed=False, active=False),
+        )
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert await alerts.request_confirmations(MORNING) == 1
+            assert await alerts.request_confirmations(MORNING) == 0
+        
+        assert [message["To"] for _, message in outbox] == ["amina@example.com"]
+        message = outbox[0][1]
+        assert message["Subject"] == "Please confirm your MoodForecast alerts for Nairobi, KE"
+        text = message.get_body(("plain",)).get_content()
+        assert "paused until you do" in text
+        assert "how the weather suits running" in text
+        assert message["List-Unsubscribe"] is None
+        with Session(engine) as session:
+            pending = session.exec(select(PendingSubscription)).one()
+        assert f"https://moodforecast.test/?confirm={pending.token}" in text
+        assert (pending.email, pending.activity, pending.location) == ("amina@example.com", "running", "nairobi")
+        assert stored(engine).confirm_requested_at is not None
+    
+    @pytest.mark.asyncio
+    async def test_a_failed_request_is_retried_on_the_next_run(self, engine, outbox, monkeypatch):
+        add(engine, make_subscriber(confirmed=False))
+        real_smtp = mailer.smtplib.SMTP
+        
+        def unreachable(host, port, **kwargs):
+            raise ConnectionRefusedError("nothing listening")
+        
+        monkeypatch.setattr(mailer.smtplib, "SMTP", unreachable)
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert await alerts.request_confirmations(MORNING) == 0
+            with Session(engine) as session:
+                assert session.exec(select(PendingSubscription)).all() == []
+            assert stored(engine).confirm_requested_at is None
+            
+            monkeypatch.setattr(mailer.smtplib, "SMTP", real_smtp)
+            assert await alerts.request_confirmations(MORNING) == 1
+    
+    @pytest.mark.asyncio
+    async def test_nothing_is_asked_without_email_configured(self, engine):
+        add(engine, make_subscriber(confirmed=False))
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert await alerts.request_confirmations(MORNING) == 0
+        assert stored(engine).confirm_requested_at is None

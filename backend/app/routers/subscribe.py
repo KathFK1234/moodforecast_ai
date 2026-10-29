@@ -26,8 +26,7 @@ router = APIRouter(prefix="/api", tags=["subscribe"])
 logger = logging.getLogger(__name__)
 
 
-# How long a confirmation link works
-CONFIRM_HOURS = 48
+CONFIRM_HOURS = alerts.CONFIRM_HOURS
 
 EMAIL_UNAVAILABLE_MESSAGE = "Email alerts aren't available right now. Please try again later."
 
@@ -164,6 +163,7 @@ async def confirm(token: str) -> ConfirmResponse:
         subscriber.activity = pending.activity
         subscriber.language = pending.language
         subscriber.active = True
+        subscriber.confirmed = True
         # The welcome email covers today if the alert hour has already passed,
         # so the first daily alert arrives the next morning
         now = datetime.now(timezone.utc)

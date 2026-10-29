@@ -127,7 +127,7 @@ To check that email works, set the SMTP variables in `backend/.env` and run, fro
 
 ```bash
 python -m app.services.mailer you@example.com   # sends one test message
-python -m app.services.alerts --all             # sends today's alert to every subscriber now
+python -m app.services.alerts --all             # sends today's alert to every confirmed subscriber now
 ```
 
 ## Testing

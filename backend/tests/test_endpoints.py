@@ -1,5 +1,6 @@
 """Integration tests for API endpoints with mocked weather client."""
 
+import asyncio
 import re
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -164,6 +165,7 @@ def test_confirming_starts_the_alerts(mock_weather, outbox):
     assert subscriber.activity is None
     assert subscriber.language == "sw"
     assert subscriber.active is True
+    assert subscriber.confirmed is True
     assert subscriber.token
     
     # Then the welcome email, with the unsubscribe link
@@ -203,6 +205,27 @@ def test_a_confirmation_link_expires(mock_weather, outbox):
         client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
         with Session(engine) as session:
             assert [p.email for p in session.exec(select(PendingSubscription))] == ["ben@example.com"]
+
+
+def test_an_earlier_subscriber_confirms_from_the_emailed_link(mock_weather, outbox):
+    """A subscriber from before confirmation keeps their subscription and token once they confirm."""
+    engine = memory_engine()
+    with Session(engine) as session:
+        session.add(Subscriber(
+            id="old-1", email="amina@example.com", token="old-token", location="nairobi",
+            place="Nairobi, KE", lat=-1.2921, lon=36.8219, activity="running", confirmed=False,
+        ))
+        session.commit()
+    with patch('app.services.alerts.get_engine', return_value=engine), \
+         patch('app.routers.subscribe.get_engine', return_value=engine):
+        asyncio.run(alerts.request_confirmations())
+        response = client.post(f"/api/confirm/{confirm_token(outbox)}")
+    assert response.status_code == 200
+    assert response.json()["activity"] == "running"
+    with Session(engine) as session:
+        subscriber = session.exec(select(Subscriber)).one()
+    assert subscriber.confirmed is True
+    assert subscriber.token == "old-token"
 
 
 def test_unknown_confirmation_token(mock_weather):

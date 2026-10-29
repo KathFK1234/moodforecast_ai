@@ -4,6 +4,7 @@ import asyncio
 import html
 import logging
 import random
+import secrets
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 
 # How often the background loop looks for subscribers whose alert is due
 CHECK_INTERVAL_SECONDS = 900
+
+# How long a confirmation link works
+CONFIRM_HOURS = 48
 
 # Emails anyone can trigger from the site's forms, recently sent, by kind and address.
 # Kept apart from the shared cache so a burst of searches can't push these out early.
@@ -113,6 +117,28 @@ def confirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
         ],
         token=None,
         footer="Didn't ask for this? Ignore this email and nothing more will be sent.",
+    )
+
+
+def reconfirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
+    """Sent once to a subscriber from before addresses had to be confirmed."""
+    if pending.activity:
+        about = f"how the weather suits {pending.activity}"
+    else:
+        about = "a new activity to try, picked to suit the weather"
+    return _compose(
+        subject=f"Please confirm your MoodForecast alerts for {pending.place}",
+        heading="Please confirm your daily alerts",
+        paragraphs=[
+            f"This address was signed up for a daily email with the weather in {pending.place}, "
+            f"how it is likely to affect mood and energy, and {about}.",
+            "MoodForecast now asks everyone to confirm their address before sending anything, "
+            "so these alerts are paused until you do.",
+            ("To keep them:", "Confirm my alerts", confirm_url(pending.token)),
+            f"The link works for {valid_hours} hours. After that you can sign up again on the site.",
+        ],
+        token=None,
+        footer="Didn't sign up? Ignore this email and nothing more will be sent.",
     )
 
 
@@ -283,6 +309,7 @@ def is_due(subscriber: Subscriber, now_utc: datetime) -> bool:
     local = now_utc + timedelta(seconds=subscriber.utc_offset_seconds)
     return (
         subscriber.active
+        and subscriber.confirmed
         and local.hour >= settings.alert_hour
         and subscriber.last_sent_on != local.date().isoformat()
     )
@@ -293,8 +320,8 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
     Email every active subscriber whose daily alert is due.
     
     A subscriber is marked as sent only once their email has gone out, so a
-    failure is retried on the next run. `force` sends to every active
-    subscriber regardless of the time or what was sent today.
+    failure is retried on the next run. `force` sends to every active,
+    confirmed subscriber regardless of the time or what was sent today.
     
     Returns the number of emails sent.
     """
@@ -304,7 +331,7 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
     
     with Session(get_engine()) as session:
         subscribers = session.exec(
-            select(Subscriber).where(Subscriber.active == True)  # noqa: E712
+            select(Subscriber).where(Subscriber.active == True, Subscriber.confirmed == True)  # noqa: E712
         ).all()
         for subscriber in subscribers:
             if not (force or is_due(subscriber, now_utc)):
@@ -327,10 +354,57 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
     return sent
 
 
+async def request_confirmations(now_utc: datetime | None = None) -> int:
+    """
+    Ask each subscriber from before addresses had to be confirmed, once, to confirm.
+    
+    Their alerts are paused until they follow the link. A subscriber is marked
+    as asked only once the email has gone out, so a failure is retried on the
+    next run; after that they are never emailed again unless they sign up anew.
+    
+    Returns the number of emails sent.
+    """
+    now_utc = now_utc or datetime.now(timezone.utc)
+    sent = 0
+    with Session(get_engine()) as session:
+        unconfirmed = session.exec(
+            select(Subscriber).where(
+                Subscriber.active == True,  # noqa: E712
+                Subscriber.confirmed == False,  # noqa: E712
+                Subscriber.confirm_requested_at == None,  # noqa: E711
+            )
+        ).all()
+        for subscriber in unconfirmed:
+            pending = PendingSubscription(
+                token=secrets.token_urlsafe(24),
+                email=subscriber.email,
+                location=subscriber.location,
+                place=subscriber.place,
+                lat=subscriber.lat,
+                lon=subscriber.lon,
+                utc_offset_seconds=subscriber.utc_offset_seconds,
+                activity=subscriber.activity,
+                language=subscriber.language,
+            )
+            session.add(pending)
+            session.commit()
+            if await send_to(subscriber.email, reconfirm_email(pending, CONFIRM_HOURS)):
+                subscriber.confirm_requested_at = now_utc
+                session.add(subscriber)
+                sent += 1
+            else:
+                session.delete(pending)
+            session.commit()
+    return sent
+
+
 async def run_alert_loop() -> None:
-    """Send due alerts every CHECK_INTERVAL_SECONDS until cancelled."""
+    """Send due alerts, and confirmation requests, every CHECK_INTERVAL_SECONDS until cancelled."""
     while True:
         try:
+            asked = await request_confirmations()
+            if asked:
+                logger.info("Asked %d earlier subscriber(s) to confirm", asked)
             sent = await send_due_alerts()
             if sent:
                 logger.info("Sent %d daily alert(s)", sent)
@@ -341,9 +415,10 @@ async def run_alert_loop() -> None:
 
 if __name__ == "__main__":
     # python -m app.services.alerts          send the alerts that are due now
-    # python -m app.services.alerts --all    send to every active subscriber now
+    # python -m app.services.alerts --all    send to every active, confirmed subscriber now
     if not mailer.is_configured():
         sys.exit("Email is not configured: set SMTP_HOST and MAIL_FROM")
     create_tables()
+    asked = asyncio.run(request_confirmations())
     count = asyncio.run(send_due_alerts(force="--all" in sys.argv[1:]))
-    print(f"Sent {count} daily alert(s)")
+    print(f"Asked {asked} earlier subscriber(s) to confirm; sent {count} daily alert(s)")

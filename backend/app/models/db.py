@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 from functools import lru_cache
+from sqlalchemy import inspect, text
 from sqlmodel import SQLModel, Field, create_engine
 from app.config import settings
 
@@ -28,6 +29,10 @@ class Subscriber(SQLModel, table=True):
     token: str = Field(..., index=True, unique=True, description="Secret used to unsubscribe")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     last_sent_on: str | None = Field(default=None, description="Local date of the last daily alert, YYYY-MM-DD")
+    confirmed: bool = Field(default=False, description="The address was confirmed from an emailed link")
+    confirm_requested_at: datetime | None = Field(
+        default=None, description="When a subscriber from before confirmation was asked to confirm"
+    )
 
 
 def engine_url(url: str) -> str:
@@ -84,7 +89,28 @@ def get_engine():
     )
 
 
+# Columns added to alert_subscriber after it went live, with the value existing
+# rows get (None: left empty). create_all doesn't change an existing table.
+ADDED_SUBSCRIBER_COLUMNS = {"confirmed": "FALSE", "confirm_requested_at": None}
+
+
 def create_tables():
-    """Create all tables."""
+    """Create all tables, and add any columns an older alert_subscriber table lacks."""
     engine = get_engine()
     SQLModel.metadata.create_all(engine)
+    _add_missing_columns(engine)
+
+
+def _add_missing_columns(engine) -> None:
+    """Bring an existing alert_subscriber table up to the model, e.g. after an upgrade."""
+    table = Subscriber.__table__
+    existing = {column["name"] for column in inspect(engine).get_columns(table.name)}
+    with engine.begin() as connection:
+        for name, default in ADDED_SUBSCRIBER_COLUMNS.items():
+            if name in existing:
+                continue
+            column_type = table.c[name].type.compile(dialect=engine.dialect)
+            ddl = f"ALTER TABLE {table.name} ADD COLUMN {name} {column_type}"
+            if default is not None:
+                ddl += f" NOT NULL DEFAULT {default}"
+            connection.execute(text(ddl))

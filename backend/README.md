@@ -269,7 +269,7 @@ The location must be one the geocoder can find, and the activity one that can be
 
 ### POST /api/confirm/{token}
 
-Confirms a request with the token from its email: starts the alerts, or applies the change to an existing subscription (`"status": "subscribed"` or `"updated"`), and sends the welcome email with the unsubscribe link. Other requests waiting for the same address are dropped. Returns `{"email", "location", "activity", "status"}`, or 404 for an unknown, used or expired token. The page opened from the email asks before calling it, so a mail scanner opening the link doesn't confirm. Subscriptions made before confirmation was introduced carry on unchanged.
+Confirms a request with the token from its email: starts the alerts, or applies the change to an existing subscription (`"status": "subscribed"` or `"updated"`), and sends the welcome email with the unsubscribe link. Other requests waiting for the same address are dropped. Returns `{"email", "location", "activity", "status"}`, or 404 for an unknown, used or expired token. The page opened from the email asks before calling it, so a mail scanner opening the link doesn't confirm. Subscribers from before confirmation get no alerts until they confirm; each is asked once, by email (see [Email Alerts](#email-alerts)).
 
 ### POST /api/unsubscribe/{token}
 
@@ -415,7 +415,7 @@ Limits worth knowing:
 
 ## Database
 
-Tables are created on startup. SQLite is used by default; set `DATABASE_URL` to a PostgreSQL URL for production.
+Tables are created on startup, and columns added to `alert_subscriber` since it first went live (`confirmed`, `confirm_requested_at`) are added to an existing table then too. SQLite is used by default; set `DATABASE_URL` to a PostgreSQL URL for production.
 
 ```bash
 sqlite3 moodforecast.db "SELECT email, place, activity, active, last_sent_on FROM alert_subscriber;"
@@ -425,18 +425,20 @@ Subscribers are in `alert_subscriber`. A database created before email alerts al
 
 ## Email Alerts
 
-Email is sent over SMTP by `app/services/mailer.py`, using the `SMTP_*` and `MAIL_FROM` variables above. Until `SMTP_HOST` and `MAIL_FROM` are set nothing is sent: subscriptions are still stored, and the startup log says daily alerts are off.
+Email is sent over SMTP by `app/services/mailer.py`, using the `SMTP_*` and `MAIL_FROM` variables above. Until `SMTP_HOST` and `MAIL_FROM` are set nothing is sent: subscribing is refused with a 503 (the page disables its form), and the startup log says daily alerts are off.
 
 ```bash
 python -m app.services.mailer you@example.com   # send one test message
-python -m app.services.alerts                   # send the alerts that are due now
-python -m app.services.alerts --all             # send to every active subscriber now
+python -m app.services.alerts                   # ask earlier subscribers to confirm, and send the alerts that are due now
+python -m app.services.alerts --all             # the same, sending to every active, confirmed subscriber now
 ```
 
-Three emails exist, all composed in `app/services/alerts.py` as plain text with an HTML alternative:
+Five emails exist, all composed in `app/services/alerts.py` as plain text with an HTML alternative:
 
-- **Confirmation** - sent when someone subscribes or changes their subscription
-- **Daily alert** - current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
+- **Confirmation request** - sent when someone asks for alerts or a change to them, with the link that starts them
+- **Welcome** - sent once the address is confirmed, with the unsubscribe link
+- **Request to confirm** - sent once to each subscriber from before addresses had to be confirmed. Their alerts are paused until they follow its link, which works for 48 hours; after that they are not emailed again unless they sign up anew. The background loop sends these as soon as email is configured
+- **Daily alert** - only to confirmed subscribers: current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
 The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default).
