@@ -109,9 +109,10 @@ async def send_with_brevo(
     """
     Send one email with Brevo's transactional email API (POST /smtp/email).
     
-    MAIL_FROM must be a sender verified in Brevo. If Brevo refuses the extra
-    headers (List-Unsubscribe), the email is sent again without them: the
-    unsubscribe link in the body still works. Raises MailError on failure.
+    MAIL_FROM must be a sender verified in Brevo. If Brevo refuses (400) an
+    email carrying extra headers (List-Unsubscribe), it is tried once more
+    without them: the unsubscribe link in the body still works. Raises
+    MailError on failure, with Brevo's reason.
     """
     name, address = parseaddr(settings.mail_from)
     sender = {"email": address, "name": name} if name else {"email": address}
