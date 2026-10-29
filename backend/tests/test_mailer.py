@@ -160,3 +160,15 @@ def test_brevo_unreachable_becomes_a_mail_error(brevo):
     state["respond"] = unreachable
     with pytest.raises(mailer.MailError, match="Brevo unreachable"):
         send("amina@example.com", "Hello", "Hi")
+
+
+@pytest.mark.parametrize("response", [
+    httpx.Response(502, text="<html>Bad gateway</html>"),
+    httpx.Response(500, json=["unexpected", "shape"]),
+])
+def test_an_unexpected_brevo_error_body_still_becomes_a_mail_error(brevo, response):
+    """Whatever comes back, the caller gets a MailError it knows how to handle."""
+    _, state = brevo
+    state["respond"] = lambda request: response
+    with pytest.raises(mailer.MailError, match=f"Brevo said {response.status_code}"):
+        send("amina@example.com", "Hello", "Hi")

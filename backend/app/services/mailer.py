@@ -148,9 +148,11 @@ def _brevo_reason(response: httpx.Response) -> str:
     """Brevo's explanation of a refusal, e.g. 'unauthorized: Key not found'."""
     try:
         body = response.json()
-        return f"{body.get('code', '')}: {body.get('message', '')}".strip(": ")
     except ValueError:
+        body = None
+    if not isinstance(body, dict):
         return response.text[:200]
+    return f"{body.get('code', '')}: {body.get('message', '')}".strip(": ")
 
 
 if __name__ == "__main__":
