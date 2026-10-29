@@ -7,7 +7,7 @@ FastAPI service combining the Open-Meteo weather API with a rule-based mood scor
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c constraints.txt
 
 # Optional - the defaults work without a .env file
 cp .env.example .env
@@ -65,6 +65,7 @@ tests/
   test_locality.py       # Place facts: country, coast, late night (no I/O)
   test_cache.py          # In-memory cache: expiry and size limit
   test_db.py             # Database URL handling (Postgres driver)
+  test_dependencies.py   # constraints.txt matches requirements.txt
   test_mailer.py         # Mailer tests (fake SMTP)
   test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
   test_static_sync.py    # static/ matches ../frontend

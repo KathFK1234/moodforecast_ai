@@ -124,7 +124,7 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 
 | Issue | What to check |
 | ----- | ------------- |
-| Build fails | Railway build logs; `backend/requirements.txt` installs locally |
+| Build fails | Railway build logs; `pip install -r requirements.txt -c constraints.txt` works locally in `backend/` |
 | App crashes on start | Railway deploy logs; `DATABASE_URL` is a valid URL if set |
 | "Location not found" (422) | Spelling of the location; try adding the country |
 | "The weather service can't be reached right now" (503) | Open-Meteo or Nominatim is unreachable or rate limiting - retry shortly |

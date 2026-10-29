@@ -13,7 +13,7 @@ cd moodforecast_ai/backend
 # Create a virtual environment and install dependencies
 python3 -m venv venv
 source venv/bin/activate        # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -c constraints.txt
 
 # Optional - the defaults work without a .env file
 cp .env.example .env
@@ -62,7 +62,8 @@ moodforecast_ai/
 │   │   ├── services/          # weather, geocoding, mood engine, cache
 │   │   └── static/            # Deployed copy of frontend/
 │   ├── tests/                 # pytest suite
-│   ├── requirements.txt
+│   ├── requirements.txt     # Direct dependencies
+│   ├── constraints.txt      # Exact versions of everything they install
 │   ├── .env.example
 │   ├── Dockerfile
 │   ├── railway.toml
