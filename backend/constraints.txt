@@ -1,6 +1,6 @@
 # Exact versions of everything requirements.txt installs, so the Docker image and local
 # environments run the same code. Refresh after changing requirements.txt:
-#   uv pip compile requirements.txt --python-version 3.11 -o constraints.txt
+#   uv pip compile requirements-dev.txt --python-version 3.11 -o constraints.txt
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1

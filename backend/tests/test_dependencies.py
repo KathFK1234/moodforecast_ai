@@ -1,4 +1,4 @@
-"""constraints.txt must keep up with requirements.txt."""
+"""constraints.txt must keep up with the requirements files."""
 
 import re
 from pathlib import Path
@@ -17,9 +17,15 @@ def pins(filename: str) -> dict[str, str]:
 
 
 def test_every_requirement_is_constrained_to_the_same_version():
-    """After changing requirements.txt, refresh constraints.txt (see its header)."""
-    requirements = pins("requirements.txt")
+    """After changing requirements.txt or requirements-dev.txt, refresh constraints.txt (see its header)."""
+    requirements = pins("requirements.txt") | pins("requirements-dev.txt")
     constraints = pins("constraints.txt")
-    assert requirements
+    assert {"fastapi", "pytest"} <= set(requirements)
     for name, version in requirements.items():
         assert constraints.get(name) == version, f"{name}: requirements {version}, constraints {constraints.get(name)}"
+
+
+def test_the_docker_image_does_not_install_the_test_tools():
+    runtime = pins("requirements.txt")
+    assert "pytest" not in runtime
+    assert "pytest-asyncio" not in runtime
