@@ -126,6 +126,18 @@ def test_refused_headers_are_dropped_and_the_email_still_goes(brevo):
     assert "headers" not in json.loads(sent[1].content)
 
 
+def test_a_refusal_for_another_reason_says_so_after_the_retry(brevo, caplog):
+    """A 400 can be about anything (an unverified sender, say), so the reason is passed on, not guessed."""
+    sent, state = brevo
+    state["respond"] = lambda request: httpx.Response(
+        400, json={"code": "invalid_parameter", "message": "sender is not valid"}
+    )
+    with pytest.raises(mailer.MailError, match="400 invalid_parameter: sender is not valid"):
+        send("amina@example.com", "Hello", "Hi", "<p>Hi</p>", {"List-Unsubscribe": "<https://x.test/u>"})
+    assert len(sent) == 2
+    assert "Brevo refused the email (invalid_parameter: sender is not valid)" in caplog.text
+
+
 def test_brevo_refusal_becomes_a_mail_error_without_the_key(brevo):
     sent, state = brevo
     state["respond"] = lambda request: httpx.Response(

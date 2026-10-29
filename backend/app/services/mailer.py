@@ -139,7 +139,7 @@ async def send_with_brevo(
                 return
             reason = _brevo_reason(response)
             if response.status_code == 400 and attempt + 1 < len(attempts):
-                logger.warning("Brevo refused the email headers (%s); sending without them", reason)
+                logger.warning("Brevo refused the email (%s); trying again without the extra headers", reason)
                 continue
             raise MailError(f"Could not send email to {to}: Brevo said {response.status_code} {reason}")
 
