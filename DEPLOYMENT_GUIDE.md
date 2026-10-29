@@ -114,6 +114,7 @@ All are optional.
 | `CACHE_TTL_SECONDS` | `600` | How long weather and geocoding results are cached |
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
+| `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is on the coast; only change this if you self-host it |
 | `PORT` | `8000` | Set by Railway |
 
 ## Open-Meteo Usage Limits

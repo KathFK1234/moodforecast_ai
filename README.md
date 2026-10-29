@@ -111,6 +111,7 @@ All are optional.
 | `CACHE_TTL_SECONDS` | `600` | How long weather and geocoding results are cached |
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
+| `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is on the coast; only change this if you self-host it |
 | `SMTP_HOST` | (unset) | SMTP server for confirmation emails and daily alerts, e.g. `smtp.gmail.com`. Nothing is sent until this and `MAIL_FROM` are set |
 | `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
