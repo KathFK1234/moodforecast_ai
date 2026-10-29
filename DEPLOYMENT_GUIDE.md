@@ -67,18 +67,25 @@ In the project's "Variables" tab:
 | `ENVIRONMENT` | `production` |
 | `CACHE_TTL_SECONDS` | `600` (optional) |
 | `DATABASE_URL` | PostgreSQL URL (recommended, see below) |
-| `PUBLIC_URL` | `https://YOUR_DOMAIN` - used for the unsubscribe links in emails |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `MAIL_FROM` | Your email provider's SMTP details (see below) |
+| `PUBLIC_URL` | `https://YOUR_DOMAIN` - used for the confirmation and unsubscribe links in emails |
+| `BREVO_API_KEY`, `MAIL_FROM` | Your Brevo API key, and the sender you verified in Brevo (see below) |
 | `ALERT_HOUR` | `7` (optional) - local hour the daily alert is sent |
 
 Variables left over from the old weather provider, such as `WEATHERAI_API_KEY`, are ignored and can be deleted.
 
 **Database:** if `DATABASE_URL` is not set, the app uses a SQLite file inside the container. That file is lost on every redeploy, so subscribers will not persist. To keep them, add a PostgreSQL database in Railway and set `DATABASE_URL` to its connection URL. Tables are created on startup.
 
-**Email:** confirmation emails and daily alerts are sent over SMTP, and nothing is sent until `SMTP_HOST` and `MAIL_FROM` are set. Any SMTP provider works, such as Gmail with an app password, Brevo, Mailgun or SendGrid. Two things to check on Railway:
+**Email:** Railway blocks outbound SMTP on its Free, Trial and Hobby plans, so on Railway the app sends through [Brevo](https://www.brevo.com)'s HTTPS API instead. Brevo's free plan allows 300 emails a day and needs no domain of your own:
 
-- Railway has blocked outbound SMTP on its Free, Trial and Hobby plans. If the logs show `Could not send email ... timed out` or `Network is unreachable`, that is the cause: move to a plan that allows SMTP, or host the app somewhere that does.
-- The daily send runs inside the web process, so keep the service at one replica. More replicas would each send their own copy of every alert.
+1. Sign up at brevo.com (free plan).
+2. Under **Senders, Domains & Dedicated IPs → Senders**, add the address emails should come from and confirm it from the email Brevo sends.
+3. Under **SMTP & API → API Keys**, create an API key.
+4. In Railway, set `BREVO_API_KEY` to that key and `MAIL_FROM` to the sender, e.g. `MoodForecast <you@gmail.com>`, and check `PUBLIC_URL` is the site's address.
+5. After the redeploy, `https://YOUR_DOMAIN/api/alerts` shows `{"available":true}` and the subscribe form is enabled. Subscribe with your own address to see the confirmation email arrive.
+
+Without your own domain, some inboxes may file the emails as spam, since they come from an address at a mail provider such as Gmail but are sent by Brevo. Adding a domain you own in Brevo (**Senders, Domains & Dedicated IPs → Domains**) fixes that. Elsewhere, plain SMTP works too: leave `BREVO_API_KEY` unset and set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `MAIL_FROM` (see the environment variables in the README).
+
+The daily send runs inside the web process, so keep the service at one replica. More replicas would each send their own copy of every alert.
 
 Once email works, anyone who subscribed before addresses had to be confirmed gets one email asking them to confirm; their alerts are paused until they do.
 
@@ -136,9 +143,9 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | Timeout (504) | Upstream service is slow - retry shortly |
 | Frontend shows old content | `backend/app/static/` was not updated from `frontend/`; browser cache |
 | Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |
-| Subscribing says "Email alerts aren't available right now" (503) | `SMTP_HOST` and `MAIL_FROM` are not set; requests can't be confirmed without email, so none are taken |
+| Subscribing says "Email alerts aren't available right now" (503) | `MAIL_FROM` and `BREVO_API_KEY` (or `SMTP_HOST`) are not set; requests can't be confirmed without email, so none are taken |
 | A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
-| Subscribing works but no email arrives | `SMTP_HOST` and `MAIL_FROM` are set; the logs for `Could not send email`; the recipient's spam folder; whether the host allows outbound SMTP |
+| Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, a sender error means `MAIL_FROM` isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |
 | Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
 

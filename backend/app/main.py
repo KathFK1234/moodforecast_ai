@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
         alert_task = asyncio.create_task(alerts.run_alert_loop())
         print(f"✓ Daily alerts scheduled for {settings.alert_hour:02d}:00 local time")
     else:
-        print("• Email not configured (SMTP_HOST, MAIL_FROM) - daily alerts are off")
+        print("• Email not configured (MAIL_FROM, and BREVO_API_KEY or SMTP_HOST) - daily alerts are off")
     
     yield
     

@@ -312,7 +312,8 @@ All are optional.
 | `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Open-Meteo base URL (only change if self-hosting) |
 | `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is by the sea |
-| `SMTP_HOST` | (unset) | SMTP server for confirmation emails and daily alerts, e.g. `smtp.gmail.com`. Nothing is sent until this and `MAIL_FROM` are set |
+| `BREVO_API_KEY` | (unset) | Brevo API key: email goes through Brevo's HTTPS API instead of SMTP (needed on hosts that block SMTP, such as Railway's Hobby plan). `MAIL_FROM` must be a sender verified in Brevo |
+| `SMTP_HOST` | (unset) | SMTP server, used when `BREVO_API_KEY` isn't set, e.g. `smtp.gmail.com`. Nothing is sent until `MAIL_FROM` and one of `BREVO_API_KEY` or `SMTP_HOST` are set |
 | `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
 | `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
@@ -425,7 +426,7 @@ Subscribers are in `alert_subscriber`. A database created before email alerts al
 
 ## Email Alerts
 
-Email is sent over SMTP by `app/services/mailer.py`, using the `SMTP_*` and `MAIL_FROM` variables above. Until `SMTP_HOST` and `MAIL_FROM` are set nothing is sent: subscribing is refused with a 503 (the page disables its form), and the startup log says daily alerts are off.
+Email is sent by `app/services/mailer.py`: through Brevo's HTTPS API when `BREVO_API_KEY` is set, otherwise over SMTP with the `SMTP_*` variables, always from `MAIL_FROM`. If Brevo refuses the `List-Unsubscribe` headers, the email is sent again without them (the unsubscribe link in the body still works). Until `MAIL_FROM` and one of `BREVO_API_KEY` or `SMTP_HOST` are set nothing is sent: subscribing is refused with a 503 (the page disables its form), and the startup log says daily alerts are off.
 
 ```bash
 python -m app.services.mailer you@example.com   # send one test message

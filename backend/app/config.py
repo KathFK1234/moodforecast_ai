@@ -19,7 +19,11 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 600
     environment: str = "development"
     
-    # Email (SMTP). Nothing is sent until smtp_host and mail_from are set.
+    # Email: Brevo's HTTPS API when brevo_api_key is set (works on hosts that block
+    # SMTP, such as Railway's Hobby plan), otherwise SMTP. Nothing is sent until
+    # mail_from and one of brevo_api_key or smtp_host are set.
+    brevo_api_key: str = ""
+    brevo_api_url: str = "https://api.brevo.com/v3"
     smtp_host: str = ""
     smtp_port: int = 587        # 465 connects over TLS; any other port upgrades with STARTTLS
     smtp_username: str = ""

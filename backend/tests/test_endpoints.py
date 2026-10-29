@@ -1,6 +1,7 @@
 """Integration tests for API endpoints with mocked weather client."""
 
 import asyncio
+import json
 import re
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -179,6 +180,23 @@ def test_confirming_starts_the_alerts(mock_weather, outbox):
     assert link in message.get_body(("html",)).get_content()
     assert message["List-Unsubscribe"] == f"<https://moodforecast.test/api/unsubscribe/{subscriber.token}>"
     assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+
+def test_confirmation_through_brevo(mock_weather, brevo):
+    """The whole flow works when email goes through Brevo's API instead of SMTP."""
+    sent, _ = brevo
+    assert client.get("/api/alerts").json() == {"available": True}
+    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    assert response.json()["confirmation_sent"] is True
+    request = json.loads(sent[-1].content)
+    assert request["to"] == [{"email": "amina@example.com"}]
+    assert request["subject"] == "Confirm your MoodForecast alerts for Nairobi, KE"
+    token = re.search(r"\?confirm=([\w-]+)", request["textContent"]).group(1)
+    
+    assert client.post(f"/api/confirm/{token}").status_code == 200
+    welcome = json.loads(sent[-1].content)
+    assert welcome["subject"] == "You're subscribed to MoodForecast for Nairobi, KE"
+    assert welcome["headers"]["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
 
 
 def test_a_confirmation_link_works_once(mock_weather, outbox):

@@ -417,7 +417,7 @@ if __name__ == "__main__":
     # python -m app.services.alerts          send the alerts that are due now
     # python -m app.services.alerts --all    send to every active, confirmed subscriber now
     if not mailer.is_configured():
-        sys.exit("Email is not configured: set SMTP_HOST and MAIL_FROM")
+        sys.exit(mailer.NOT_CONFIGURED)
     create_tables()
     asked = asyncio.run(request_confirmations())
     count = asyncio.run(send_due_alerts(force="--all" in sys.argv[1:]))

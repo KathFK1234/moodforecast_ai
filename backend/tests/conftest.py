@@ -1,5 +1,6 @@
 """Shared test fixtures."""
 
+import httpx
 import pytest
 from app.config import settings
 from app.services import alerts, geocoding, mailer
@@ -48,6 +49,7 @@ def empty_cache():
 def no_real_email(monkeypatch):
     """Tests never send real email, whatever the developer's .env says."""
     monkeypatch.setattr(settings, "smtp_host", "")
+    monkeypatch.setattr(settings, "brevo_api_key", "")
     monkeypatch.setattr(settings, "mail_from", "")
 
 
@@ -69,3 +71,23 @@ def outbox(monkeypatch):
         mailer.smtplib, "SMTP_SSL", lambda host, port, **kwargs: FakeSMTP(sent, host, port, **kwargs)
     )
     return sent
+
+
+@pytest.fixture
+def brevo(monkeypatch):
+    """Configure Brevo and answer its API with `respond(request)`; requests are collected."""
+    sent = []
+    state = {"respond": lambda request: httpx.Response(201, json={"messageId": "<1@relay>"})}
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return state["respond"](request)
+    
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        mailer.httpx, "AsyncClient",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs)
+    )
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-test")
+    monkeypatch.setattr(settings, "mail_from", "MoodForecast <alerts@moodforecast.test>")
+    return sent, state

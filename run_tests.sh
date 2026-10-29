@@ -99,7 +99,7 @@ subscribe_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST $BASE_URL/api/
   -d '{"email":"smoke-test@example.com","location":"Nairobi"}')
 case "$subscribe_status" in
     202) pass "Subscribe endpoint working (confirmation email requested)" ;;
-    503) skip "Subscribe endpoint answers, but email isn't configured (SMTP_HOST, MAIL_FROM)" ;;
+    503) skip "Subscribe endpoint answers, but email isn't configured (MAIL_FROM, and BREVO_API_KEY or SMTP_HOST)" ;;
     *) fail "Subscribe endpoint not working (HTTP $subscribe_status)" ;;
 esac
 
