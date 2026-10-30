@@ -190,8 +190,7 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
     """
     Stop daily alerts for the subscription the token belongs to.
     
-    The token comes from the subscribe response and from the link in every
-    email. Unsubscribing twice is fine. Returns 404 for an unknown token.
+    The token comes from the link in every email to a subscriber. Unsubscribing twice is fine. Returns 404 for an unknown token.
     """
     engine = get_engine()
     with Session(engine) as session:

@@ -318,7 +318,7 @@ All are optional.
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | (unset) | SMTP login. For Gmail, your address and an [app password](https://myaccount.google.com/apppasswords) |
 | `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
 | `MAIL_FROM` | (unset) | Sender, e.g. `MoodForecast <you@gmail.com>` |
-| `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the unsubscribe links in emails |
+| `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the confirmation and unsubscribe links in emails |
 | `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent |
 
 ## Weather Provider
