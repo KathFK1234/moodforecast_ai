@@ -909,3 +909,10 @@ def test_the_privacy_page_is_linked_and_served():
     page = client.get("/privacy.html")
     assert page.status_code == 200
     assert "Unsubscribing deletes your details" in page.text
+
+
+def test_search_engines_are_kept_out_of_the_api_only():
+    robots = client.get("/robots.txt")
+    assert robots.status_code == 200
+    assert robots.text.splitlines() == ["User-agent: *", "Disallow: /api/"]
+    assert 'rel="canonical"' in client.get("/?confirm=abc").text
