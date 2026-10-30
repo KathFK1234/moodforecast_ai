@@ -43,6 +43,7 @@ SECURITY_HEADERS = {
 # up the weather services' allowance, or the form emails for everyone else
 api_limiter = RateLimiter(300, 60)
 form_limiter = RateLimiter(20, 3600)
+MAX_BODY_BYTES = 4096
 FORM_PATHS = ("/api/subscribe", "/api/unsubscribe-link")
 TOO_MANY_REQUESTS_MESSAGE = "That's a lot of requests in a short time. Please wait a few minutes and try again."
 
@@ -131,6 +132,10 @@ def create_app() -> FastAPI:
     async def limit_requests(request: Request, call_next):
         path = request.url.path
         if path.startswith("/api/"):
+            # The API's requests are a few short fields
+            length = request.headers.get("content-length", "0")
+            if not length.isdigit() or int(length) > MAX_BODY_BYTES:
+                return JSONResponse({"detail": "That request is too large."}, status_code=413)
             # Railway's proxy says who the visitor is; without one there's the connection
             visitor = request.headers.get("x-real-ip") or (request.client.host if request.client else "")
             limiter = form_limiter if path in FORM_PATHS and request.method == "POST" else api_limiter

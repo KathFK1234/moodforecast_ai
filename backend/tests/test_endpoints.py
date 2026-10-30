@@ -867,3 +867,7 @@ class TestRateLimits:
         assert client.get("/api/activities").status_code == 429
         assert client.get("/").status_code == 200
         assert client.get("/health").status_code == 200
+    
+    def test_an_oversized_request_is_refused_unread(self):
+        response = client.post("/api/subscribe", content=b"x" * 5000, headers={"content-type": "application/json"})
+        assert response.status_code == 413
