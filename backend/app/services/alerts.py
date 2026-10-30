@@ -212,10 +212,13 @@ async def send_once(to: str, email: Email, kind: str, token: str | None = None) 
     if not _form_email_allowance_left():
         logger.warning("Daily limit of %d form emails reached, not sent", MAX_FORM_EMAILS_PER_DAY)
         return False
+    # Marked before sending: a second request arriving during the send must not send again
+    _recently_sent.set(cache_key, True)
     sent = await send_to(to, email, token)
     if sent:
-        _recently_sent.set(cache_key, True)
         _form_emails_sent.append(time.time())
+    else:
+        _recently_sent.delete(cache_key)
     return sent
 
 

@@ -1,5 +1,6 @@
 """Unit tests for alert emails and the daily send - SMTP and weather are faked."""
 
+import asyncio
 import random
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
@@ -143,6 +144,29 @@ class TestIsDue:
     def test_alert_hour_is_configurable(self, monkeypatch):
         monkeypatch.setattr(settings, "alert_hour", 9)
         assert alerts.is_due(make_subscriber(), MORNING) is False
+
+
+class TestSendOnce:
+    """Test the one-email-per-address guard on the site's forms."""
+    
+    @pytest.mark.asyncio
+    async def test_requests_at_the_same_moment_send_one_email(self, outbox):
+        email = alerts.Email("Subject", "Text", "<p>Html</p>")
+        
+        results = await asyncio.gather(*[alerts.send_once("a@example.com", email, "confirm") for _ in range(3)])
+        
+        assert results == [True, True, True]
+        assert len(outbox) == 1
+    
+    @pytest.mark.asyncio
+    async def test_a_failed_send_can_be_tried_again_straight_away(self, outbox):
+        email = alerts.Email("Subject", "Text", "<p>Html</p>")
+        
+        with patch("app.services.alerts.send_to", AsyncMock(return_value=False)):
+            assert await alerts.send_once("a@example.com", email, "confirm") is False
+        
+        assert await alerts.send_once("a@example.com", email, "confirm") is True
+        assert len(outbox) == 1
 
 
 class TestFormEmailLimit:
