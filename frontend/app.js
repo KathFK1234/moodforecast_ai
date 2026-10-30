@@ -823,7 +823,7 @@ function showUnsubscribePrompt(token) {
             confirm.classList.add('hidden');
             showNotice(msg, `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
             const saved = savedSubscription();
-            if (saved && saved.token === token) rememberSubscription(null);
+            if (saved && saved.email === data.email) rememberSubscription(null);
             // Drop the token from the address bar so a reload doesn't ask again
             window.history.replaceState(null, '', window.location.pathname);
         } catch (error) {
