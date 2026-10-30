@@ -66,6 +66,11 @@ class HideTokens(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(HideTokens())
 
+# Without this the app's own INFO lines, such as how many alerts went out, are
+# dropped. httpx logs every request's address at INFO, which is only noise here.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(name)s: %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 class RevalidatedStaticFiles(StaticFiles):
     """

@@ -871,3 +871,8 @@ class TestRateLimits:
     def test_an_oversized_request_is_refused_unread(self):
         response = client.post("/api/subscribe", content=b"x" * 5000, headers={"content-type": "application/json"})
         assert response.status_code == 413
+
+
+def test_the_apps_info_lines_are_logged_and_httpx_is_quiet():
+    assert logging.getLogger("app.services.alerts").getEffectiveLevel() <= logging.INFO
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
