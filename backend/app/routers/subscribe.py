@@ -1,6 +1,5 @@
 """Subscribe router - GET /api/alerts; POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
-import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,14 +15,13 @@ from app.models.schemas import (
     UnsubscribeLinkResponse,
     UnsubscribeResponse,
 )
-from app.routers.common import TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, resolve_location
+from app.routers.common import friendly_errors, resolve_location
 from app.services import alerts, mailer
 from app.services.activity_advisor import find_activity
 from app.services.locality import build_place, local_issue
 from app.services.weather import get_weather_client
 
 router = APIRouter(prefix="/api", tags=["subscribe"])
-logger = logging.getLogger(__name__)
 
 
 CONFIRM_HOURS = alerts.CONFIRM_HOURS
@@ -38,6 +36,7 @@ async def alerts_status() -> AlertsStatus:
 
 
 @router.post("/subscribe", status_code=202)
+@friendly_errors
 async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     """
     Ask for daily alerts about a location, or for a change to existing ones.
@@ -55,67 +54,54 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     if not mailer.is_configured():
         raise HTTPException(status_code=503, detail=EMAIL_UNAVAILABLE_MESSAGE)
     
-    try:
-        client = get_weather_client()
-        lat, lon, place = await resolve_location(client, request.location)
-        forecast = await client.get_forecast(lat, lon)
-        
-        # A daily report on something the place can't offer would only ever say no
-        if request.activity:
-            local_place = build_place(place, lat, forecast, await client.get_sea(lat, lon))
-            issue = local_issue(find_activity(request.activity).needs, request.activity, local_place)
-            if issue and issue[0] == 2:
-                raise HTTPException(status_code=422, detail=f"{issue[1]} Pick another activity.")
-        
-        # A link went out minutes ago and no new one will until the guard
-        # lifts, so say so rather than store details the emailed link won't apply
-        if alerts.recently_sent(request.email, "confirm"):
-            return SubscribeResponse(
-                email=request.email,
-                location=place,
-                activity=request.activity,
-                status="already_sent",
-                confirmation_sent=True
-            )
-        
-        pending = PendingSubscription(
-            token=secrets.token_urlsafe(24),
-            email=request.email,
-            location=request.location,
-            place=place,
-            lat=lat,
-            lon=lon,
-            utc_offset_seconds=forecast.get("utc_offset_seconds", 0),
-            activity=request.activity,
-            language=request.language,
-        )
-        with Session(get_engine()) as session:
-            session.add(pending)
-            session.commit()
-            session.refresh(pending)
-        
-        confirmation_sent = await alerts.send_once(
-            pending.email, alerts.confirm_email(pending, CONFIRM_HOURS), "confirm"
-        )
-        
+    client = get_weather_client()
+    lat, lon, place = await resolve_location(client, request.location)
+    forecast = await client.get_forecast(lat, lon)
+    
+    # A daily report on something the place can't offer would only ever say no
+    if request.activity:
+        local_place = build_place(place, lat, forecast, await client.get_sea(lat, lon))
+        issue = local_issue(find_activity(request.activity).needs, request.activity, local_place)
+        if issue and issue[0] == 2:
+            raise HTTPException(status_code=422, detail=f"{issue[1]} Pick another activity.")
+    
+    # A link went out minutes ago and no new one will until the guard
+    # lifts, so say so rather than store details the emailed link won't apply
+    if alerts.recently_sent(request.email, "confirm"):
         return SubscribeResponse(
-            email=pending.email,
-            location=pending.place,
-            activity=pending.activity,
-            confirmation_sent=confirmation_sent
+            email=request.email,
+            location=place,
+            activity=request.activity,
+            status="already_sent",
+            confirmation_sent=True
         )
     
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception:
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+    pending = PendingSubscription(
+        token=secrets.token_urlsafe(24),
+        email=request.email,
+        location=request.location,
+        place=place,
+        lat=lat,
+        lon=lon,
+        utc_offset_seconds=forecast.get("utc_offset_seconds", 0),
+        activity=request.activity,
+        language=request.language,
+    )
+    with Session(get_engine()) as session:
+        session.add(pending)
+        session.commit()
+        session.refresh(pending)
+    
+    confirmation_sent = await alerts.send_once(
+        pending.email, alerts.confirm_email(pending, CONFIRM_HOURS), "confirm"
+    )
+    
+    return SubscribeResponse(
+        email=pending.email,
+        location=pending.place,
+        activity=pending.activity,
+        confirmation_sent=confirmation_sent
+    )
 
 
 @router.post("/confirm/{token}")

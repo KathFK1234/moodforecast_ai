@@ -1,15 +1,13 @@
 """Activity router - GET /api/activity, /api/random-activity and /api/activities"""
 
-import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from app.services.weather import get_weather_client
 from app.services.activity_advisor import ACTIVITIES, check_activity, group_of, local_activities, random_activity
 from app.services.locality import LOCAL_FAVOURITES
 from app.models.schemas import ActivityChoice, ActivityResponse
-from app.routers.common import LocationPath, TIMEOUT_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, local_weather
+from app.routers.common import friendly_errors, local_weather, LocationPath
 
 router = APIRouter(prefix="/api", tags=["activity"])
-logger = logging.getLogger(__name__)
 
 
 @router.get("/activities")
@@ -19,6 +17,7 @@ async def list_activities() -> list[str]:
 
 
 @router.get("/activities/{location}")
+@friendly_errors
 async def list_local_activities(location: LocationPath) -> list[ActivityChoice]:
     """
     The activities that are practical at a location, local favourites first.
@@ -29,34 +28,22 @@ async def list_local_activities(location: LocationPath) -> list[ActivityChoice]:
     Leaves out what the place can't offer (sea activities inland, snow sports
     away from snow country) and sports that aren't commonly played there.
     """
-    try:
-        client = get_weather_client()
-        _, weather, place = await local_weather(client, location)
-        favourites = LOCAL_FAVOURITES.get(place.country, ())
-        return [
-            ActivityChoice(
-                name=activity.name,
-                prompt=activity.prompt,
-                group=group_of(activity),
-                favourite=activity.name in favourites,
-            )
-            for activity in local_activities(place, weather.condition)
-        ]
-    
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception:
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+    client = get_weather_client()
+    _, weather, place = await local_weather(client, location)
+    favourites = LOCAL_FAVOURITES.get(place.country, ())
+    return [
+        ActivityChoice(
+            name=activity.name,
+            prompt=activity.prompt,
+            group=group_of(activity),
+            favourite=activity.name in favourites,
+        )
+        for activity in local_activities(place, weather.condition)
+    ]
 
 
 @router.get("/activity/{location}")
+@friendly_errors
 async def get_activity_advice(
     location: LocationPath,
     activity: str = Query(
@@ -74,38 +61,26 @@ async def get_activity_advice(
     Returns a verdict (go, maybe or skip) with the reasons behind it, something
     to do instead when the answer is no, and other places to compare.
     """
-    try:
-        client = get_weather_client()
-        resolved_location, weather, place = await local_weather(client, location)
-        
-        advice = check_activity(
-            activity,
-            resolved_location,
-            weather.condition,
-            weather.temp_c,
-            weather.humidity,
-            weather.wind_kph,
-            weather.is_day,
-            searched_as=location,
-            place=place
-        )
-        
-        return ActivityResponse(location=resolved_location, weather=weather, **advice)
+    client = get_weather_client()
+    resolved_location, weather, place = await local_weather(client, location)
     
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception:
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+    advice = check_activity(
+        activity,
+        resolved_location,
+        weather.condition,
+        weather.temp_c,
+        weather.humidity,
+        weather.wind_kph,
+        weather.is_day,
+        searched_as=location,
+        place=place
+    )
+    
+    return ActivityResponse(location=resolved_location, weather=weather, **advice)
 
 
 @router.get("/random-activity/{location}")
+@friendly_errors
 async def get_random_activity(
     location: LocationPath,
     exclude: str = Query("", max_length=40, description="An activity name to leave out, to get a different pick")
@@ -118,32 +93,19 @@ async def get_random_activity(
     
     Returns the same shape as the activity check, with the verdict always "go".
     """
-    try:
-        client = get_weather_client()
-        resolved_location, weather, place = await local_weather(client, location)
-        
-        advice = random_activity(
-            resolved_location,
-            weather.condition,
-            weather.temp_c,
-            weather.humidity,
-            weather.wind_kph,
-            weather.is_day,
-            searched_as=location,
-            exclude=exclude,
-            place=place
-        )
-        
-        return ActivityResponse(location=resolved_location, weather=weather, **advice)
+    client = get_weather_client()
+    resolved_location, weather, place = await local_weather(client, location)
     
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except TimeoutError:
-        raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
-    except Exception:
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+    advice = random_activity(
+        resolved_location,
+        weather.condition,
+        weather.temp_c,
+        weather.humidity,
+        weather.wind_kph,
+        weather.is_day,
+        searched_as=location,
+        exclude=exclude,
+        place=place
+    )
+    
+    return ActivityResponse(location=resolved_location, weather=weather, **advice)

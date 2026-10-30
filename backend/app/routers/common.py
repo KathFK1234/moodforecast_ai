@@ -1,11 +1,16 @@
 """Helpers shared by the forecast and wellbeing routers."""
 
+import logging
+from collections.abc import Awaitable, Callable
+from functools import wraps
 from typing import Annotated, Any
 from fastapi import HTTPException, Path
 from app.models.schemas import MAX_LOCATION_LENGTH, WeatherData
 from app.services.locality import Place, build_place
 from app.services.weather import WeatherClient
 
+
+logger = logging.getLogger(__name__)
 
 # A location in a URL, e.g. /api/forecast/{location}
 LocationPath = Annotated[str, Path(max_length=MAX_LOCATION_LENGTH, description="City or town, e.g. 'Kisumu, Kenya'")]
@@ -15,6 +20,26 @@ TIMEOUT_MESSAGE = "The weather service is taking too long to answer. Please try 
 UNAVAILABLE_MESSAGE = "The weather service can't be reached right now. Please try again in a moment."
 # The details of an unexpected error go to the log, not to the visitor
 UNEXPECTED_MESSAGE = "Something went wrong on our side. Please try again."
+
+
+def friendly_errors(route: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    """Turn a route's failures into responses that tell the visitor what to do next."""
+    @wraps(route)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return await route(*args, **kwargs)
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except TimeoutError:
+            raise HTTPException(status_code=504, detail=TIMEOUT_MESSAGE)
+        except RuntimeError:
+            raise HTTPException(status_code=503, detail=UNAVAILABLE_MESSAGE)
+        except Exception:
+            logger.exception("Unexpected error")
+            raise HTTPException(status_code=500, detail=UNEXPECTED_MESSAGE)
+    return wrapper
 
 
 async def resolve_location(client: WeatherClient, location: str) -> tuple[float, float, str]:

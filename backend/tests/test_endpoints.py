@@ -876,3 +876,24 @@ class TestRateLimits:
 def test_the_apps_info_lines_are_logged_and_httpx_is_quiet():
     assert logging.getLogger("app.services.alerts").getEffectiveLevel() <= logging.INFO
     assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
+
+
+@pytest.mark.parametrize("path", [
+    "/api/forecast/Nairobi",
+    "/api/wellbeing/Nairobi",
+    "/api/activities/Nairobi",
+    "/api/activity/Nairobi?activity=run",
+    "/api/random-activity/Nairobi",
+])
+@pytest.mark.parametrize("failure, status, words", [
+    (TimeoutError("slow"), 504, "taking too long"),
+    (RuntimeError("down"), 503, "can't be reached"),
+    (ValueError("Not usable"), 422, "Not usable"),
+    (KeyError("surprise"), 500, "went wrong on our side"),
+])
+def test_every_weather_route_explains_its_failures(mock_weather, path, failure, status, words):
+    mock_weather.get_forecast.side_effect = failure
+    mock_weather.get_current.side_effect = failure
+    response = client.get(path)
+    assert response.status_code == status
+    assert words in response.json()["detail"]
