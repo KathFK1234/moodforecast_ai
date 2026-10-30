@@ -151,6 +151,17 @@ def test_brevo_refusal_becomes_a_mail_error_without_the_key(brevo):
     assert len(sent) == 1  # Only a 400 about the headers is worth a second try
 
 
+@pytest.mark.parametrize("mail_from", ['"MoodForecast <a@example.com>"', "MoodForecast [a@example.com]", "MoodForecast"])
+def test_a_malformed_mail_from_is_named_and_never_reaches_brevo(brevo, monkeypatch, mail_from):
+    sent, _ = brevo
+    monkeypatch.setattr(settings, "mail_from", mail_from)
+    
+    with pytest.raises(mailer.MailError, match="MAIL_FROM is not valid"):
+        send("amina@example.com", "Subject", "Body")
+    
+    assert sent == []
+
+
 def test_brevo_unreachable_becomes_a_mail_error(brevo):
     _, state = brevo
     

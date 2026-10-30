@@ -112,9 +112,11 @@ async def send_with_brevo(
     MAIL_FROM must be a sender verified in Brevo. If Brevo refuses (400) an
     email carrying extra headers (List-Unsubscribe), it is tried once more
     without them: the unsubscribe link in the body still works. Raises
-    MailError on failure, with Brevo's reason.
+    MailError on failure, with Brevo's reason, or if MAIL_FROM isn't an address.
     """
     name, address = parseaddr(settings.mail_from)
+    if "@" not in address or " " in address:
+        raise MailError("MAIL_FROM is not valid: write it as Name <address> or just address, without quotes")
     sender = {"email": address, "name": name} if name else {"email": address}
     payload = {
         "sender": sender,
