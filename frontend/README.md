@@ -19,6 +19,7 @@ The frontend is intentionally minimal:
 | `app.js` | Search, rendering and subscribe logic |
 | `styles.css` | Styling |
 | `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | Icons |
+| `og-image.png` | The card shown when a link to the site is shared |
 
 ## How It Is Served
 
