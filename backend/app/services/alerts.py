@@ -344,8 +344,14 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
             
             # Follow daylight saving changes
             subscriber.utc_offset_seconds = forecast.get("utc_offset_seconds", subscriber.utc_offset_seconds)
-            sea = await client.get_sea(subscriber.lat, subscriber.lon)
-            if await send(subscriber, daily_email(subscriber, forecast, sea=sea)):
+            try:
+                sea = await client.get_sea(subscriber.lat, subscriber.lon)
+                email = daily_email(subscriber, forecast, sea=sea)
+            except Exception:
+                # One subscriber's unusual data must not cost everyone after them their alert
+                logger.exception("Alert for %s could not be written, not sent", subscriber.place)
+                continue
+            if await send(subscriber, email):
                 subscriber.last_sent_on = local_date(subscriber.utc_offset_seconds, now_utc)
                 sent += 1
             session.add(subscriber)

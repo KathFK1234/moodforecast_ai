@@ -172,6 +172,27 @@ class TestSendDueAlerts:
         assert len(outbox) == 1
     
     @pytest.mark.asyncio
+    async def test_an_alert_that_cant_be_written_only_costs_that_subscriber(self, engine, weather, outbox):
+        add(
+            engine,
+            make_subscriber(),
+            make_subscriber(id="sub-2", email="ben@example.com", token="tok-2"),
+        )
+        real_daily_email = alerts.daily_email
+        
+        def fail_for_the_first(subscriber, forecast, sea=None):
+            if subscriber.id == "sub-1":
+                raise KeyError("condition")
+            return real_daily_email(subscriber, forecast, sea=sea)
+        
+        with patch("app.services.alerts.get_engine", return_value=engine), \
+                patch("app.services.alerts.daily_email", fail_for_the_first):
+            assert await alerts.send_due_alerts(MORNING) == 1
+        
+        assert [message["To"] for _, message in outbox] == ["ben@example.com"]
+        assert stored(engine).last_sent_on is None
+    
+    @pytest.mark.asyncio
     async def test_a_failed_send_is_retried_on_the_next_run(self, engine, weather, outbox, monkeypatch):
         add(engine, make_subscriber())
         working_smtp = mailer.smtplib.SMTP
