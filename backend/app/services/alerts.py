@@ -11,6 +11,8 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
 from urllib.parse import quote
+from sqlalchemy import and_, delete, or_
+from sqlalchemy.orm.exc import StaleDataError
 from sqlmodel import Session, select
 from app.config import settings
 from app.models.db import PendingSubscription, Subscriber, create_tables, get_engine
@@ -353,11 +355,13 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
     sent = 0
     
     with Session(get_engine()) as session:
-        subscribers = session.exec(
-            select(Subscriber).where(Subscriber.active == True, Subscriber.confirmed == True)  # noqa: E712
+        subscriber_ids = session.exec(
+            select(Subscriber.id).where(Subscriber.active == True, Subscriber.confirmed == True)  # noqa: E712
         ).all()
-        for subscriber in subscribers:
-            if not (force or is_due(subscriber, now_utc)):
+        for subscriber_id in subscriber_ids:
+            # Fetched one at a time: anyone can unsubscribe, deleting their row, during the run
+            subscriber = session.get(Subscriber, subscriber_id)
+            if subscriber is None or not (force or is_due(subscriber, now_utc)):
                 continue
             try:
                 forecast = await client.get_forecast(subscriber.lat, subscriber.lon)
@@ -378,7 +382,7 @@ async def send_due_alerts(now_utc: datetime | None = None, force: bool = False) 
                 subscriber.last_sent_on = local_date(subscriber.utc_offset_seconds, now_utc)
                 sent += 1
             session.add(subscriber)
-            session.commit()
+            _commit_unless_deleted(session)
     
     return sent
 
@@ -389,7 +393,7 @@ async def request_confirmations(now_utc: datetime | None = None) -> int:
     
     Their alerts are paused until they follow the link. A subscriber is marked
     as asked only once the email has gone out, so a failure is retried on the
-    next run; after that they are never emailed again unless they sign up anew.
+    next run; if they still do not confirm, delete_unused_data removes them.
     
     Returns the number of emails sent.
     """
@@ -397,13 +401,16 @@ async def request_confirmations(now_utc: datetime | None = None) -> int:
     sent = 0
     with Session(get_engine()) as session:
         unconfirmed = session.exec(
-            select(Subscriber).where(
+            select(Subscriber.id).where(
                 Subscriber.active == True,  # noqa: E712
                 Subscriber.confirmed == False,  # noqa: E712
                 Subscriber.confirm_requested_at == None,  # noqa: E711
             )
         ).all()
-        for subscriber in unconfirmed:
+        for subscriber_id in unconfirmed:
+            subscriber = session.get(Subscriber, subscriber_id)
+            if subscriber is None:
+                continue
             pending = PendingSubscription(
                 token=secrets.token_urlsafe(24),
                 email=subscriber.email,
@@ -423,8 +430,36 @@ async def request_confirmations(now_utc: datetime | None = None) -> int:
                 sent += 1
             else:
                 session.delete(pending)
-            session.commit()
+            _commit_unless_deleted(session)
     return sent
+
+
+def delete_unused_data(now_utc: datetime | None = None) -> int:
+    """
+    Delete what will never be used again: subscribers who have unsubscribed,
+    earlier subscribers who didn't confirm in time, and requests nobody confirmed.
+    
+    Returns the number of records deleted.
+    """
+    cutoff = (now_utc or datetime.now(timezone.utc)) - timedelta(hours=CONFIRM_HOURS)
+    with Session(get_engine()) as session:
+        subscribers = session.exec(delete(Subscriber).where(
+            or_(
+                Subscriber.active == False,  # noqa: E712
+                and_(Subscriber.confirmed == False, Subscriber.confirm_requested_at < cutoff),  # noqa: E712
+            )
+        ))
+        requests = session.exec(delete(PendingSubscription).where(PendingSubscription.created_at < cutoff))
+        session.commit()
+        return subscribers.rowcount + requests.rowcount
+
+
+def _commit_unless_deleted(session: Session) -> None:
+    """Save a subscriber's progress, unless they unsubscribed while their email was going out."""
+    try:
+        session.commit()
+    except StaleDataError:
+        session.rollback()
 
 
 async def run_alert_loop() -> None:
@@ -437,6 +472,10 @@ async def run_alert_loop() -> None:
             sent = await send_due_alerts()
             if sent:
                 logger.info("Sent %d daily alert(s)", sent)
+            # Last, so a problem here can't cost anyone their alert
+            deleted = delete_unused_data()
+            if deleted:
+                logger.info("Deleted %d record(s) no longer needed", deleted)
         except Exception:
             logger.exception("Daily alert run failed")
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)

@@ -2,7 +2,7 @@
 
 import asyncio
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import time
@@ -169,6 +169,40 @@ class TestSendOnce:
         assert len(outbox) == 1
 
 
+class TestDeleteUnusedData:
+    """Test that details nobody will use again are deleted."""
+    
+    def test_deletes_only_what_will_not_be_used(self, engine):
+        old = MORNING - timedelta(hours=alerts.CONFIRM_HOURS + 1)
+        recent = MORNING - timedelta(hours=1)
+        add(
+            engine,
+            make_subscriber(id="keep-confirmed", email="a@example.com", token="a"),
+            make_subscriber(id="keep-not-asked", email="b@example.com", token="b", confirmed=False),
+            make_subscriber(
+                id="keep-still-time", email="c@example.com", token="c", confirmed=False, confirm_requested_at=recent
+            ),
+            make_subscriber(id="unsubscribed", email="d@example.com", token="d", active=False),
+            make_subscriber(
+                id="never-confirmed", email="e@example.com", token="e", confirmed=False, confirm_requested_at=old
+            ),
+        )
+        shared = {"location": "Nairobi", "place": "Nairobi, KE", "lat": -1.3, "lon": 36.8}
+        with Session(engine) as session:
+            session.add(PendingSubscription(token="old", email="f@example.com", created_at=old, **shared))
+            session.add(PendingSubscription(token="new", email="g@example.com", created_at=recent, **shared))
+            session.commit()
+        
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert alerts.delete_unused_data(MORNING) == 3
+        
+        with Session(engine) as session:
+            kept = {subscriber.id for subscriber in session.exec(select(Subscriber))}
+            requests = [request.token for request in session.exec(select(PendingSubscription))]
+        assert kept == {"keep-confirmed", "keep-not-asked", "keep-still-time"}
+        assert requests == ["new"]
+
+
 class TestFormEmailLimit:
     """Test the daily limit on emails sent from the site's forms."""
     
@@ -208,6 +242,32 @@ class TestSendDueAlerts:
         assert outbox[0][1]["List-Unsubscribe"] == "<https://moodforecast.test/api/unsubscribe/tok-1>"
         assert stored(engine).last_sent_on == "2026-10-05"
         assert stored(engine, "sub-2").last_sent_on is None
+    
+    @pytest.mark.asyncio
+    async def test_unsubscribing_during_the_run_only_affects_that_subscriber(self, engine, weather, outbox):
+        add(
+            engine,
+            make_subscriber(),
+            make_subscriber(id="sub-2", email="ben@example.com", token="tok-2"),
+            make_subscriber(id="sub-3", email="chao@example.com", token="tok-3"),
+        )
+        real_send = alerts.send
+        
+        async def unsubscribe_someone(subscriber, email):
+            sent = await real_send(subscriber, email)
+            if subscriber.id == "sub-1":
+                with Session(engine) as other:
+                    other.delete(other.get(Subscriber, "sub-1"))
+                    other.delete(other.get(Subscriber, "sub-2"))
+                    other.commit()
+            return sent
+        
+        with patch("app.services.alerts.get_engine", return_value=engine), \
+                patch("app.services.alerts.send", unsubscribe_someone):
+            await alerts.send_due_alerts(MORNING)
+        
+        assert [message["To"] for _, message in outbox] == ["amina@example.com", "chao@example.com"]
+        assert stored(engine, "sub-3").last_sent_on == "2026-10-05"
     
     @pytest.mark.asyncio
     async def test_a_second_run_the_same_day_sends_nothing(self, engine, weather, outbox):

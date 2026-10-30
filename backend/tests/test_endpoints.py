@@ -219,11 +219,6 @@ def test_a_confirmation_link_expires(mock_weather, outbox):
             session.add(pending)
             session.commit()
         assert client.post(f"/api/confirm/{confirm_token(outbox)}").status_code == 404
-        # A new request clears out ones nobody confirmed in time
-        alerts._recently_sent.clear()
-        client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"})
-        with Session(engine) as session:
-            assert [p.email for p in session.exec(select(PendingSubscription))] == ["ben@example.com"]
 
 
 def test_an_earlier_subscriber_confirms_from_the_emailed_link(mock_weather, outbox):
@@ -317,12 +312,14 @@ def test_subscribe_rejects_unknown_location(mock_weather, outbox):
     assert outbox == []
 
 
-def test_unsubscribe(mock_weather, outbox):
-    """POST /api/unsubscribe/{token} should stop the alerts, and subscribing again restarts them."""
+def test_unsubscribe_deletes_the_subscriber(mock_weather, outbox):
+    """POST /api/unsubscribe/{token} should delete their details; subscribing again starts afresh."""
     engine = memory_engine()
     
     with patch('app.routers.subscribe.get_engine', return_value=engine):
         subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+        alerts._recently_sent.clear()
+        assert client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"}).status_code == 202
         with Session(engine) as session:
             token = session.exec(select(Subscriber)).one().token
         
@@ -330,17 +327,21 @@ def test_unsubscribe(mock_weather, outbox):
         assert response.status_code == 200
         assert response.json() == {"email": "amina@example.com", "status": "unsubscribed"}
         with Session(engine) as session:
-            assert session.exec(select(Subscriber)).one().active is False
+            assert session.exec(select(Subscriber)).all() == []
+            assert session.exec(select(PendingSubscription)).all() == []
         
-        # Unsubscribing twice is harmless
-        assert client.post(f"/api/unsubscribe/{token}").status_code == 200
+        # Using the link twice says so
+        repeat = client.post(f"/api/unsubscribe/{token}")
+        assert repeat.status_code == 404
+        assert "already unsubscribed" in repeat.json()["detail"]
         
+        alerts._recently_sent.clear()
         again = subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
         assert again.json()["status"] == "subscribed"
         with Session(engine) as session:
             subscriber = session.exec(select(Subscriber)).one()
             assert subscriber.active is True
-            assert subscriber.token == token
+            assert subscriber.token != token
 
 
 def test_unsubscribe_unknown_token(mock_weather):

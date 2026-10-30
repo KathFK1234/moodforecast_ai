@@ -90,10 +90,6 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
             language=request.language,
         )
         with Session(get_engine()) as session:
-            # Requests nobody confirmed in time are dropped
-            cutoff = utc_now() - timedelta(hours=CONFIRM_HOURS)
-            for expired in session.exec(select(PendingSubscription).where(PendingSubscription.created_at < cutoff)):
-                session.delete(expired)
             session.add(pending)
             session.commit()
             session.refresh(pending)
@@ -188,22 +184,29 @@ async def confirm(token: str) -> ConfirmResponse:
 @router.post("/unsubscribe/{token}")
 async def unsubscribe(token: str) -> UnsubscribeResponse:
     """
-    Stop daily alerts for the subscription the token belongs to.
+    Stop daily alerts and delete the subscriber's details.
     
-    The token comes from the link in every email to a subscriber. Unsubscribing twice is fine. Returns 404 for an unknown token.
+    The token comes from the link in every email to a subscriber. Requests
+    waiting for the same address go too. Subscribing again starts afresh with
+    a new token. Returns 404 for an unknown token, which includes one already
+    used.
     """
-    engine = get_engine()
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         subscriber = session.exec(
             select(Subscriber).where(Subscriber.token == token)
         ).first()
         if subscriber is None:
-            raise HTTPException(status_code=404, detail="Subscription not found")
+            raise HTTPException(
+                status_code=404,
+                detail="This link has already been used, so you're already unsubscribed."
+            )
         
-        subscriber.active = False
-        session.add(subscriber)
+        email = subscriber.email
+        for request in session.exec(select(PendingSubscription).where(PendingSubscription.email == email)):
+            session.delete(request)
+        session.delete(subscriber)
         session.commit()
-        return UnsubscribeResponse(email=subscriber.email)
+        return UnsubscribeResponse(email=email)
 
 
 @router.post("/unsubscribe-link", status_code=202)

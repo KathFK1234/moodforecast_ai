@@ -273,7 +273,7 @@ Confirms a request with the token from its email: starts the alerts, or applies 
 
 ### POST /api/unsubscribe/{token}
 
-Stops the alerts for the subscription the token belongs to. The token is in the link in every email sent to a subscriber. Returns `{"email": "...", "status": "unsubscribed"}`, or 404 for an unknown token. Subscribing again with the same email, and confirming, turns the alerts back on.
+Stops the alerts and deletes the subscriber's details, along with any request waiting for that address. The token is in the link in every email sent to a subscriber. Returns `{\"email\": \"...\", \"status\": \"unsubscribed\"}`, or 404 for an unknown token, which includes one already used. Subscribing again and confirming starts afresh.
 
 ### POST /api/unsubscribe-link
 
@@ -438,13 +438,15 @@ Five emails exist, all composed in `app/services/alerts.py` as plain text with a
 
 - **Confirmation request** - sent when someone asks for alerts or a change to them, with the link that starts them
 - **Welcome** - sent once the address is confirmed, with the unsubscribe link
-- **Request to confirm** - sent once to each subscriber from before addresses had to be confirmed. Their alerts are paused until they follow its link, which works for 48 hours; after that they are not emailed again unless they sign up anew. The background loop sends these as soon as email is configured
+- **Request to confirm** - sent once to each subscriber from before addresses had to be confirmed. Their alerts are paused until they follow its link, which works for 48 hours; after that their details are deleted, and they would need to sign up anew. The background loop sends these as soon as email is configured
 - **Daily alert** - only to confirmed subscribers: current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
 The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default). Together they are limited to 100 emails a day across all addresses (`MAX_FORM_EMAILS_PER_DAY` in `app/services/alerts.py`), so they can't use up the mail provider's daily allowance.
 
 Every email to a subscriber ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
+
+Details are not kept once they have no use: unsubscribing deletes a subscriber straight away, and the background loop deletes requests nobody confirmed within 48 hours and earlier subscribers who didn't confirm in time. Brevo keeps its own logs of sent emails for a period set by its plan.
 
 The daily send runs inside the web process: a background task started with the app checks every 15 minutes for subscribers where it is past `ALERT_HOUR` local time and today's alert has not gone out. A subscriber is marked as sent only after their email is accepted, so a failed send is retried on the next check. Someone who subscribes after `ALERT_HOUR` gets their first alert the next morning. Because the task runs in every process, run a single instance of the app, or each one will send its own copy.
 
