@@ -171,7 +171,10 @@ async def _search_open_meteo(location: str) -> dict | None:
     the rest is used to choose between places of that name. Returns None if
     nothing matches or this lookup fails too.
     """
-    name, *hints = [part.strip().lower() for part in location.split(",") if part.strip()]
+    parts = [part.strip().lower() for part in location.split(",") if part.strip()]
+    if not parts:
+        return None
+    name, *hints = parts
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(

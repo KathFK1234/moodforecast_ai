@@ -327,3 +327,8 @@ async def test_lookups_that_would_wait_too_long_use_the_fallback(monkeypatch):
     result = await geocoding.get_coordinates("Eldoret")
     assert hosts == ["nominatim.openstreetmap.org", "geocoding-api.open-meteo.com"]
     assert result["lat"] == pytest.approx(0.52)
+
+
+@pytest.mark.asyncio
+async def test_a_location_of_only_commas_is_no_match_for_the_fallback_geocoder():
+    assert await geocoding._search_open_meteo(" , ,") is None
