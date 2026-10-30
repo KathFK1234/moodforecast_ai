@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
+import time
 import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -142,6 +143,27 @@ class TestIsDue:
     def test_alert_hour_is_configurable(self, monkeypatch):
         monkeypatch.setattr(settings, "alert_hour", 9)
         assert alerts.is_due(make_subscriber(), MORNING) is False
+
+
+class TestFormEmailLimit:
+    """Test the daily limit on emails sent from the site's forms."""
+    
+    @pytest.mark.asyncio
+    async def test_nothing_more_is_sent_once_the_limit_is_reached(self, outbox, monkeypatch):
+        monkeypatch.setattr(alerts, "MAX_FORM_EMAILS_PER_DAY", 2)
+        email = alerts.Email("Subject", "Text", "<p>Html</p>")
+        
+        results = [await alerts.send_once(f"p{n}@example.com", email, "confirm") for n in range(3)]
+        
+        assert results == [True, True, False]
+        assert len(outbox) == 2
+    
+    @pytest.mark.asyncio
+    async def test_a_day_old_send_no_longer_counts(self, outbox, monkeypatch):
+        monkeypatch.setattr(alerts, "MAX_FORM_EMAILS_PER_DAY", 1)
+        alerts._form_emails_sent.append(time.time() - 86401)
+        
+        assert await alerts.send_once("a@example.com", alerts.Email("S", "T", "H"), "confirm") is True
 
 
 class TestSendDueAlerts:

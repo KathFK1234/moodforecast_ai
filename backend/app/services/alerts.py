@@ -6,6 +6,8 @@ import logging
 import random
 import secrets
 import sys
+import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
 from urllib.parse import quote
@@ -31,6 +33,12 @@ CONFIRM_HOURS = 48
 # Emails anyone can trigger from the site's forms, recently sent, by kind and address.
 # Kept apart from the shared cache so a burst of searches can't push these out early.
 _recently_sent = TTLCache(settings.cache_ttl_seconds)
+
+# Emails the site's forms may send in a day, across all addresses. Stops someone
+# typing in thousands of addresses from using up the mail provider's daily
+# allowance (300 on Brevo's free plan), which the daily alerts need too.
+MAX_FORM_EMAILS_PER_DAY = 100
+_form_emails_sent: deque[float] = deque()
 
 # A paragraph is plain text, or (text, link label, link url)
 Paragraph = str | tuple[str, str, str]
@@ -175,6 +183,14 @@ def unsubscribe_link_email(subscriber: Subscriber) -> Email:
     )
 
 
+def _form_email_allowance_left() -> bool:
+    """Whether the site's forms may send another email today."""
+    day_ago = time.time() - 86400
+    while _form_emails_sent and _form_emails_sent[0] < day_ago:
+        _form_emails_sent.popleft()
+    return len(_form_emails_sent) < MAX_FORM_EMAILS_PER_DAY
+
+
 def recently_sent(to: str, kind: str) -> bool:
     """Whether send_once sent this kind of email to this address within the last cache lifetime."""
     return bool(_recently_sent.get(f"{kind}:{to}"))
@@ -186,16 +202,20 @@ async def send_once(to: str, email: Email, kind: str, token: str | None = None) 
     at most once per address per cache lifetime (10 minutes by default).
     
     Stops the subscribe and unsubscribe forms being used to flood someone's
-    inbox. Returns True if the email was sent now or is already on its way
+    inbox, and sends nothing once MAX_FORM_EMAILS_PER_DAY is reached. Returns True if the email was sent now or is already on its way
     from a moment ago. `token` is the subscriber's, for the unsubscribe
     headers, if there is one.
     """
     cache_key = f"{kind}:{to}"
     if _recently_sent.get(cache_key):
         return True
+    if not _form_email_allowance_left():
+        logger.warning("Daily limit of %d form emails reached, not sent", MAX_FORM_EMAILS_PER_DAY)
+        return False
     sent = await send_to(to, email, token)
     if sent:
         _recently_sent.set(cache_key, True)
+        _form_emails_sent.append(time.time())
     return sent
 
 

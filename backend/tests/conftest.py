@@ -38,10 +38,12 @@ def empty_cache():
     """Start every test with an empty cache, so one test's lookups and sends don't affect the next."""
     cache.clear()
     alerts._recently_sent.clear()
+    alerts._form_emails_sent.clear()
     geocoding._suggested.clear()
     yield
     cache.clear()
     alerts._recently_sent.clear()
+    alerts._form_emails_sent.clear()
     geocoding._suggested.clear()
 
 

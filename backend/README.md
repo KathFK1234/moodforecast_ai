@@ -442,7 +442,7 @@ Five emails exist, all composed in `app/services/alerts.py` as plain text with a
 - **Daily alert** - only to confirmed subscribers: current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
-The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default).
+The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default). Together they are limited to 100 emails a day across all addresses (`MAX_FORM_EMAILS_PER_DAY` in `app/services/alerts.py`), so they can't use up the mail provider's daily allowance.
 
 Every email to a subscriber ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
 
