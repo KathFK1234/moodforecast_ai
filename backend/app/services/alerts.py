@@ -105,6 +105,11 @@ def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str
     return Email(subject, text, page)
 
 
+def _about(activity: str | None) -> str:
+    """What the daily email says about the activity, for the emails describing it."""
+    return f"how the weather suits {activity}" if activity else "a new activity to try, picked to suit the weather"
+
+
 def confirm_url(token: str) -> str:
     """Link that opens the site and asks to confirm a subscription."""
     return f"{settings.public_url.rstrip('/')}/?confirm={token}"
@@ -112,10 +117,7 @@ def confirm_url(token: str) -> str:
 
 def confirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
     """Sent when someone asks for alerts: nothing else is sent until its link is followed."""
-    if pending.activity:
-        about = f"how the weather suits {pending.activity}"
-    else:
-        about = "a new activity to try, picked to suit the weather"
+    about = _about(pending.activity)
     return _compose(
         subject=f"Confirm your MoodForecast alerts for {pending.place}",
         heading="Confirm your daily alerts",
@@ -132,10 +134,7 @@ def confirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
 
 def reconfirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
     """Sent once to a subscriber from before addresses had to be confirmed."""
-    if pending.activity:
-        about = f"how the weather suits {pending.activity}"
-    else:
-        about = "a new activity to try, picked to suit the weather"
+    about = _about(pending.activity)
     return _compose(
         subject=f"Please confirm your MoodForecast alerts for {pending.place}",
         heading="Please confirm your daily alerts",
@@ -154,10 +153,7 @@ def reconfirm_email(pending: PendingSubscription, valid_hours: int) -> Email:
 
 def welcome_email(subscriber: Subscriber) -> Email:
     """Confirmation sent when someone subscribes or changes their subscription."""
-    if subscriber.activity:
-        about = f"how the weather suits {subscriber.activity}"
-    else:
-        about = "a new activity to try, picked to suit the weather"
+    about = _about(subscriber.activity)
     return _compose(
         subject=f"You're subscribed to MoodForecast for {subscriber.place}",  # Sent once confirmed
         heading=f"Daily alerts for {subscriber.place} are on",
