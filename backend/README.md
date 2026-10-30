@@ -70,6 +70,7 @@ tests/
   test_db.py             # Database URL handling (Postgres driver)
   test_dependencies.py   # constraints.txt matches the requirements files
   test_mailer.py         # Mailer tests (fake SMTP)
+  test_postgres.py       # Database code on real PostgreSQL (needs TEST_DATABASE_URL)
   test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
   test_static_sync.py    # static/ matches ../frontend
 ```
