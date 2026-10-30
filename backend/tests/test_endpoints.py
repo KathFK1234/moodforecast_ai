@@ -785,3 +785,21 @@ def test_subscribe_refuses_an_overlong_location_or_unknown_language(mock_weather
     assert long.status_code == 422
     odd = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi", "language": "xx"})
     assert odd.status_code == 422
+
+
+class TestSecurityHeaders:
+    """Test the headers that protect the page and the tokens in email links."""
+    
+    @pytest.mark.parametrize("path", ["/", "/health", "/api/alerts"])
+    def test_every_response_has_them(self, path):
+        response = client.get(path)
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["x-frame-options"] == "DENY"
+        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["strict-transport-security"] == "max-age=31536000"
+        assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    
+    def test_the_api_docs_keep_working_without_the_content_policy(self):
+        response = client.get("/docs")
+        assert response.status_code == 200
+        assert "content-security-policy" not in response.headers

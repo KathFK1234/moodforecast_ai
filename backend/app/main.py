@@ -3,7 +3,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
@@ -12,6 +12,26 @@ from app.routers import forecast, wellbeing, activity, locations, subscribe
 from app.models.schemas import HealthResponse
 from app.services import alerts, mailer
 from app.services.weather import get_weather_client
+
+
+# The page loads only its own files and Google Fonts. /docs and /redoc need
+# more, so they go without the content policy.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "style-src 'self' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; "
+    "img-src 'self' data:; "
+    "base-uri 'none'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=31536000",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    # Email links carry a subscriber's token, which must not reach other sites
+    "Referrer-Policy": "no-referrer",
+}
 
 
 class RevalidatedStaticFiles(StaticFiles):
@@ -73,6 +93,14 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET"],
     )
+    
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        if request.url.path not in ("/docs", "/redoc"):
+            response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        return response
     
     # Include routers
     app.include_router(forecast.router)
