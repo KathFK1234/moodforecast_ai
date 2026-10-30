@@ -42,3 +42,20 @@ jobs:
         run: pip install pip-audit==2.10.1
       - name: Look for known vulnerabilities in the pinned packages
         run: pip-audit -r constraints.txt --no-deps --disable-pip
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Build the image Railway deploys
+        run: docker build -t moodforecast backend
+      - name: Start it and check it answers
+        run: |
+          docker run -d --name app -p 8000:8000 -e ENVIRONMENT=production moodforecast
+          for attempt in $(seq 1 20); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          docker logs app
+          exit 1
