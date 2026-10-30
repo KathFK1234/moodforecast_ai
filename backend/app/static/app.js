@@ -659,7 +659,7 @@ async function handleSubscribe(event) {
         if (data.status === 'already_sent') {
             showNotice(
                 msg,
-                `We emailed a confirmation link to ${data.email} a few minutes ago. Use that one, or try again in 10 minutes to change the details.`,
+                `We emailed a confirmation link to ${data.email} a few minutes ago. If you don't see it, check your spam folder. Use that one, or try again in 10 minutes to change the details.`,
                 false
             );
             return;
@@ -670,7 +670,7 @@ async function handleSubscribe(event) {
         const about = data.activity ? `how the weather suits ${data.activity}` : 'a new activity to try';
         showNotice(
             msg,
-            `Almost there: we've emailed a link to ${data.email}. Once you confirm, you'll get a daily email for ${data.location} with ${about}.`,
+            `Almost there: we've emailed a link to ${data.email}. If you don't see it, check your spam folder. Once you confirm, you'll get a daily email for ${data.location} with ${about}.`,
             false
         );
     } catch (error) {
@@ -766,7 +766,7 @@ async function handleOptOut(event) {
                 throw new Error('Could not reach the server. Check your connection and try again.');
             }
             if (!res.ok) throw new Error(await errorMessage(res, 'Could not unsubscribe. Please try again.'));
-            showNotice(msg, `Check your inbox. If ${email} is subscribed, we've sent a link to finish unsubscribing.`, false);
+            showNotice(msg, `Check your inbox and spam folder. If ${email} is subscribed, we've sent a link to finish unsubscribing.`, false);
         }
         el('optOutForm').classList.add('hidden');
         el('optOutToggle').setAttribute('aria-expanded', 'false');
@@ -799,7 +799,7 @@ function showConfirmPrompt(token) {
             if (!res.ok) throw new Error(await errorMessage(res, 'Could not confirm. Please try again.'));
             const data = await res.json();
             banner.className = 'notice notice-success';
-            banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due.`;
+            banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due. If they land in spam, mark them as not spam.`;
             rememberSubscription({ email: data.email, location: data.location });
             // Drop the token from the address bar so a reload doesn't ask again
             window.history.replaceState(null, '', window.location.pathname);
