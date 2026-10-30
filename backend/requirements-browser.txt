@@ -1,0 +1,2 @@
+# For browser_tests/, on top of requirements.txt. Then run: playwright install chromium
+playwright==1.64.1

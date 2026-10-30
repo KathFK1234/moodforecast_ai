@@ -141,6 +141,8 @@ pytest tests/ -q
 
 The tests mock all network calls, so they run offline.
 
+`pytest browser_tests -q` runs the page in a real browser, after `pip install -r requirements-browser.txt` and `playwright install chromium`. `tests/test_postgres.py` runs when `TEST_DATABASE_URL` points to a PostgreSQL server whose tables it may drop. CI runs both.
+
 Two helper scripts check a full setup:
 
 ```bash
