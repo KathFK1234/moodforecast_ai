@@ -46,7 +46,7 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Location suggestions** - matching places appear as you type in either location field
 - **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim
-- **Daily email alerts** - subscribe with an email, a location and an activity (or a random pick each day); alerts start once the address is confirmed from the emailed link, then arrive every morning, local time. Every email has an unsubscribe link. Needs a Brevo API key (or SMTP settings), see below
+- **Daily email alerts** - subscribe with an email, a location and an activity (or a random pick each day); alerts start once the address is confirmed from the emailed link, then arrive every morning, local time. Every email has an unsubscribe link, and unsubscribing deletes the person's details. Needs a Brevo API key (or SMTP settings), see below
 - **Caching** - repeat requests are answered from an in-memory cache
 
 ## Project Structure

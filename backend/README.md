@@ -27,13 +27,13 @@ Requires Python 3.11 or newer.
 
 ```text
 app/
-  main.py             # FastAPI app factory, CORS, static files
+  main.py             # FastAPI app factory, CORS, security headers, rate limits, static files
   config.py           # Pydantic Settings from environment / .env
   
   routers/            # Endpoint handlers
     forecast.py       # GET /api/forecast/{location}
     wellbeing.py      # GET /api/wellbeing/{location}
-    common.py         # Location lookup and weather model shared by both
+    common.py         # Location lookup, weather model and error handling shared by the routes
     activity.py       # GET /api/activity, /api/random-activity, /api/activities[/{location}]
     locations.py      # GET /api/locations
     subscribe.py      # POST /api/subscribe, /api/unsubscribe/{token}, /api/unsubscribe-link
@@ -45,15 +45,18 @@ app/
     activity_advisor.py  # Whether an activity suits the weather and the place; random picks
     locality.py       # What a place can offer: coast, snow country, local sports and favourites
     curiosity.py      # Questions about other places
-    mailer.py         # SMTP email
+    mailer.py         # Email through Brevo's API or SMTP
     alerts.py         # Confirmation and daily alert emails, and the daily send
     cache.py          # In-memory TTL cache
+    rate_limit.py     # In-memory limit per visitor
   
   models/             # Data schemas
     schemas.py        # Pydantic request/response models
     db.py             # SQLModel table definitions
   
   static/             # Deployed copy of ../frontend (served by FastAPI)
+
+browser_tests/        # The page in a real browser (see requirements-browser.txt)
 
 tests/
   test_mood_engine.py    # Mood engine unit tests (no I/O)
