@@ -2,7 +2,6 @@
 
 import random
 
-import pytest
 from app.services import mood_engine
 from app.services.mood_engine import (
     BASELINE_SCORE,
