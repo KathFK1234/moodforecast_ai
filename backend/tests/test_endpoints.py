@@ -902,3 +902,10 @@ def test_every_weather_route_explains_its_failures(mock_weather, path, failure, 
 def test_the_page_scripts_are_compressed():
     response = client.get("/app.js", headers={"accept-encoding": "gzip"})
     assert response.headers["content-encoding"] == "gzip"
+
+
+def test_the_privacy_page_is_linked_and_served():
+    assert 'href="privacy.html"' in client.get("/").text
+    page = client.get("/privacy.html")
+    assert page.status_code == 200
+    assert "Unsubscribing deletes your details" in page.text

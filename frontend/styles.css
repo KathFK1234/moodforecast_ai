@@ -1085,6 +1085,36 @@ body {
     cursor: progress;
 }
 
+/* The privacy page */
+.privacy {
+    max-width: 680px;
+    margin: 32px auto;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.privacy h1 {
+    font-size: 28px;
+}
+
+.privacy h2 {
+    margin-top: 22px;
+    font-size: 17px;
+}
+
+.privacy p,
+.privacy ul {
+    margin-top: 8px;
+}
+
+.privacy ul {
+    padding-left: 20px;
+}
+
+.privacy a {
+    color: var(--accent-ink);
+}
+
 /* Opting out, under the subscribe form */
 .opt-out {
     margin-top: 16px;
