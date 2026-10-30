@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import re
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -9,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
-from app.main import app
+from app.main import HideTokens, app
 from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
 from app.services.cache import cache
@@ -803,3 +804,23 @@ class TestSecurityHeaders:
         response = client.get("/docs")
         assert response.status_code == 200
         assert "content-security-policy" not in response.headers
+
+
+class TestAccessLog:
+    """Test that tokens stay out of the access log."""
+    
+    @pytest.mark.parametrize("path, logged", [
+        ("/api/unsubscribe/abc-123", "/api/unsubscribe/[token]"),
+        ("/api/confirm/abc-123", "/api/confirm/[token]"),
+        ("/?unsubscribe=abc-123", "/?unsubscribe=[token]"),
+        ("/?confirm=abc-123&x=1", "/?confirm=[token]&x=1"),
+        ("/api/unsubscribe-link", "/api/unsubscribe-link"),
+        ("/api/forecast/Nairobi", "/api/forecast/Nairobi"),
+    ])
+    def test_tokens_are_hidden(self, path, logged):
+        record = logging.LogRecord(
+            "uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
+            ("100.64.0.5:1", "POST", path, "1.1", 200), None
+        )
+        assert HideTokens().filter(record) is True
+        assert record.getMessage() == f'100.64.0.5:1 - "POST {logged} HTTP/1.1" 200'

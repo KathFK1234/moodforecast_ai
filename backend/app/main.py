@@ -1,6 +1,8 @@
 """FastAPI application factory."""
 
 import asyncio
+import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -32,6 +34,25 @@ SECURITY_HEADERS = {
     # Email links carry a subscriber's token, which must not reach other sites
     "Referrer-Policy": "no-referrer",
 }
+
+
+# Paths that carry a subscriber's token, as the access log prints them
+TOKEN_IN_PATH = re.compile(r"(/api/(?:confirm|unsubscribe)/|[?&](?:confirm|unsubscribe)=)[^/?&\s]+")
+
+
+class HideTokens(logging.Filter):
+    """Keep subscribers' tokens out of the access log: anyone reading it could unsubscribe them."""
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                TOKEN_IN_PATH.sub(r"\1[token]", arg) if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(HideTokens())
 
 
 class RevalidatedStaticFiles(StaticFiles):
