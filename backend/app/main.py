@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.models.db import create_tables
@@ -122,6 +123,9 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan
     )
+    
+    # app.js and styles.css are 40 KB and more, which is slow on a mobile connection
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     
     # CORS: the page is served from this app, so other sites only need to read
     # the public GET endpoints. They can't subscribe, unsubscribe or send cookies.

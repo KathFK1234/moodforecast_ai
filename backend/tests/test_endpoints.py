@@ -897,3 +897,8 @@ def test_every_weather_route_explains_its_failures(mock_weather, path, failure, 
     response = client.get(path)
     assert response.status_code == status
     assert words in response.json()["detail"]
+
+
+def test_the_page_scripts_are_compressed():
+    response = client.get("/app.js", headers={"accept-encoding": "gzip"})
+    assert response.headers["content-encoding"] == "gzip"
