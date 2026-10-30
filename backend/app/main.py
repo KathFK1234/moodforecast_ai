@@ -6,6 +6,7 @@ import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
@@ -13,6 +14,7 @@ from app.models.db import create_tables
 from app.routers import forecast, wellbeing, activity, locations, subscribe
 from app.models.schemas import HealthResponse
 from app.services import alerts, mailer
+from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
 
@@ -33,7 +35,16 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     # Email links carry a subscriber's token, which must not reach other sites
     "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
 }
+
+# Generous for someone using the page, and low enough to stop one script using
+# up the weather services' allowance, or the form emails for everyone else
+api_limiter = RateLimiter(300, 60)
+form_limiter = RateLimiter(20, 3600)
+FORM_PATHS = ("/api/subscribe", "/api/unsubscribe-link")
+TOO_MANY_REQUESTS_MESSAGE = "That's a lot of requests in a short time. Please wait a few minutes and try again."
 
 
 # Paths that carry a subscriber's token, as the access log prints them
@@ -114,6 +125,22 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET"],
     )
+    
+    # Added first, so the security headers wrap this response too
+    @app.middleware("http")
+    async def limit_requests(request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/api/"):
+            # Railway's proxy says who the visitor is; without one there's the connection
+            visitor = request.headers.get("x-real-ip") or (request.client.host if request.client else "")
+            limiter = form_limiter if path in FORM_PATHS and request.method == "POST" else api_limiter
+            if not limiter.allow(visitor):
+                return JSONResponse(
+                    {"detail": TOO_MANY_REQUESTS_MESSAGE},
+                    status_code=429,
+                    headers={"Retry-After": str(int(limiter.window_seconds))}
+                )
+        return await call_next(request)
     
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):

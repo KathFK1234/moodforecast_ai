@@ -12,6 +12,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
+from app.services.rate_limit import RateLimiter
 
 
 FORECAST = {
@@ -410,3 +411,21 @@ class TestEarlierSubscribers:
         with patch("app.services.alerts.get_engine", return_value=engine):
             assert await alerts.request_confirmations(MORNING) == 0
         assert stored(engine).confirm_requested_at is None
+
+
+class TestRateLimiter:
+    """Test the limiter on its own."""
+    
+    def test_a_use_counts_only_for_its_window(self):
+        limiter = RateLimiter(1, 60)
+        with patch("app.services.rate_limit.time.monotonic", side_effect=[0, 1, 61]):
+            assert limiter.allow("a") is True
+            assert limiter.allow("a") is False
+            assert limiter.allow("a") is True
+    
+    def test_the_quietest_visitors_are_forgotten_first(self, monkeypatch):
+        monkeypatch.setattr("app.services.rate_limit.MAX_VISITORS", 2)
+        limiter = RateLimiter(1, 60)
+        for visitor in "abc":
+            limiter.allow(visitor)
+        assert list(limiter._uses) == ["b", "c"]

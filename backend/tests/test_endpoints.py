@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
-from app.main import HideTokens, app
+from app.main import HideTokens, api_limiter, app, form_limiter
 from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
 from app.services.cache import cache
@@ -842,3 +842,28 @@ class TestLinkPreview:
         assert image.status_code == 200
         assert image.headers["content-type"] == "image/png"
         assert len(image.content) < 1_000_000
+
+
+class TestRateLimits:
+    """Test the limits on how often one visitor can use the site."""
+    
+    def test_the_form_limit_stops_one_visitor_only(self, monkeypatch):
+        monkeypatch.setattr(form_limiter, "limit", 1)
+        body = {"email": "amina@example.com"}
+        first = client.post("/api/unsubscribe-link", json=body, headers={"x-real-ip": "1.1.1.1"})
+        second = client.post("/api/unsubscribe-link", json=body, headers={"x-real-ip": "1.1.1.1"})
+        other = client.post("/api/unsubscribe-link", json=body, headers={"x-real-ip": "2.2.2.2"})
+        
+        assert first.status_code == 503  # Email isn't configured here, so it got through to the route
+        assert second.status_code == 429
+        assert "wait a few minutes" in second.json()["detail"]
+        assert second.headers["retry-after"] == "3600"
+        assert second.headers["x-content-type-options"] == "nosniff"
+        assert other.status_code == 503
+    
+    def test_the_general_limit_covers_the_api_but_not_the_page(self, monkeypatch):
+        monkeypatch.setattr(api_limiter, "limit", 1)
+        assert client.get("/api/activities").status_code == 200
+        assert client.get("/api/activities").status_code == 429
+        assert client.get("/").status_code == 200
+        assert client.get("/health").status_code == 200
