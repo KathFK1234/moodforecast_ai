@@ -83,7 +83,7 @@ Variables left over from the old weather provider, such as `WEATHERAI_API_KEY`, 
 4. In Railway, set `BREVO_API_KEY` to that key and `MAIL_FROM` to the sender, e.g. `MoodForecast <you@gmail.com>`, and check `PUBLIC_URL` is the site's address.
 5. After the redeploy, `https://YOUR_DOMAIN/api/alerts` shows `{"available":true}` and the subscribe form is enabled. Subscribe with your own address to see the confirmation email arrive.
 
-Without your own domain, some inboxes may file the emails as spam, since they come from an address at a mail provider such as Gmail but are sent by Brevo. Adding a domain you own in Brevo (**Senders, Domains & Dedicated IPs → Domains**) fixes that. Elsewhere, plain SMTP works too: leave `BREVO_API_KEY` unset and set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `MAIL_FROM` (see the environment variables in the README).
+Write `MAIL_FROM` without quotation marks. Brevo warns that a free address such as Gmail isn't compliant, because only the mail provider can set up DKIM and DMARC for it: the emails still go out, but Brevo replaces the address subscribers see with one at `brevosend.com`, and some inboxes file them as spam (the page reminds people to look there). Adding a domain you own in Brevo (**Senders, Domains & Dedicated IPs → Domains**) fixes that. Elsewhere, plain SMTP works too: leave `BREVO_API_KEY` unset and set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `MAIL_FROM` (see the environment variables in the README).
 
 The daily send runs inside the web process, so keep the service at one replica. More replicas would each send their own copy of every alert.
 
@@ -145,7 +145,7 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |
 | Subscribing says "Email alerts aren't available right now" (503) | `MAIL_FROM` and `BREVO_API_KEY` (or `SMTP_HOST`) are not set; requests can't be confirmed without email, so none are taken |
 | A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
-| Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, a sender error means `MAIL_FROM` isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |
+| Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, `MAIL_FROM is not valid` means it's badly written, a sender error means it isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |
 | Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
 
