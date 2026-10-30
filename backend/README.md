@@ -451,5 +451,5 @@ The daily send runs inside the web process: a background task started with the a
 ## Notes
 
 - Emails are in English only, so the page's subscribe form has no language choice
-- Subscribing does not ask the address owner to confirm first (no double opt-in), so anyone can sign an address up; every email has an unsubscribe link
+- Nothing is sent to a new address beyond one confirmation request until its owner follows the link, and every email to a subscriber has an unsubscribe link
 - Deployment: see [../DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)
