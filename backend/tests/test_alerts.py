@@ -429,3 +429,46 @@ class TestRateLimiter:
         for visitor in "abc":
             limiter.allow(visitor)
         assert list(limiter._uses) == ["b", "c"]
+
+
+class TestAlertLoop:
+    """Test the background loop."""
+    
+    @pytest.mark.asyncio
+    async def test_it_waits_first_then_sends_and_tidies_up(self):
+        pauses = []
+        
+        async def pause(seconds):
+            pauses.append(seconds)
+            if len(pauses) == 2:
+                raise asyncio.CancelledError
+        
+        with patch("app.services.alerts.asyncio.sleep", pause), \
+                patch("app.services.alerts.request_confirmations", AsyncMock(return_value=0)) as asked, \
+                patch("app.services.alerts.send_due_alerts", AsyncMock(return_value=0)) as sent, \
+                patch("app.services.alerts.delete_unused_data", return_value=0) as deleted:
+            with pytest.raises(asyncio.CancelledError):
+                await alerts.run_alert_loop()
+        
+        assert pauses == [alerts.STARTUP_DELAY_SECONDS, alerts.CHECK_INTERVAL_SECONDS]
+        asked.assert_awaited_once()
+        sent.assert_awaited_once()
+        deleted.assert_called_once()
+    
+    @pytest.mark.asyncio
+    async def test_a_failed_tidy_up_does_not_stop_the_loop(self):
+        pauses = []
+        
+        async def pause(seconds):
+            pauses.append(seconds)
+            if len(pauses) == 2:
+                raise asyncio.CancelledError
+        
+        with patch("app.services.alerts.asyncio.sleep", pause), \
+                patch("app.services.alerts.request_confirmations", AsyncMock(return_value=0)), \
+                patch("app.services.alerts.send_due_alerts", AsyncMock(return_value=0)), \
+                patch("app.services.alerts.delete_unused_data", side_effect=RuntimeError("database")):
+            with pytest.raises(asyncio.CancelledError):
+                await alerts.run_alert_loop()
+        
+        assert len(pauses) == 2

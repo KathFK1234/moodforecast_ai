@@ -29,6 +29,9 @@ logger = logging.getLogger(__name__)
 # How often the background loop looks for subscribers whose alert is due
 CHECK_INTERVAL_SECONDS = 900
 
+# How long a newly started app waits before its first check
+STARTUP_DELAY_SECONDS = 60
+
 # How long a confirmation link works
 CONFIRM_HOURS = 48
 
@@ -460,6 +463,8 @@ def _commit_unless_deleted(session: Session) -> None:
 
 async def run_alert_loop() -> None:
     """Send due alerts, and confirmation requests, every CHECK_INTERVAL_SECONDS until cancelled."""
+    # During a deploy the old instance runs on briefly; waiting stops both sending the same alerts
+    await asyncio.sleep(STARTUP_DELAY_SECONDS)
     while True:
         try:
             asked = await request_confirmations()
