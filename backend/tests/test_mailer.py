@@ -92,6 +92,7 @@ def test_sends_through_brevo(brevo):
     assert request.headers["api-key"] == "xkeysib-test"
     assert json.loads(request.content) == {
         "sender": {"email": "alerts@moodforecast.test", "name": "MoodForecast"},
+        "replyTo": {"email": "alerts@moodforecast.test"},
         "to": [{"email": "amina@example.com"}],
         "subject": "Hello",
         "textContent": "Plain words",

@@ -120,6 +120,8 @@ async def send_with_brevo(
     sender = {"email": address, "name": name} if name else {"email": address}
     payload = {
         "sender": sender,
+        # Brevo can swap the sender for its own address, so replies need this to reach MAIL_FROM
+        "replyTo": {"email": address},
         "to": [{"email": to}],
         "subject": subject,
         "textContent": text,
