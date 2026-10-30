@@ -719,18 +719,14 @@ function showSubscription(subscription) {
     }
 }
 
-// Open or close the opt-out form, starting from the address this browser subscribed with
-function toggleOptOut() {
-    const form = el('optOutForm');
-    const opening = form.classList.contains('hidden');
-    form.classList.toggle('hidden', !opening);
-    el('optOutToggle').setAttribute('aria-expanded', opening ? 'true' : 'false');
+// Open the unsubscribe pop-up, starting from the address this browser subscribed with
+function openOptOut() {
+    const saved = savedSubscription();
+    el('optOutEmail').value = (saved && saved.email) || el('emailInput').value.trim();
+    el('optOutForm').classList.remove('hidden');
     el('optOutMessage').classList.add('hidden');
-    if (opening) {
-        const saved = savedSubscription();
-        el('optOutEmail').value = (saved && saved.email) || el('emailInput').value.trim();
-        el('optOutEmail').focus();
-    }
+    el('optOutDialog').showModal();
+    el('optOutEmail').focus();
 }
 
 // Unsubscribe straight away if this browser made the subscription; otherwise
@@ -769,7 +765,6 @@ async function handleOptOut(event) {
             showNotice(msg, `Check your inbox and spam folder. If ${email} is subscribed, we've sent a link to finish unsubscribing.`, false);
         }
         el('optOutForm').classList.add('hidden');
-        el('optOutToggle').setAttribute('aria-expanded', 'false');
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
@@ -814,30 +809,36 @@ function showConfirmPrompt(token) {
 
 // Opened from an email's unsubscribe link: ask before unsubscribing
 function showUnsubscribePrompt(token) {
-    const banner = el('emailLinkBanner');
-    const text = document.createElement('span');
-    text.textContent = 'Stop the daily MoodForecast emails?';
-    const confirm = document.createElement('button');
-    confirm.type = 'button';
-    confirm.className = 'banner-button';
-    confirm.textContent = 'Yes, unsubscribe';
+    const prompt = el('optOutPrompt');
+    const confirm = el('optOutConfirm');
+    const msg = el('optOutMessage');
+    el('optOutForm').classList.add('hidden');
+    prompt.classList.remove('hidden');
+    confirm.classList.remove('hidden');
     confirm.addEventListener('click', async () => {
         confirm.disabled = true;
         try {
             const data = await postUnsubscribe(token);
-            banner.className = 'notice notice-success';
-            banner.textContent = `${data.email} has been unsubscribed. No more daily alerts will be sent.`;
+            prompt.classList.add('hidden');
+            confirm.classList.add('hidden');
+            showNotice(msg, `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
             const saved = savedSubscription();
             if (saved && saved.token === token) rememberSubscription(null);
             // Drop the token from the address bar so a reload doesn't ask again
             window.history.replaceState(null, '', window.location.pathname);
         } catch (error) {
-            banner.className = 'notice notice-error';
-            banner.textContent = error.message;
+            showNotice(msg, error.message, true);
+        } finally {
+            confirm.disabled = false;
         }
     });
-    banner.append(text, confirm);
-    banner.classList.remove('hidden');
+    el('optOutDialog').showModal();
+}
+
+// Closing puts the pop-up back to the form, in case the email link's prompt was showing
+function resetOptOut() {
+    el('optOutPrompt').classList.add('hidden');
+    el('optOutConfirm').classList.add('hidden');
 }
 
 // The activities that are practical at a place, local favourites first
@@ -1006,7 +1007,13 @@ function init() {
     });
     el('surpriseButton').addEventListener('click', surpriseMe);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
-    el('optOutToggle').addEventListener('click', toggleOptOut);
+    el('optOutToggle').addEventListener('click', openOptOut);
+    el('optOutClose').addEventListener('click', () => el('optOutDialog').close());
+    el('optOutDialog').addEventListener('close', resetOptOut);
+    // A click on the dimmed page around the pop-up lands on the dialog itself
+    el('optOutDialog').addEventListener('click', (event) => {
+        if (event.target === el('optOutDialog')) el('optOutDialog').close();
+    });
     el('optOutForm').addEventListener('submit', handleOptOut);
     showSubscription(savedSubscription());
     checkAlertsAvailable();
