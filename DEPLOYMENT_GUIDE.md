@@ -87,7 +87,7 @@ Write `MAIL_FROM` without quotation marks. Brevo warns that a free address such 
 
 The daily send runs inside the web process, so keep the service at one replica. More replicas would each send their own copy of every alert.
 
-Once email works, anyone who subscribed before addresses had to be confirmed gets one email asking them to confirm; their alerts are paused until they do.
+Once email works, anyone who subscribed before addresses had to be confirmed gets one email asking them to confirm; their alerts are paused until they do, and their details are deleted if they haven't confirmed 48 hours later.
 
 The deploy log shows `✓ Daily alerts scheduled for 07:00 local time` when email is configured, and `• Email not configured` when it is not.
 
