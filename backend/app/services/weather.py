@@ -120,7 +120,8 @@ class WeatherClient:
             if status == 429:
                 raise RateLimitedError(f"Server error: {error_text}")
             if 400 <= status < 500:
-                raise ValueError(f"Bad request: {error_text}")
+                # This text reaches the visitor, so it leaves out the service's own reply
+                raise ValueError("The weather service couldn't use that request.")
             else:
                 raise RuntimeError(f"Server error: {error_text}")
         except httpx.TimeoutException:

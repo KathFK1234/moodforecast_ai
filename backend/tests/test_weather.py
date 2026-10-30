@@ -377,3 +377,16 @@ class TestGetSea:
         
         client = make_client(handler)
         assert (await client.get_sea(-17.7, 179.95))["coastal"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_refused_request_does_not_repeat_the_services_reply():
+    client = WeatherClient("https://weather.test")
+    client._client = httpx.AsyncClient(
+        base_url="https://weather.test",
+        transport=httpx.MockTransport(lambda request: httpx.Response(400, text="internal detail"))
+    )
+    with pytest.raises(ValueError) as error:
+        await client._request("GET", "/forecast")
+    assert "internal detail" not in str(error.value)
+    await client.close()
