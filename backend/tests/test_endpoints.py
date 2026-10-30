@@ -825,3 +825,20 @@ class TestAccessLog:
         )
         assert HideTokens().filter(record) is True
         assert record.getMessage() == f'100.64.0.5:1 - "POST {logged} HTTP/1.1" 200'
+
+
+class TestLinkPreview:
+    """Test the preview card shown when a link to the site is shared."""
+    
+    def test_the_page_carries_the_tags_and_the_image_is_served(self):
+        page = client.get("/?unsubscribe=abc-123").text
+        for tag in ("og:title", "og:description", "og:url", "og:type", "og:site_name"):
+            assert f'property="{tag}"' in page
+        assert '<meta name="twitter:card" content="summary_large_image">' in page
+        assert "abc-123" not in page
+        
+        image_url = re.search(r'property="og:image" content="(https://[^"]+)"', page).group(1)
+        image = client.get(image_url.split(".app", 1)[1])
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/png"
+        assert len(image.content) < 1_000_000
