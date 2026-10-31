@@ -88,7 +88,7 @@ class TestDailyEmail:
         email = alerts.daily_email(make_subscriber(), FORECAST, rng=random.Random(1))
         assert email.subject == "Nairobi, KE: Radiant today, 22°C and clear"
         assert "Clear and 22°C in Nairobi, KE." in email.text
-        assert "Mood score: 90 out of 100 (Radiant), with high energy." in email.text
+        assert "Weather mood score: 90 out of 100 (Radiant). Days like this tend to bring high energy, though yours may differ." in email.text
         assert "Today: light rain showers, 16 to 26°C, 40% chance of rain." in email.text
     
     def test_chosen_activity_is_judged_against_the_weather(self):
