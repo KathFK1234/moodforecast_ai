@@ -13,6 +13,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.main import HideTokens, api_limiter, app, form_limiter, warn_if_email_links_are_local
 from app.models.db import PendingSubscription, Subscriber
+from app.models.schemas import normalise_email
 from app.services import alerts, mailer
 from app.services.cache import cache
 
@@ -1025,3 +1026,13 @@ def test_a_location_with_control_characters_is_refused(location):
     )
     assert response.status_code == 422
     assert "Enter a place name" in response.json()["detail"][0]["msg"]
+
+
+@pytest.mark.parametrize("email", ["a,b@example.com", "a;b@example.com", "<a@example.com>", "a(b)@example.com"])
+def test_an_address_with_list_punctuation_is_refused(email):
+    response = client.post("/api/unsubscribe-link", json={"email": email})
+    assert response.status_code == 422
+
+
+def test_an_address_with_ordinary_punctuation_is_accepted():
+    assert normalise_email("Amina.O'Neil+alerts@Example.co.ke") == "amina.o'neil+alerts@example.co.ke"
