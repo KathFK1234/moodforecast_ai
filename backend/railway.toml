@@ -2,9 +2,11 @@
 dockerfile = "backend/Dockerfile"
 
 [deploy]
-startCommand = "sh -c 'uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+startCommand = "sh -c 'exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-graceful-shutdown 10'"
 healthcheckPath = "/health"
 healthcheckTimeout = 10
+# Time to finish after the stop signal, a little longer than uvicorn's own limit
+drainingSeconds = 15
 
 [env]
 PYTHONUNBUFFERED = "1"
