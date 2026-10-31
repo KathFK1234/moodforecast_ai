@@ -7,6 +7,7 @@ from app.services.activity_advisor import find_activity
 
 
 # Control characters are left out too: PostgreSQL can't store or search for a NUL byte
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 EMAIL_PATTERN = re.compile(r"[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+\.[^@\s\x00-\x1f\x7f]+")
 
 # Longer than any real place name with its region and country
@@ -56,7 +57,8 @@ class SubscribeRequest(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Location is required")
-        if "\x00" in v:
+        # A place's name goes into email subjects, where a line break isn't allowed
+        if CONTROL_CHARACTERS.search(v):
             raise ValueError("Enter a place name")
         return v
 

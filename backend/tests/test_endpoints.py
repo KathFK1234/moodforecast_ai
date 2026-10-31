@@ -1014,3 +1014,14 @@ def test_input_that_cant_be_echoed_is_still_answered_as_invalid(path, body, cont
     response = client.post(path, content=body, headers={"content-type": content_type})
     assert response.status_code == 422
     assert all(set(problem) == {"type", "loc", "msg"} for problem in response.json()["detail"])
+
+
+@pytest.mark.parametrize("location", ["Nairobi\\nBcc: x", "Nairobi\\rKenya", "Nai\\trobi", "Nairobi\\u007f"])
+def test_a_location_with_control_characters_is_refused(location):
+    response = client.post(
+        "/api/subscribe",
+        content=f'{{"email": "amina@example.com", "location": "{location}"}}',
+        headers={"content-type": "application/json"}
+    )
+    assert response.status_code == 422
+    assert "Enter a place name" in response.json()["detail"][0]["msg"]
