@@ -842,6 +842,15 @@ class TestLinkPreview:
         assert image.status_code == 200
         assert image.headers["content-type"] == "image/png"
         assert len(image.content) < 1_000_000
+    
+    def test_the_privacy_page_has_its_own_card(self):
+        page = client.get("/privacy.html").text
+        address = re.search(r'property="og:url" content="([^"]+)"', page).group(1)
+        assert address.endswith("/privacy.html")
+        assert f'<link rel="canonical" href="{address}">' in page
+        assert 'property="og:title" content="Privacy - MoodForecast AI"' in page
+        assert 'property="og:image" content="https://' in page
+        assert '<meta name="twitter:card" content="summary_large_image">' in page
 
 
 class TestRateLimits:
