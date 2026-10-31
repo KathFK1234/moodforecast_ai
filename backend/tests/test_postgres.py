@@ -71,6 +71,13 @@ def test_unsubscribing_deletes_the_row(engine):
         assert session.exec(select(PendingSubscription)).all() == []
 
 
+@pytest.mark.parametrize("path", ["/api/confirm/abc%00def", "/api/unsubscribe/abc%00def"])
+def test_a_nul_byte_in_a_token_is_a_404_not_a_database_error(engine, path):
+    """SQLite shrugs at these; PostgreSQL raises, which is why this runs here."""
+    with patch("app.routers.subscribe.get_engine", return_value=engine):
+        assert TestClient(app).post(path).status_code == 404
+
+
 def test_columns_added_since_launch_are_added_to_an_older_table(engine):
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE alert_subscriber DROP COLUMN confirmed"))
