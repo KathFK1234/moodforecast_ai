@@ -304,7 +304,14 @@ function displayWellbeing(data) {
 
     setBadge(el('energyBadge'), `${data.energy_level} energy`, level);
     const riskLevel = { Minimal: 'high', Low: 'medium', Moderate: 'low', High: 'verylow' }[data.risk_level] || 'medium';
-    setBadge(el('riskBadge'), `${data.risk_level} risk of low mood`, riskLevel);
+    // About the weather, not a reading of the person looking at it
+    const riskText = {
+        Minimal: 'Weather unlikely to dampen mood',
+        Low: 'Weather has little effect on mood',
+        Moderate: 'Weather may dampen mood',
+        High: 'Weather likely to dampen mood',
+    }[data.risk_level] || 'Weather has little effect on mood';
+    setBadge(el('riskBadge'), riskText, riskLevel);
 
     // Summary
     const summary = el('aiSummaryDiv');
