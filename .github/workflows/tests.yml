@@ -68,11 +68,15 @@ jobs:
         run: |
           docker run -d --name app -p 8000:8000 moodforecast
           for attempt in $(seq 1 20); do
-            curl -sf http://localhost:8000/health && exit 0
+            curl -sf http://localhost:8000/health && break
+            if [ "$attempt" = 20 ]; then docker logs app; exit 1; fi
             sleep 1
           done
-          docker logs app
-          exit 1
+      - name: Check the page and its preview image are in the image
+        run: |
+          curl -sf http://localhost:8000/ | grep -q 'property="og:image"'
+          curl -sf http://localhost:8000/privacy.html | grep -q 'rel="canonical"'
+          curl -sf -o /dev/null http://localhost:8000/og-image.png
 
   browser:
     runs-on: ubuntu-latest
