@@ -66,8 +66,11 @@
         <!-- Shown when the page is opened from an email's confirmation link -->
         <div id="emailLinkBanner" class="notice notice-info hidden" role="status"></div>
 
+        <!-- Says what the search did, for people who can't see the results change -->
+        <p id="searchStatus" class="visually-hidden" role="status"></p>
+
         <!-- Loading State -->
-        <div id="loadingState" class="skeleton-grid hidden" aria-live="polite" aria-label="Loading forecast">
+        <div id="loadingState" class="skeleton-grid hidden" aria-hidden="true">
             <div class="card skeleton"></div>
             <div class="card skeleton"></div>
             <div class="card skeleton skeleton-wide"></div>
@@ -176,7 +179,7 @@
                     <button type="submit" id="activityButton">Ask</button>
                     <button type="button" class="button-ghost" id="surpriseButton">Surprise me</button>
                 </form>
-                <div class="chips" id="activityChips" aria-label="Popular activities"></div>
+                <div class="chips" id="activityChips" role="group" aria-label="Popular activities"></div>
                 <div id="activityError" class="notice notice-error hidden" role="alert"></div>
                 <div id="activityResult" class="activity-result hidden" aria-live="polite">
                     <span class="badge" id="activityVerdict"></span>

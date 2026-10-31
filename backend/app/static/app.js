@@ -111,6 +111,7 @@ async function handleSearch(location, record = true) {
     const token = ++searchToken;
     hideError();
     showLoading(true);
+    el('searchStatus').textContent = `Loading the weather for ${location}.`;
     el('searchButton').disabled = true;
 
     try {
@@ -137,6 +138,7 @@ async function handleSearch(location, record = true) {
         hasResults = true;
         replayReveal();
         highlightChip(location);
+        el('searchStatus').textContent = `Showing the weather for ${wellbeingData.location}.`;
         try {
             localStorage.setItem(LAST_LOCATION_KEY, location);
         } catch (e) {
@@ -144,6 +146,7 @@ async function handleSearch(location, record = true) {
         }
     } catch (error) {
         if (token !== searchToken) return;
+        el('searchStatus').textContent = '';
         showError(error.message || 'Something went wrong. Please try again.');
     } finally {
         if (token === searchToken) {
