@@ -20,6 +20,7 @@ The frontend is intentionally minimal:
 | `styles.css` | Styling |
 | `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | Icons |
 | `privacy.html` | What the site does with people's details |
+| `sitemap.xml` | The pages search engines should know about |
 | `og-image.png` | The card shown when a link to the site is shared |
 | `dm-sans-*.woff2`, `dm-sans-OFL.txt` | The page's font and its licence, served from here so visits don't reach Google |
 

@@ -146,7 +146,7 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
 | Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, `MAIL_FROM is not valid` means it's badly written, a sender error means it isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |
 | Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
-| Shared links show the old address or no image after moving to a new domain | The `og:url`, `og:image` and `twitter:image` tags and the canonical links in `frontend/index.html` and `frontend/privacy.html` name the address in full; update them and copy both files to `backend/app/static/`. Platforms keep old previews for a while: LinkedIn's Post Inspector refreshes them |
+| Shared links show the old address or no image after moving to a new domain | The `og:url`, `og:image` and `twitter:image` tags and the canonical links in `frontend/index.html` and `frontend/privacy.html`, plus `frontend/robots.txt` and `frontend/sitemap.xml`, name the address in full; update them and copy those files to `backend/app/static/`. Platforms keep old previews for a while: LinkedIn's Post Inspector refreshes them |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
 
 To see request details:

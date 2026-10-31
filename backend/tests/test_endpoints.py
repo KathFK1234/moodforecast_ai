@@ -950,7 +950,11 @@ def test_the_privacy_page_is_linked_and_served():
 def test_search_engines_are_kept_out_of_the_api_only():
     robots = client.get("/robots.txt")
     assert robots.status_code == 200
-    assert robots.text.splitlines() == ["User-agent: *", "Disallow: /api/"]
+    assert robots.text.splitlines()[:2] == ["User-agent: *", "Disallow: /api/"]
+    sitemap_address = robots.text.splitlines()[2].removeprefix("Sitemap: ")
+    sitemap = client.get("/sitemap.xml")
+    assert sitemap.status_code == 200
+    assert sitemap_address in robots.text and sitemap_address.removesuffix("sitemap.xml") + "privacy.html" in sitemap.text
     assert 'rel="canonical"' in client.get("/?confirm=abc").text
 
 
