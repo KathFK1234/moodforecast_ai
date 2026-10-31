@@ -635,8 +635,11 @@ async function handleSubscribe(event) {
     const activity = el('activitySelect').value || null;
     const msg = el('subscribeMessage');
 
+    el('emailInput').setAttribute('aria-invalid', String(!email));
+    el('subLocationInput').setAttribute('aria-invalid', String(!location));
     if (!email || !location) {
         showNotice(msg, 'Enter an email address and a location.', true);
+        el(email ? 'subLocationInput' : 'emailInput').focus();
         return;
     }
 

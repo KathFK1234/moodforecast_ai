@@ -179,3 +179,16 @@ def test_a_confirmation_link_asks_first_then_confirms(page, site):
     expect(banner).to_contain_text("Confirmed.")
     expect(banner).to_contain_text("spam")
     assert not re.search("confirm=", page.url)
+
+
+def test_the_form_points_to_a_field_left_empty(page, site):
+    open_page(page, site)
+    page.fill("#subLocationInput", "")
+    page.click("#subscribeBtn")
+    expect(page.locator("#emailInput")).to_be_focused()
+    expect(page.locator("#emailInput")).to_have_attribute("aria-invalid", "true")
+    
+    page.fill("#emailInput", SUBSCRIBED["email"])
+    page.click("#subscribeBtn")
+    expect(page.locator("#subLocationInput")).to_be_focused()
+    expect(page.locator("#emailInput")).to_have_attribute("aria-invalid", "false")
