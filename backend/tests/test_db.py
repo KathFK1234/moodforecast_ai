@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine, inspect, text
 from app.config import Settings
 from app.models.db import create_tables, engine_url
@@ -58,3 +59,9 @@ def test_an_older_subscriber_table_gets_the_new_columns(tmp_path):
 
 def test_queries_and_their_values_are_not_logged_unless_asked_for():
     assert Settings(_env_file=None).sql_echo is False
+
+
+@pytest.mark.parametrize("hour", [-1, 24])
+def test_an_alert_hour_that_never_comes_is_refused(hour):
+    with pytest.raises(ValidationError):
+        Settings(alert_hour=hour, _env_file=None)

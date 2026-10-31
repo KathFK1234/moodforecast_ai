@@ -1,5 +1,6 @@
 """Application configuration from environment variables."""
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,8 +36,9 @@ class Settings(BaseSettings):
     # Where the site is reachable, for the links in emails
     public_url: str = "http://localhost:8000"
     
-    # Local hour (0-23) at the subscriber's location when the daily alert goes out
-    alert_hour: int = 7
+    # Local hour (0-23) at the subscriber's location when the daily alert goes out.
+    # Refused at startup outside that range: no alert would ever be due.
+    alert_hour: int = Field(default=7, ge=0, le=23)
 
 
 settings = Settings()
