@@ -241,7 +241,11 @@ function displayForecast(days) {
         const rainEl = document.createElement('div');
         rainEl.className = 'day-rain';
         rainEl.textContent = day.precipitation_chance == null ? '' : `${round(day.precipitation_chance)}%`;
-        rainEl.setAttribute('aria-label', day.precipitation_chance == null ? '' : `${round(day.precipitation_chance)}% chance of rain`);
+        if (day.precipitation_chance != null) {
+            // aria-label needs a role: a plain div's label is ignored
+            rainEl.setAttribute('role', 'img');
+            rainEl.setAttribute('aria-label', `${round(day.precipitation_chance)}% chance of rain`);
+        }
 
         const tempEl = document.createElement('div');
         tempEl.className = 'day-temp';
