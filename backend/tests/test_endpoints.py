@@ -835,6 +835,7 @@ class TestLinkPreview:
         for tag in ("og:title", "og:description", "og:url", "og:type", "og:site_name"):
             assert f'property="{tag}"' in page
         assert '<meta name="twitter:card" content="summary_large_image">' in page
+        assert 'name="twitter:image:alt"' in page
         assert "abc-123" not in page
         
         image_url = re.search(r'property="og:image" content="(https://[^"]+)"', page).group(1)
