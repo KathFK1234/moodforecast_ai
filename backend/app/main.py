@@ -6,6 +6,7 @@ import mimetypes
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,8 @@ from app.services import alerts, mailer
 from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
+
+logger = logging.getLogger(__name__)
 
 # Python's own list doesn't have this on every system
 mimetypes.add_type("font/woff2", ".woff2")
@@ -91,6 +94,15 @@ class RevalidatedStaticFiles(StaticFiles):
         return response
 
 
+def warn_if_email_links_are_local() -> None:
+    """Say so when emails would link to this machine: their links would work for nobody."""
+    if mailer.is_configured() and urlsplit(settings.public_url).hostname in ("localhost", "127.0.0.1"):
+        logger.warning(
+            "PUBLIC_URL is %s, so the confirmation and unsubscribe links in emails won't work for anyone else",
+            settings.public_url
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
@@ -98,6 +110,8 @@ async def lifespan(app: FastAPI):
     create_tables()
     print("✓ Database tables initialized")
     print("✓ Weather client ready (Open-Meteo)")
+    
+    warn_if_email_links_are_local()
     
     # Daily alerts run in the background, in this process
     alert_task = None

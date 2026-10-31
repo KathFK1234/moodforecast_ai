@@ -10,7 +10,8 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
-from app.main import HideTokens, api_limiter, app, form_limiter
+from app.config import settings
+from app.main import HideTokens, api_limiter, app, form_limiter, warn_if_email_links_are_local
 from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
 from app.services.cache import cache
@@ -962,3 +963,22 @@ def test_the_font_is_served_as_a_font():
     response = client.get("/dm-sans-latin.woff2")
     assert response.status_code == 200
     assert response.headers["content-type"] == "font/woff2"
+
+
+@pytest.mark.parametrize("url, warned", [
+    ("http://localhost:8000", True),
+    ("http://127.0.0.1:8000/", True),
+    ("https://moodforecast.test", False),
+])
+def test_email_links_to_this_machine_are_warned_about(monkeypatch, caplog, url, warned):
+    monkeypatch.setattr(settings, "public_url", url)
+    with patch("app.main.mailer.is_configured", return_value=True):
+        warn_if_email_links_are_local()
+    assert ("PUBLIC_URL" in caplog.text) is warned
+
+
+def test_a_site_without_email_is_not_warned_about_its_links(monkeypatch, caplog):
+    monkeypatch.setattr(settings, "public_url", "http://localhost:8000")
+    with patch("app.main.mailer.is_configured", return_value=False):
+        warn_if_email_links_are_local()
+    assert "PUBLIC_URL" not in caplog.text
