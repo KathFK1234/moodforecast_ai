@@ -220,6 +220,8 @@ def create_app() -> FastAPI:
         response.headers.update(SECURITY_HEADERS)
         if request.url.path not in ("/docs", "/redoc"):
             response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        if request.url.path in ("/docs", "/redoc", "/openapi.json"):
+            response.headers["X-Robots-Tag"] = "noindex"
         return response
     
     @app.exception_handler(RequestValidationError)

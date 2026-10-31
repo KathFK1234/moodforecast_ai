@@ -1041,3 +1041,12 @@ def test_an_address_with_list_punctuation_is_refused(email):
 
 def test_an_address_with_ordinary_punctuation_is_accepted():
     assert normalise_email("Amina.O'Neil+alerts@Example.co.ke") == "amina.o'neil+alerts@example.co.ke"
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_search_engines_are_kept_off_the_api_docs(path):
+    assert client.get(path).headers["x-robots-tag"] == "noindex"
+
+
+def test_search_engines_may_index_the_page():
+    assert "x-robots-tag" not in client.get("/").headers
