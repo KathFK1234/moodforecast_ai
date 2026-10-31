@@ -67,7 +67,7 @@ Errors show the message returned by the API.
 - **Sky background** follows the weather and time of day. `applyTheme()` in `app.js` sets `data-theme` on `<body>`; each theme's colors are at the top of `styles.css`.
 - **Mood levels** use four colors (`--level-high`, `--level-medium`, `--level-low`, `--level-verylow`), always next to a number or label so color is never the only cue.
 - **Icons** are inline SVG, defined in `ICONS` in `app.js`.
-- **Font**: DM Sans (Google Fonts)
+- **Font**: DM Sans, served from this folder
 - **Responsive**: two columns on desktop, one below 860px, compact forecast rows below 520px
 - **Motion** is turned off when the visitor's system asks for reduced motion
 

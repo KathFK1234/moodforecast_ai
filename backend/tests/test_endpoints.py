@@ -952,3 +952,9 @@ def test_search_engines_are_kept_out_of_the_api_only():
     assert robots.status_code == 200
     assert robots.text.splitlines() == ["User-agent: *", "Disallow: /api/"]
     assert 'rel="canonical"' in client.get("/?confirm=abc").text
+
+
+def test_the_font_is_served_as_a_font():
+    response = client.get("/dm-sans-latin.woff2")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "font/woff2"

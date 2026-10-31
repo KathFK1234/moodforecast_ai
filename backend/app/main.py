@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import mimetypes
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +19,9 @@ from app.services import alerts, mailer
 from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
+
+# Python's own list doesn't have this on every system
+mimetypes.add_type("font/woff2", ".woff2")
 
 # The page loads only its own files. /docs and /redoc need more, so they go
 # without the content policy.
