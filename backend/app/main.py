@@ -19,12 +19,10 @@ from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
 
-# The page loads only its own files and Google Fonts. /docs and /redoc need
-# more, so they go without the content policy.
+# The page loads only its own files. /docs and /redoc need more, so they go
+# without the content policy.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
-    "style-src 'self' https://fonts.googleapis.com; "
-    "font-src https://fonts.gstatic.com; "
     "img-src 'self' data:; "
     "base-uri 'none'; "
     "form-action 'self'; "

@@ -21,6 +21,7 @@ The frontend is intentionally minimal:
 | `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | Icons |
 | `privacy.html` | What the site does with people's details |
 | `og-image.png` | The card shown when a link to the site is shared |
+| `dm-sans-*.woff2`, `dm-sans-OFL.txt` | The page's font and its licence, served from here so visits don't reach Google |
 
 ## How It Is Served
 

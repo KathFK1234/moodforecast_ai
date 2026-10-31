@@ -68,7 +68,6 @@ def page(request, browser):
     page.route("**/api/unsubscribe/good", lambda route: route.fulfill(json={"email": SUBSCRIBED["email"], "status": "unsubscribed"}))
     page.route("**/api/confirm/good", lambda route: route.fulfill(json={**SUBSCRIBED, "status": "subscribed"}))
     page.route("**/api/subscribe", lambda route: route.fulfill(status=202, json={**SUBSCRIBED, "status": "pending", "confirmation_sent": True}))
-    page.route("**/fonts.g*/**", lambda route: route.abort())
     yield page
     context.close()
     assert errors == []
@@ -84,6 +83,14 @@ def test_the_page_fits_the_screen(page, site):
     open_page(page, site)
     width = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
     assert width[0] <= width[1]
+
+
+def test_the_font_loads_from_this_site(page, site):
+    requests = []
+    page.on("request", lambda request: requests.append(request.url))
+    open_page(page, site)
+    assert page.evaluate("document.fonts.load(\"16px 'DM Sans'\").then((faces) => faces.length)") > 0
+    assert all(url.startswith(site) for url in requests)
 
 
 def test_the_form_reminds_people_about_spam(page, site):
