@@ -96,6 +96,8 @@ def get_engine():
     return create_engine(
         url,
         echo=settings.sql_echo,
+        # A failed query's error text would otherwise carry its values, addresses and tokens, into the log
+        hide_parameters=not settings.sql_echo,
         connect_args=connect_args(url),
         # A connection the database closed while idle is replaced, not handed to a request
         pool_pre_ping=True

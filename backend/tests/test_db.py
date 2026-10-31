@@ -5,8 +5,9 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 from app.config import Settings
-from app.models.db import connect_args, create_tables, engine_url
+from app.models.db import connect_args, create_tables, engine_url, get_engine
 
 
 @pytest.mark.parametrize("url", [
@@ -73,3 +74,14 @@ def test_postgresql_connections_give_up_rather_than_hang():
 
 def test_sqlite_is_not_given_a_postgresql_option():
     assert connect_args("sqlite:///./moodforecast.db") == {}
+
+
+def test_a_failed_query_doesnt_put_its_values_in_the_error(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.models.db.settings.database_url", f"sqlite:///{tmp_path / 'test.db'}")
+    get_engine.cache_clear()
+    try:
+        with get_engine().connect() as connection, pytest.raises(OperationalError) as failure:
+            connection.execute(text("SELECT * FROM no_such_table WHERE email = :email"), {"email": "amina@example.com"})
+    finally:
+        get_engine.cache_clear()
+    assert "amina@example.com" not in str(failure.value)
