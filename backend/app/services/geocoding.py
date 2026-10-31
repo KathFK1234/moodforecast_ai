@@ -6,6 +6,10 @@ import httpx
 from app.services.cache import cache
 
 
+# What reading a reply of an unexpected shape raises
+UNUSABLE_REPLY = (AttributeError, IndexError, KeyError, TypeError, ValueError)
+
+
 # Popular locations with their coordinates for offline fallback
 POPULAR_LOCATIONS = {
     "nairobi": {"lat": -1.2921, "lon": 36.8219, "country": "KE", "timezone": "Africa/Nairobi"},
@@ -138,14 +142,27 @@ async def _look_up(location: str) -> dict:
         parts = [part.strip() for part in location.split(",")]
         if not matches and len(parts) >= 3:
             matches = await _search_nominatim(f"{parts[0]}, {parts[-1]}")
+        place = _nominatim_place(matches[0], location) if matches else None
     except (TimeoutError, RuntimeError):
         fallback = await _search_open_meteo(location)
         if fallback:
             return fallback
         raise
     
-    if matches:
-        data = matches[0]
+    if place:
+        return place
+    
+    # Location not found
+    return {
+        "error": f"We couldn't find '{location}'. Check the spelling, or add the country (for example 'Kisumu, Kenya').",
+        "lat": None,
+        "lon": None
+    }
+
+
+def _nominatim_place(data: dict, location: str) -> dict:
+    """A Nominatim match as get_coordinates returns it. Raises RuntimeError if it can't be read."""
+    try:
         return {
             "lat": float(data["lat"]),
             "lon": float(data["lon"]),
@@ -154,13 +171,8 @@ async def _look_up(location: str) -> dict:
             "country": data.get("address", {}).get("country_code", "").upper(),
             "timezone": "",  # Nominatim doesn't provide timezone
         }
-    
-    # Location not found
-    return {
-        "error": f"We couldn't find '{location}'. Check the spelling, or add the country (for example 'Kisumu, Kenya').",
-        "lat": None,
-        "lon": None
-    }
+    except UNUSABLE_REPLY as e:
+        raise RuntimeError(f"Geocoding service sent an unusable reply: {e!r}") from e
 
 
 async def _search_open_meteo(location: str) -> dict | None:
@@ -184,23 +196,26 @@ async def _search_open_meteo(location: str) -> dict | None:
             )
             response.raise_for_status()
             matches = response.json().get("results") or []
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, *UNUSABLE_REPLY):
         return None
     
     def fits(match: dict) -> bool:
         described = {str(match.get(key, "")).lower() for key in ("country", "country_code", "admin1")}
         return all(hint in described for hint in hints)
     
-    match = next((m for m in matches if fits(m)), None)
-    if match is None or match.get("latitude") is None or match.get("longitude") is None:
+    try:
+        match = next((m for m in matches if fits(m)), None)
+        if match is None or match.get("latitude") is None or match.get("longitude") is None:
+            return None
+        return {
+            "lat": float(match["latitude"]),
+            "lon": float(match["longitude"]),
+            "name": match.get("name") or location,
+            "country": match.get("country_code", ""),
+            "timezone": match.get("timezone", ""),
+        }
+    except UNUSABLE_REPLY:
         return None
-    return {
-        "lat": float(match["latitude"]),
-        "lon": float(match["longitude"]),
-        "name": match.get("name") or location,
-        "country": match.get("country_code", ""),
-        "timezone": match.get("timezone", ""),
-    }
 
 
 async def _search_nominatim(query: str) -> list[dict]:
@@ -227,12 +242,15 @@ async def _search_nominatim(query: str) -> list[dict]:
                 timeout=5.0
             )
             response.raise_for_status()
-            return response.json()
+            matches = response.json()
     except httpx.TimeoutException:
         raise TimeoutError("Geocoding request timed out")
     except (httpx.HTTPError, ValueError) as e:
         # Don't report "not found" (or guess a city) when the lookup itself failed
         raise RuntimeError(f"Geocoding service unavailable: {e}")
+    if not isinstance(matches, list):
+        raise RuntimeError("Geocoding service sent an unusable reply")
+    return matches
 
 
 async def suggest_locations(query: str, limit: int = 5) -> list[dict]:
@@ -266,9 +284,20 @@ async def suggest_locations(query: str, limit: int = 5) -> list[dict]:
             )
             response.raise_for_status()
             matches = response.json().get("results") or []
-    except (httpx.HTTPError, ValueError):
+    except (httpx.HTTPError, *UNUSABLE_REPLY):
         return []
     
+    try:
+        suggestions = _suggestions_from(matches, query, limit)
+    except UNUSABLE_REPLY:
+        return []
+    
+    cache.set(cache_key, suggestions)
+    return suggestions
+
+
+def _suggestions_from(matches: list[dict], query: str, limit: int) -> list[dict]:
+    """Geocoder matches as suggestions, remembering where each place is."""
     # Names that start with the query first (the API also matches alternate
     # names), then the largest places
     query_lower = query.lower()
@@ -305,6 +334,4 @@ async def suggest_locations(query: str, limit: int = 5) -> list[dict]:
             })
         if len(suggestions) == limit:
             break
-    
-    cache.set(cache_key, suggestions)
     return suggestions

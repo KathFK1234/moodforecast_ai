@@ -332,3 +332,25 @@ async def test_lookups_that_would_wait_too_long_use_the_fallback(monkeypatch):
 @pytest.mark.asyncio
 async def test_a_location_of_only_commas_is_no_match_for_the_fallback_geocoder():
     assert await geocoding._search_open_meteo(" , ,") is None
+
+
+@pytest.mark.parametrize("reply", [
+    {"error": "x"}, "text", None, [1], [{"name": "x"}], [{"lat": "x", "lon": "1"}],
+    [{"lat": "1", "lon": "2", "address": None}], [{"lat": "1", "lon": "2", "name": 5}],
+])
+@pytest.mark.asyncio
+async def test_a_nominatim_reply_of_the_wrong_shape_counts_as_unavailable(monkeypatch, reply):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply if "nominatim" in request.url.host else None))
+    with pytest.raises(RuntimeError):
+        await geocoding.get_coordinates("Somewhere Odd")
+
+
+@pytest.mark.parametrize("reply", [
+    None, "text", [1], {"results": "text"}, {"results": [1]},
+    {"results": [{"name": "x", "latitude": "a", "longitude": 1}]},
+    {"results": [{"name": "x", "population": "a"}, {"name": "y", "population": 3}]},
+])
+@pytest.mark.asyncio
+async def test_a_suggestion_reply_of_the_wrong_shape_means_no_suggestions(monkeypatch, reply):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
+    assert await geocoding.suggest_locations("somewhere") == []
