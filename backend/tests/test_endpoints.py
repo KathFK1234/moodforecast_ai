@@ -350,6 +350,13 @@ def test_a_token_with_a_nul_byte_is_just_an_unknown_token(path):
     assert client.post(path).status_code == 404
 
 
+def test_nul_bytes_are_refused_before_they_reach_the_database():
+    email = client.post("/api/unsubscribe-link", json={"email": "a\x00b@example.com"})
+    location = client.post("/api/subscribe", json={"email": "a@example.com", "location": "Nai\x00robi"})
+    assert email.status_code == 422
+    assert location.status_code == 422
+
+
 def test_unsubscribe_unknown_token(mock_weather):
     response = client.post("/api/unsubscribe/not-a-real-token")
     assert response.status_code == 404

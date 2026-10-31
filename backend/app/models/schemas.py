@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field, field_validator
 from app.services.activity_advisor import find_activity
 
 
-EMAIL_PATTERN = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+# Control characters are left out too: PostgreSQL can't store or search for a NUL byte
+EMAIL_PATTERN = re.compile(r"[^@\s\x00-\x1f\x7f]+@[^@\s\x00-\x1f\x7f]+\.[^@\s\x00-\x1f\x7f]+")
 
 # Longer than any real place name with its region and country
 MAX_LOCATION_LENGTH = 120
@@ -55,6 +56,8 @@ class SubscribeRequest(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Location is required")
+        if "\x00" in v:
+            raise ValueError("Enter a place name")
         return v
 
 
