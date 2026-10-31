@@ -4,7 +4,7 @@ import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from sqlmodel import Session, select
 from app.models.db import PendingSubscription, Subscriber, as_utc, get_engine, utc_now
 from app.models.schemas import (
@@ -203,13 +203,15 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
 
 
 @router.post("/unsubscribe-link", status_code=202)
-async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeLinkResponse:
+async def send_unsubscribe_link(request: UnsubscribeLinkRequest, background: BackgroundTasks) -> UnsubscribeLinkResponse:
     """
     Email a subscriber their unsubscribe link.
     
     For someone who no longer has an alert email to hand. The response is the
     same whether or not the address is subscribed, so it can't be used to find
-    out who is. Returns 503 if email is not configured.
+    out who is. The email goes out after the response, because waiting for it
+    would make the answer slower for subscribers and show who is that way.
+    Returns 503 if email is not configured.
     """
     if not mailer.is_configured():
         raise HTTPException(
@@ -224,7 +226,8 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest) -> UnsubscribeL
         ).first()
     
     if subscriber is not None:
-        await alerts.send_once(
+        background.add_task(
+            alerts.send_once,
             subscriber.email, alerts.unsubscribe_link_email(subscriber), "unsubscribe-link", subscriber.token
         )
     
