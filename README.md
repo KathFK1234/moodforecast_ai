@@ -116,6 +116,7 @@ All are optional.
 | `SQL_ECHO` | `false` | `true` logs every SQL statement with its values, including email addresses and tokens. For local debugging only |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
 | `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is on the coast; only change this if you self-host it |
+| `BREVO_API_URL` | `https://api.brevo.com/v3` | Brevo's API address; only change this to test against something else |
 | `BREVO_API_KEY` | (unset) | Brevo API key: email goes through Brevo's HTTPS API instead of SMTP (needed on hosts that block SMTP, such as Railway's Hobby plan). `MAIL_FROM` must be a sender verified in Brevo |
 | `SMTP_HOST` | (unset) | SMTP server, used when `BREVO_API_KEY` isn't set, e.g. `smtp.gmail.com`. Nothing is sent until `MAIL_FROM` and one of `BREVO_API_KEY` or `SMTP_HOST` are set |
 | `SMTP_PORT` | `587` | `465` connects over TLS; other ports upgrade with STARTTLS |
