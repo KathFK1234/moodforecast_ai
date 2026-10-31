@@ -128,6 +128,9 @@ class WeatherClient:
             raise TimeoutError("Weather API request timed out")
         except httpx.RequestError as e:
             raise RuntimeError(f"Weather API unreachable: {e}")
+        except ValueError:
+            # A proxy's error page with a 200 status, say. Its parser message means nothing to visitors.
+            raise RuntimeError("Weather API sent a reply that isn't JSON")
     
     def _get_condition_text(self, condition_code: str | int | None) -> str:
         """Convert WMO weather code to readable text."""

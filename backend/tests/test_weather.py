@@ -390,3 +390,11 @@ async def test_a_refused_request_does_not_repeat_the_services_reply():
         await client._request("GET", "/forecast")
     assert "internal detail" not in str(error.value)
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_a_reply_that_isnt_json_counts_as_the_service_being_down():
+    """A ValueError would reach the visitor as a 422 with the parser's message."""
+    client = make_client(lambda request: httpx.Response(200, text="<html>Bad gateway</html>"))
+    with pytest.raises(RuntimeError, match="isn't JSON"):
+        await client._request_once("GET", "/forecast")
