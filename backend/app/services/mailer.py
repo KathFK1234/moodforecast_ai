@@ -75,7 +75,7 @@ def send_email(
                 server.login(settings.smtp_username, settings.smtp_password)
             server.send_message(message)
     except (smtplib.SMTPException, OSError) as e:
-        raise MailError(f"Could not send email to {to}: {e}") from e
+        raise MailError(_failure(to, str(e))) from e
 
 
 async def send_email_async(
@@ -139,14 +139,22 @@ async def send_with_brevo(
                     headers={"api-key": settings.brevo_api_key, "accept": "application/json"},
                 )
             except httpx.HTTPError as e:
-                raise MailError(f"Could not send email to {to}: Brevo unreachable ({e})") from e
+                raise MailError(_failure(to, f"Brevo unreachable ({e})")) from e
             if response.status_code in (200, 201, 202):
                 return
             reason = _brevo_reason(response)
             if response.status_code == 400 and attempt + 1 < len(attempts):
-                logger.warning("Brevo refused the email (%s); trying again without the extra headers", reason)
+                logger.warning(
+                    "Brevo refused the email (%s); trying again without the extra headers",
+                    reason.replace(to, "[address]")
+                )
                 continue
-            raise MailError(f"Could not send email to {to}: Brevo said {response.status_code} {reason}")
+            raise MailError(_failure(to, f"Brevo said {response.status_code} {reason}"))
+
+
+def _failure(to: str, reason: str) -> str:
+    """Why an email failed, for the log: subscribers' addresses don't belong there, even in a mail service's reply."""
+    return "Could not send email: " + reason.replace(to, "[address]")
 
 
 def _brevo_reason(response: httpx.Response) -> str:

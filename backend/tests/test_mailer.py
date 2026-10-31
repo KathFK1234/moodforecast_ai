@@ -54,8 +54,19 @@ def test_smtp_failure_becomes_a_mail_error(outbox, monkeypatch):
         raise smtplib.SMTPConnectError(421, "busy")
     
     monkeypatch.setattr(mailer.smtplib, "SMTP", refuse)
-    with pytest.raises(mailer.MailError, match="amina@example.com"):
+    with pytest.raises(mailer.MailError, match="busy") as raised:
         mailer.send_email("amina@example.com", "Hello", "Hi")
+    assert "amina" not in str(raised.value)
+
+
+def test_a_mail_server_quoting_the_address_doesnt_put_it_in_the_log(outbox, monkeypatch):
+    def refuse(host, port, **kwargs):
+        raise smtplib.SMTPResponseException(550, "amina@example.com: no such user")
+    
+    monkeypatch.setattr(mailer.smtplib, "SMTP", refuse)
+    with pytest.raises(mailer.MailError) as raised:
+        mailer.send_email("amina@example.com", "Hello", "Hi")
+    assert "amina" not in str(raised.value)
 
 
 def test_connection_failure_becomes_a_mail_error(outbox, monkeypatch):
@@ -146,7 +157,7 @@ def test_brevo_refusal_becomes_a_mail_error_without_the_key(brevo):
     )
     with pytest.raises(mailer.MailError) as raised:
         send("amina@example.com", "Hello", "Hi")
-    assert "amina@example.com" in str(raised.value)
+    assert "amina@example.com" not in str(raised.value)
     assert "401 unauthorized: Key not found" in str(raised.value)
     assert "xkeysib-test" not in str(raised.value)
     assert len(sent) == 1  # Only a 400 about the headers is worth a second try
