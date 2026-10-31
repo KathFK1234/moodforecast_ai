@@ -295,7 +295,9 @@ Health check used by the Railway deploy probe. Returns `{"status": "ok"}`.
 
 | Status | Meaning |
 | ------ | ------- |
-| 422 | Location not found, or invalid request body |
+| 413 | Request body over 4 KB |
+| 422 | Location not found, or invalid request body (`detail` lists each field's `type`, `loc` and `msg`; the input is not echoed) |
+| 429 | Too many requests from one visitor; `Retry-After` says how long to wait |
 | 503 | Weather or geocoding service unavailable (including rate limiting) |
 | 504 | Weather or geocoding request timed out |
 
@@ -328,7 +330,7 @@ All are optional.
 | `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
 | `MAIL_FROM` | (unset) | Sender, e.g. `MoodForecast <you@gmail.com>` |
 | `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the confirmation and unsubscribe links in emails |
-| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent |
+| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent. The app won't start with any other value |
 
 ## Weather Provider
 

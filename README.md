@@ -124,7 +124,7 @@ All are optional.
 | `SMTP_STARTTLS` | `true` | Set to `false` only for a local test server without TLS |
 | `MAIL_FROM` | (unset) | Sender, e.g. `MoodForecast <you@gmail.com>` |
 | `PUBLIC_URL` | `http://localhost:8000` | Public address of the site, used for the confirmation and unsubscribe links in emails |
-| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent |
+| `ALERT_HOUR` | `7` | Local hour (0-23) at each subscriber's location when the daily alert is sent. The app won't start with any other value |
 
 To check that email works, set the SMTP variables in `backend/.env` and run, from `backend/`:
 

@@ -68,7 +68,7 @@ In the project's "Variables" tab:
 | `DATABASE_URL` | PostgreSQL URL (recommended, see below) |
 | `PUBLIC_URL` | `https://YOUR_DOMAIN` - used for the confirmation and unsubscribe links in emails |
 | `BREVO_API_KEY`, `MAIL_FROM` | Your Brevo API key, and the sender you verified in Brevo (see below) |
-| `ALERT_HOUR` | `7` (optional) - local hour the daily alert is sent |
+| `ALERT_HOUR` | `7` (optional) - local hour (0-23) the daily alert is sent; the app won't start with any other value |
 
 Variables left over from earlier versions, such as `WEATHERAI_API_KEY` and `ENVIRONMENT`, are ignored and can be deleted.
 
@@ -146,7 +146,7 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | Subscribing says "Email alerts aren't available right now" (503) | `MAIL_FROM` and `BREVO_API_KEY` (or `SMTP_HOST`) are not set; requests can't be confirmed without email, so none are taken |
 | A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
 | Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, `MAIL_FROM is not valid` means it's badly written, a sender error means it isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |
-| Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address |
+| Unsubscribe links point to localhost | `PUBLIC_URL` is not set to the site's public address. The app logs a warning about this when it starts |
 | Shared links show the old address or no image after moving to a new domain | The `og:url`, `og:image` and `twitter:image` tags and the canonical links in `frontend/index.html` and `frontend/privacy.html`, plus `frontend/robots.txt` and `frontend/sitemap.xml`, name the address in full; update them and copy those files to `backend/app/static/`. Platforms keep old previews for a while: LinkedIn's Post Inspector refreshes them |
 | Stale weather | Results are cached for `CACHE_TTL_SECONDS`; restarting clears the cache |
 
