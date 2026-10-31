@@ -38,7 +38,7 @@ GitHub Actions runs the same tests on every push to `main` and every pull reques
 If you changed anything in `frontend/`, copy it into the deployed location first:
 
 ```bash
-cp frontend/index.html frontend/app.js frontend/styles.css backend/app/static/
+cp -r frontend/. backend/app/static/ && rm backend/app/static/README.md
 ```
 
 ## Railway
