@@ -54,7 +54,8 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     activity one that can be done there.
     
     Returns 503 if email is not configured, since the request could never be
-    confirmed. `confirmation_sent` says whether the email went out. If a link
+    confirmed. `confirmation_sent` says whether the email went out; if it
+    didn't, nothing is kept. If a link
     went to the address in the last few minutes, no new request is stored or
     sent and `status` is "already_sent".
     """
@@ -102,6 +103,12 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     confirmation_sent = await alerts.send_once(
         pending.email, alerts.confirm_email(pending, CONFIRM_HOURS), "confirm"
     )
+    
+    # Without the email nobody holds the link, so there is no reason to keep the details
+    if not confirmation_sent:
+        with Session(get_engine()) as session:
+            session.delete(session.merge(pending))
+            session.commit()
     
     return SubscribeResponse(
         email=pending.email,

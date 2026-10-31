@@ -422,9 +422,14 @@ def test_subscribe_survives_a_mail_failure(mock_weather, outbox, monkeypatch):
         raise ConnectionRefusedError("nothing listening")
     
     monkeypatch.setattr(mailer.smtplib, "SMTP", unreachable)
-    response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        response = client.post("/api/subscribe", json={"email": "amina@example.com", "location": "Nairobi"})
     assert response.status_code == 202
     assert response.json()["confirmation_sent"] is False
+    # Nobody holds a link to it, so the details aren't kept
+    with Session(engine) as session:
+        assert session.exec(select(PendingSubscription)).all() == []
 
 
 def test_unsubscribe_link_is_emailed_to_subscribers_only(mock_weather, outbox):
