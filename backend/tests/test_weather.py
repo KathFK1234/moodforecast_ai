@@ -398,3 +398,19 @@ async def test_a_reply_that_isnt_json_counts_as_the_service_being_down():
     client = make_client(lambda request: httpx.Response(200, text="<html>Bad gateway</html>"))
     with pytest.raises(RuntimeError, match="isn't JSON"):
         await client._request_once("GET", "/forecast")
+
+
+@pytest.mark.asyncio
+async def test_a_null_temperature_falls_back_to_the_last_forecast():
+    fresh = make_client(lambda request: httpx.Response(200, json=OPEN_METEO_RESPONSE))
+    good = await fresh.get_forecast(50.0, 8.0)
+    cache.delete("weather:50.0:8.0")
+    cache._cache["weather:50.0:8.0"] = (good, time.time() - 900)
+    
+    broken = {**OPEN_METEO_RESPONSE, "current": {**OPEN_METEO_RESPONSE["current"], "temperature_2m": None}}
+    client = make_client(lambda request: httpx.Response(200, json=broken))
+    assert await client.get_forecast(50.0, 8.0) == good
+    
+    cache.delete("weather:50.0:8.0")
+    with pytest.raises(RuntimeError, match="no current conditions"):
+        await client.get_forecast(50.0, 8.0)

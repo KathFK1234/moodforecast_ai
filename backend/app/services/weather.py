@@ -42,6 +42,9 @@ CONDITION_MAP = {
 # Current-conditions variables requested from Open-Meteo
 CURRENT_VARIABLES = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m"
 
+# Without these there is nothing to show or score
+REQUIRED_CURRENT = ("temperature_2m", "relative_humidity_2m", "wind_speed_10m")
+
 # Daily forecast variables requested from Open-Meteo
 DAILY_VARIABLES = (
     "weather_code,temperature_2m_max,temperature_2m_min,relative_humidity_2m_mean,"
@@ -200,14 +203,15 @@ class WeatherClient:
         
         try:
             data = await self._request("GET", "/forecast", retries=RETRIES, params=params)
+            current = data.get("current") or {}
+            # Open-Meteo sends null for what it has no data for, and these can't be guessed
+            if any(current.get(name) is None for name in REQUIRED_CURRENT):
+                raise RuntimeError("Weather API returned no current conditions")
         except (TimeoutError, RuntimeError):
             stale = cache.get_stale(cache_key, STALE_SECONDS)
             if stale:
                 return stale
             raise
-        current = data.get("current")
-        if not current:
-            raise RuntimeError("Weather API returned no current conditions")
         
         condition_code = current.get("weather_code")
         result = {
