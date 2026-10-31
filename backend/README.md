@@ -273,15 +273,19 @@ The location must be one the geocoder can find, and the activity one that can be
 
 ### POST /api/confirm/{token}
 
-Confirms a request with the token from its email: starts the alerts, or applies the change to an existing subscription (`"status": "subscribed"` or `"updated"`), and sends the welcome email with the unsubscribe link. Other requests waiting for the same address are dropped. Returns `{"email", "location", "activity", "status"}`, or 404 for an unknown, used or expired token. The page opened from the email asks before calling it, so a mail scanner opening the link doesn't confirm. Subscribers from before confirmation get no alerts until they confirm; each is asked once, by email (see [Email Alerts](#email-alerts)).
+Confirms a request with the token from its email: starts the alerts, or applies the change to an existing subscription (`"status": "subscribed"` or `"updated"`), and sends the welcome email with the unsubscribe link. Other requests waiting for the same address are dropped. Returns `{"email", "location", "activity", "status"}`, or 404 for an unknown, used or expired token. The page opened from the email asks before calling it, so a mail scanner opening the link doesn't confirm. It also takes the token out of the address as soon as it opens, so a copied link doesn't carry it. Subscribers from before confirmation get no alerts until they confirm; each is asked once, by email (see [Email Alerts](#email-alerts)).
 
 ### POST /api/unsubscribe/{token}
 
 Stops the alerts and deletes the subscriber's details, along with any request waiting for that address. The token is in the link in every email sent to a subscriber. Returns `{\"email\": \"...\", \"status\": \"unsubscribed\"}`, or 404 for an unknown token, which includes one already used. Subscribing again and confirming starts afresh.
 
+### GET /api/unsubscribe/{token}
+
+For mail apps that open the `List-Unsubscribe` address as a link. Redirects (303) to `/?unsubscribe=<token>`, where the page asks first. It changes nothing, so a mail scanner fetching it can't unsubscribe anyone.
+
 ### POST /api/unsubscribe-link
 
-Emails a subscriber their unsubscribe link, for when they have no alert email to hand. Body: `{"email": "amina@example.com"}`. Always answers 202 with `{"status": "sent_if_subscribed"}`, so it does not reveal who is subscribed. Returns 503 if email is not configured.
+Emails a subscriber their unsubscribe link, for when they have no alert email to hand. Body: `{"email": "amina@example.com"}`. Always answers 202 with `{"status": "sent_if_subscribed"}`, and the email goes out after the response, so neither the answer nor its timing reveals who is subscribed. Returns 503 if email is not configured.
 
 ### GET /health
 

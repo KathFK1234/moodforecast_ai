@@ -91,6 +91,7 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | POST | `/api/subscribe` | Ask for daily alerts, or a change to them; emails a confirmation link and nothing starts until it is followed |
 | POST | `/api/confirm/{token}` | Confirm a request from its emailed link: starts or changes the alerts |
 | POST | `/api/unsubscribe/{token}` | Stop the alerts for a subscription |
+| GET | `/api/unsubscribe/{token}` | Redirect a mail app's unsubscribe link to the page, which asks first |
 | POST | `/api/unsubscribe-link` | Email a subscriber their unsubscribe link |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger UI |
