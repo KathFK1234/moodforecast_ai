@@ -344,6 +344,12 @@ def test_unsubscribe_deletes_the_subscriber(mock_weather, outbox):
             assert subscriber.token != token
 
 
+@pytest.mark.parametrize("path", ["/api/confirm/abc%00def", "/api/unsubscribe/abc%00def"])
+def test_a_token_with_a_nul_byte_is_just_an_unknown_token(path):
+    """PostgreSQL raises on these rather than finding nothing."""
+    assert client.post(path).status_code == 404
+
+
 def test_unsubscribe_unknown_token(mock_weather):
     response = client.post("/api/unsubscribe/not-a-real-token")
     assert response.status_code == 404

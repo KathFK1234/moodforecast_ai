@@ -1,5 +1,6 @@
 """Subscribe router - GET /api/alerts; POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,10 @@ router = APIRouter(prefix="/api", tags=["subscribe"])
 
 
 CONFIRM_HOURS = alerts.CONFIRM_HOURS
+
+# What secrets.token_urlsafe produces. Anything else is no token of ours, and
+# PostgreSQL refuses to look up text with a NUL byte in it.
+TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 EMAIL_UNAVAILABLE_MESSAGE = "Email alerts aren't available right now. Please try again later."
 
@@ -115,7 +120,7 @@ async def confirm(token: str) -> ConfirmResponse:
     expired token.
     """
     with Session(get_engine()) as session:
-        pending = session.get(PendingSubscription, token)
+        pending = session.get(PendingSubscription, token) if TOKEN_PATTERN.fullmatch(token) else None
         if pending is None or as_utc(pending.created_at) < utc_now() - timedelta(hours=CONFIRM_HOURS):
             raise HTTPException(
                 status_code=404,
@@ -178,9 +183,11 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
     used.
     """
     with Session(get_engine()) as session:
-        subscriber = session.exec(
-            select(Subscriber).where(Subscriber.token == token)
-        ).first()
+        subscriber = None
+        if TOKEN_PATTERN.fullmatch(token):
+            subscriber = session.exec(
+                select(Subscriber).where(Subscriber.token == token)
+            ).first()
         if subscriber is None:
             raise HTTPException(
                 status_code=404,
