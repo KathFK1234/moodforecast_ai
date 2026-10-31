@@ -1002,3 +1002,15 @@ def test_a_site_without_email_is_not_warned_about_its_links(monkeypatch, caplog)
     with patch("app.main.mailer.is_configured", return_value=False):
         warn_if_email_links_are_local()
     assert "PUBLIC_URL" not in caplog.text
+
+
+@pytest.mark.parametrize("path", ["/api/subscribe", "/api/unsubscribe-link"])
+@pytest.mark.parametrize("body, content_type", [
+    (b'{"email": "\\ud800", "location": "Nairobi"}', "application/json"),
+    (b'{"email": 1e999, "location": "Nairobi"}', "application/json"),
+    (b"\xff\xfe", "text/plain"),
+])
+def test_input_that_cant_be_echoed_is_still_answered_as_invalid(path, body, content_type):
+    response = client.post(path, content=body, headers={"content-type": content_type})
+    assert response.status_code == 422
+    assert all(set(problem) == {"type", "loc", "msg"} for problem in response.json()["detail"])

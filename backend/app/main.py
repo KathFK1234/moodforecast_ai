@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -220,6 +221,12 @@ def create_app() -> FastAPI:
         if request.url.path not in ("/docs", "/redoc"):
             response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
         return response
+    
+    @app.exception_handler(RequestValidationError)
+    async def refuse_invalid_request(request: Request, error: RequestValidationError) -> JSONResponse:
+        """Say what was wrong without echoing the input: what can't be parsed can't be sent back as JSON either."""
+        fields = [{key: problem[key] for key in ("type", "loc", "msg")} for problem in error.errors()]
+        return JSONResponse({"detail": fields}, status_code=422)
     
     # Include routers
     app.include_router(forecast.router)
