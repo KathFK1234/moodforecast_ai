@@ -908,6 +908,26 @@ class TestRateLimits:
     def test_an_oversized_request_is_refused_unread(self):
         response = client.post("/api/subscribe", content=b"x" * 5000, headers={"content-type": "application/json"})
         assert response.status_code == 413
+        assert response.headers["x-content-type-options"] == "nosniff"
+    
+    def test_a_chunked_request_cant_get_past_the_size_limit(self):
+        """A generator body is sent chunked, with no Content-Length to check."""
+        response = client.post(
+            "/api/subscribe",
+            content=(b"x" * 1000 for _ in range(5)),
+            headers={"content-type": "application/json"}
+        )
+        assert "content-length" not in response.request.headers
+        assert response.status_code == 413
+    
+    def test_a_chunked_request_within_the_limit_reaches_the_route(self):
+        body = json.dumps({"email": "not-an-address", "location": "Nairobi"}).encode()
+        response = client.post(
+            "/api/subscribe",
+            content=(body[i:i + 8] for i in range(0, len(body), 8)),
+            headers={"content-type": "application/json"}
+        )
+        assert response.status_code == 422
 
 
 def test_the_apps_info_lines_are_logged_and_httpx_is_quiet():

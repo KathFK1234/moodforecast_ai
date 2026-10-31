@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.config import settings
 from app.models.db import create_tables
 from app.routers import forecast, wellbeing, activity, locations, subscribe
@@ -49,6 +51,7 @@ SECURITY_HEADERS = {
 # up the weather services' allowance, or the form emails for everyone else
 api_limiter = RateLimiter(300, 60)
 form_limiter = RateLimiter(20, 3600)
+# The API's requests are a few short fields
 MAX_BODY_BYTES = 4096
 FORM_PATHS = ("/api/subscribe", "/api/unsubscribe-link")
 TOO_MANY_REQUESTS_MESSAGE = "That's a lot of requests in a short time. Please wait a few minutes and try again."
@@ -92,6 +95,46 @@ class RevalidatedStaticFiles(StaticFiles):
         # "no-cache" still allows caching, but only after asking the server (a cheap 304)
         response.headers["Cache-Control"] = "no-cache"
         return response
+
+
+class LimitApiBodySize:
+    """
+    Refuse an API request with a body over the limit, however it was sent.
+    
+    A chunked request declares no length, so the body is read here, stopping at
+    the limit, and handed on to the app once it's known to fit.
+    """
+    
+    def __init__(self, app: ASGIApp, limit: int = MAX_BODY_BYTES) -> None:
+        self.app = app
+        self.limit = limit
+    
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith("/api/"):
+            await self.app(scope, receive, send)
+            return
+        
+        length = Headers(scope=scope).get("content-length", "0")
+        too_large = not length.isdecimal() or int(length) > self.limit
+        messages: list[Message] = []
+        size = 0
+        more = not too_large
+        while more:
+            message = await receive()
+            messages.append(message)
+            size += len(message.get("body", b""))
+            too_large = size > self.limit
+            more = message.get("more_body", False) and not too_large
+        
+        if too_large:
+            response = JSONResponse({"detail": "That request is too large."}, status_code=413)
+            await response(scope, receive, send)
+            return
+        
+        async def replay() -> Message:
+            return messages.pop(0) if messages else await receive()
+        
+        await self.app(scope, replay, send)
 
 
 def warn_if_email_links_are_local() -> None:
@@ -152,15 +195,13 @@ def create_app() -> FastAPI:
         allow_methods=["GET"],
     )
     
+    app.add_middleware(LimitApiBodySize)
+    
     # Added first, so the security headers wrap this response too
     @app.middleware("http")
     async def limit_requests(request: Request, call_next):
         path = request.url.path
         if path.startswith("/api/"):
-            # The API's requests are a few short fields
-            length = request.headers.get("content-length", "0")
-            if not length.isdigit() or int(length) > MAX_BODY_BYTES:
-                return JSONResponse({"detail": "That request is too large."}, status_code=413)
             # Railway's proxy says who the visitor is; without one there's the connection
             visitor = request.headers.get("x-real-ip") or (request.client.host if request.client else "")
             limiter = form_limiter if path in FORM_PATHS and request.method == "POST" else api_limiter
