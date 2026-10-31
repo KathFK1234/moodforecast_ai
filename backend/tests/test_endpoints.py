@@ -1050,3 +1050,38 @@ def test_search_engines_are_kept_off_the_api_docs(path):
 
 def test_search_engines_may_index_the_page():
     assert "x-robots-tag" not in client.get("/").headers
+
+
+def test_startup_and_shutdown_run_the_alert_loop_only_while_the_app_is_up(monkeypatch):
+    started, stopped = asyncio.Event(), []
+    
+    async def alert_loop():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            stopped.append(True)
+            raise
+    
+    monkeypatch.setattr(alerts, "run_alert_loop", alert_loop)
+    with patch("app.main.create_tables") as create_tables, \
+         patch("app.main.mailer.is_configured", return_value=True), \
+         patch("app.main.get_weather_client") as weather_client:
+        weather_client.return_value.close = AsyncMock()
+        with TestClient(app) as running:
+            assert running.get("/health").status_code == 200
+            running.portal.call(started.wait)
+        assert stopped == [True]
+        weather_client.return_value.close.assert_awaited_once()
+    create_tables.assert_called_once()
+
+
+def test_without_email_no_alert_loop_is_started(monkeypatch):
+    monkeypatch.setattr(alerts, "run_alert_loop", AsyncMock(side_effect=AssertionError("started")))
+    with patch("app.main.create_tables"), \
+         patch("app.main.mailer.is_configured", return_value=False), \
+         patch("app.main.get_weather_client") as weather_client:
+        weather_client.return_value.close = AsyncMock()
+        with TestClient(app):
+            pass
+    alerts.run_alert_loop.assert_not_called()
