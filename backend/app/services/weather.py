@@ -1,6 +1,7 @@
 """Async HTTP client for the Open-Meteo weather API (https://open-meteo.com)."""
 
 import asyncio
+import math
 import httpx
 from typing import Any
 from app.config import settings
@@ -61,6 +62,19 @@ STALE_SECONDS = 3600
 
 # How far around a place to look for open sea, in degrees (about 20 km)
 SEA_SEARCH_DEGREES = 0.2
+
+
+def finite(value: Any) -> float:
+    """A number from a reply. Raises ValueError for NaN or infinity, which JSON responses can't carry."""
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{value} is not a usable number")
+    return number
+
+
+def optional_number(value: Any) -> float | None:
+    """A number from a reply that may be missing."""
+    return None if value is None else finite(value)
 
 
 class RateLimitedError(RuntimeError):
@@ -203,33 +217,40 @@ class WeatherClient:
         
         try:
             data = await self._request("GET", "/forecast", retries=RETRIES, params=params)
-            current = data.get("current") or {}
-            # Open-Meteo sends null for what it has no data for, and these can't be guessed
-            if any(current.get(name) is None for name in REQUIRED_CURRENT):
-                raise RuntimeError("Weather API returned no current conditions")
+            result = self._parse_forecast(data)
         except (TimeoutError, RuntimeError):
             stale = cache.get_stale(cache_key, STALE_SECONDS)
             if stale:
                 return stale
             raise
         
-        condition_code = current.get("weather_code")
-        result = {
-            "current": {
-                "temperature": float(current.get("temperature_2m", 0)),
-                "feels_like": current.get("apparent_temperature"),
-                "humidity": float(current.get("relative_humidity_2m", 0)),
-                "wind_speed": float(current.get("wind_speed_10m", 0)),
-                "is_day": current.get("is_day", 1) != 0,
-                "condition_code": condition_code,
-                "condition": self._get_condition_text(condition_code),
-            },
-            "daily": self._parse_daily(data.get("daily") or {}),
-            "utc_offset_seconds": int(data.get("utc_offset_seconds") or 0),
-            "elevation": data.get("elevation"),
-        }
         cache.set(cache_key, result)
         return result
+    
+    def _parse_forecast(self, data: Any) -> dict[str, Any]:
+        """Turn Open-Meteo's reply into get_forecast's shape. Raises RuntimeError if it can't be used."""
+        try:
+            current = data.get("current") or {}
+            # Open-Meteo sends null for what it has no data for, and these can't be guessed
+            if any(current.get(name) is None for name in REQUIRED_CURRENT):
+                raise RuntimeError("Weather API returned no current conditions")
+            condition_code = current.get("weather_code")
+            return {
+                "current": {
+                    "temperature": finite(current["temperature_2m"]),
+                    "feels_like": optional_number(current.get("apparent_temperature")),
+                    "humidity": finite(current["relative_humidity_2m"]),
+                    "wind_speed": finite(current["wind_speed_10m"]),
+                    "is_day": current.get("is_day", 1) != 0,
+                    "condition_code": condition_code,
+                    "condition": self._get_condition_text(condition_code),
+                },
+                "daily": self._parse_daily(data.get("daily") or {}),
+                "utc_offset_seconds": int(data.get("utc_offset_seconds") or 0),
+                "elevation": data.get("elevation"),
+            }
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            raise RuntimeError(f"Weather API sent a reply it can't be read from: {e!r}") from e
     
     def _parse_daily(self, daily: dict[str, Any]) -> list[dict[str, Any]]:
         """Turn Open-Meteo's column-per-variable daily block into one dict per day."""
@@ -260,9 +281,9 @@ class WeatherClient:
                 "condition": self._get_condition_text(code),
                 "temp_max": float(temp_max),
                 "temp_min": float(temp_min),
-                "humidity": humidity,
-                "precipitation_chance": rain_chance,
-                "uv_index": uv_index,
+                "humidity": optional_number(humidity),
+                "precipitation_chance": optional_number(rain_chance),
+                "uv_index": optional_number(uv_index),
                 # "2026-10-05T06:17" -> "06:17"
                 "sunrise": sunrise[-5:] if sunrise else None,
                 "sunset": sunset[-5:] if sunset else None,
@@ -305,12 +326,15 @@ class WeatherClient:
             return None
         
         # One result per point; a single point comes back as a bare object
-        readings = [
-            (place.get("current") or {})
-            for place in (data if isinstance(data, list) else [data])
-        ]
-        at_sea = [r for r in readings if r.get("wave_height") is not None]
-        temps = [r["sea_surface_temperature"] for r in at_sea if r.get("sea_surface_temperature") is not None]
+        try:
+            readings = [
+                (place.get("current") or {})
+                for place in (data if isinstance(data, list) else [data])
+            ]
+            at_sea = [r for r in readings if r.get("wave_height") is not None]
+            temps = [r["sea_surface_temperature"] for r in at_sea if r.get("sea_surface_temperature") is not None]
+        except AttributeError:
+            return None
         result = {"coastal": bool(at_sea), "sea_temp_c": temps[0] if temps else None}
         cache.set(cache_key, result)
         return result

@@ -1,9 +1,10 @@
 """Unit tests for the Open-Meteo weather client - HTTP layer is mocked."""
 
+import asyncio
+import json
+import time
 import httpx
 import pytest
-import asyncio
-import time
 
 from app.services import weather
 from app.services.cache import cache
@@ -414,3 +415,37 @@ async def test_a_null_temperature_falls_back_to_the_last_forecast():
     cache.delete("weather:50.0:8.0")
     with pytest.raises(RuntimeError, match="no current conditions"):
         await client.get_forecast(50.0, 8.0)
+
+
+@pytest.mark.parametrize("reply", [
+    [],
+    None,
+    "text",
+    {"current": []},
+    {"current": {**OPEN_METEO_RESPONSE["current"], "temperature_2m": "hot"}},
+    {"current": {**OPEN_METEO_RESPONSE["current"], "temperature_2m": 1e999}},
+    {**OPEN_METEO_RESPONSE, "daily": "text"},
+    {**OPEN_METEO_RESPONSE, "daily": {**OPEN_METEO_RESPONSE["daily"], "temperature_2m_max": ["x", "y", "z"]}},
+    {**OPEN_METEO_RESPONSE, "utc_offset_seconds": "text"},
+])
+@pytest.mark.asyncio
+async def test_a_forecast_reply_of_the_wrong_shape_counts_as_unavailable(reply):
+    client = make_client(lambda request: httpx.Response(200, text=json.dumps(reply)))
+    with pytest.raises(RuntimeError):
+        await client.get_forecast(1.0, 2.0)
+
+
+@pytest.mark.asyncio
+async def test_a_recent_forecast_stands_in_for_a_reply_of_the_wrong_shape():
+    replies = [OPEN_METEO_RESPONSE, {"current": []}]
+    client = make_client(lambda request: httpx.Response(200, json=replies.pop(0)))
+    first = await client.get_forecast(1.0, 2.0)
+    cache._cache["weather:1.0:2.0"] = (first, time.time() - weather.settings.cache_ttl_seconds - 1)
+    assert await client.get_forecast(1.0, 2.0) == first
+
+
+@pytest.mark.parametrize("reply", [None, "text", 1, [1], [{"current": "text"}]])
+@pytest.mark.asyncio
+async def test_a_sea_reply_of_the_wrong_shape_is_no_sea_information(reply):
+    client = make_client(lambda request: httpx.Response(200, json=reply))
+    assert await client.get_sea(1.0, 2.0) is None
