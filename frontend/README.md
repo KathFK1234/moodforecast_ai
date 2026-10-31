@@ -29,7 +29,7 @@ The frontend is intentionally minimal:
 The backend serves `backend/app/static/`, which is a copy of this directory. After editing files here, copy them across:
 
 ```bash
-cp frontend/index.html frontend/app.js frontend/styles.css backend/app/static/
+cp -r frontend/. backend/app/static/ && rm backend/app/static/README.md
 ```
 
 The backend test `tests/test_static_sync.py` fails if the two copies differ.

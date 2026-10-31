@@ -163,7 +163,7 @@ BASE_URL=http://localhost:8001 ./run_tests.sh
 The backend serves the files in `backend/app/static/`, which is a copy of `frontend/`. Edit the files in `frontend/`, then copy them across:
 
 ```bash
-cp frontend/index.html frontend/app.js frontend/styles.css backend/app/static/
+cp -r frontend/. backend/app/static/ && rm backend/app/static/README.md
 ```
 
 A test (`tests/test_static_sync.py`) fails if the two copies differ.
