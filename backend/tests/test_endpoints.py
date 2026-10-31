@@ -350,6 +350,19 @@ def test_a_token_with_a_nul_byte_is_just_an_unknown_token(path):
     assert client.post(path).status_code == 404
 
 
+def test_opening_the_mail_header_link_in_a_browser_asks_on_the_page(mock_weather, outbox):
+    engine = memory_engine()
+    with patch('app.routers.subscribe.get_engine', return_value=engine):
+        subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi")
+        with Session(engine) as session:
+            token = session.exec(select(Subscriber)).one().token
+        response = client.get(f"/api/unsubscribe/{token}", follow_redirects=False)
+        with Session(engine) as session:
+            assert session.exec(select(Subscriber)).one().token == token  # Still subscribed
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/?unsubscribe={token}"
+
+
 def test_nul_bytes_are_refused_before_they_reach_the_database():
     email = client.post("/api/unsubscribe-link", json={"email": "a\x00b@example.com"})
     location = client.post("/api/subscribe", json={"email": "a@example.com", "location": "Nai\x00robi"})

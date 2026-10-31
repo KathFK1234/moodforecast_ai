@@ -4,7 +4,9 @@ import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 from app.models.db import PendingSubscription, Subscriber, as_utc, get_engine, utc_now
 from app.models.schemas import (
@@ -200,6 +202,17 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
         session.delete(subscriber)
         session.commit()
         return UnsubscribeResponse(email=email)
+
+
+@router.get("/unsubscribe/{token}", include_in_schema=False)
+async def unsubscribe_page(token: str) -> RedirectResponse:
+    """
+    Send someone who opened the List-Unsubscribe address in a browser to the page.
+    
+    Mail apps without one-click support open it as a link. This changes nothing:
+    mail scanners fetch links too, so unsubscribing stays a POST the page asks about.
+    """
+    return RedirectResponse(f"/?unsubscribe={quote(token, safe='')}", status_code=303)
 
 
 @router.post("/unsubscribe-link", status_code=202)
