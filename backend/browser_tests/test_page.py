@@ -141,6 +141,15 @@ def test_an_email_link_unsubscribes_from_the_pop_up_and_clears_the_saved_subscri
     assert page.evaluate("localStorage.getItem('moodforecast:subscription')") is None
 
 
+@pytest.mark.parametrize("link", ["?unsubscribe=good", "?confirm=good"])
+def test_an_email_links_token_leaves_the_address_at_once(page, site, link):
+    open_page(page, site, f"{link}&q=Nairobi")
+    assert "good" not in page.url
+    assert "q=Nairobi" in page.url
+    page.keyboard.press("Escape")
+    assert "good" not in page.url
+
+
 def test_a_used_email_link_says_so_and_the_pop_up_recovers(page, site):
     open_page(page, site, "?unsubscribe=used")
     page.click("#optOutConfirm")

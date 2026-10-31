@@ -796,8 +796,6 @@ function showConfirmPrompt(token) {
             banner.className = 'notice notice-success';
             banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due. If they land in spam, mark them as not spam.`;
             rememberSubscription({ email: data.email, location: data.location });
-            // Drop the token from the address bar so a reload doesn't ask again
-            window.history.replaceState(null, '', window.location.pathname);
         } catch (error) {
             banner.className = 'notice notice-error';
             banner.textContent = error.message;
@@ -824,8 +822,6 @@ function showUnsubscribePrompt(token) {
             showNotice(msg, `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
             const saved = savedSubscription();
             if (saved && saved.email === data.email) rememberSubscription(null);
-            // Drop the token from the address bar so a reload doesn't ask again
-            window.history.replaceState(null, '', window.location.pathname);
         } catch (error) {
             showNotice(msg, error.message, true);
         } finally {
@@ -986,6 +982,16 @@ function reloadIfPageIsStale() {
     return true;
 }
 
+// Whatever the visitor does next, the address must not keep an email link's token:
+// searches add to this address, and it gets copied, shared and kept in the history
+function forgetEmailToken() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('unsubscribe') && !url.searchParams.has('confirm')) return;
+    url.searchParams.delete('unsubscribe');
+    url.searchParams.delete('confirm');
+    window.history.replaceState(null, '', url);
+}
+
 function init() {
     if (reloadIfPageIsStale()) return;
 
@@ -1021,6 +1027,7 @@ function init() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('unsubscribe')) showUnsubscribePrompt(params.get('unsubscribe'));
     else if (params.get('confirm')) showConfirmPrompt(params.get('confirm'));
+    forgetEmailToken();
 
     // Start from ?q= in the link, then the last place searched, then the default
     let initial = el('locationInput').value;
