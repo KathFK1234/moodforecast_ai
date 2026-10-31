@@ -269,7 +269,7 @@ curl -X POST http://localhost:8000/api/subscribe \
 }
 ```
 
-The location must be one the geocoder can find, and the activity one that can be done there: surfing in an inland town is refused with the reason (both 422). `confirmation_sent` is `false` if the email could not be sent. If a link went to the same address in the last 10 minutes, nothing new is stored or sent and `status` is `"already_sent"`, so the link already in the inbox stays the one that counts. Without email configured the request is refused with 503, since it could never be confirmed. The response never includes a subscriber's token, so typing someone's address in can't be used to unsubscribe them or change their alerts.
+The location must be one the geocoder can find, and the activity one that can be done there: surfing in an inland town is refused with the reason (both 422). `confirmation_sent` is `false` if the email could not be sent. If a link went to the same address in the last 10 minutes, nothing new is stored or sent and `status` is `"already_sent"`, so the link already in the inbox stays the one that counts. One address gets at most 5 emails a day from the forms. Without email configured the request is refused with 503, since it could never be confirmed. The response never includes a subscriber's token, so typing someone's address in can't be used to unsubscribe them or change their alerts.
 
 ### POST /api/confirm/{token}
 

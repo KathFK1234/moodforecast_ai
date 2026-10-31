@@ -22,6 +22,7 @@ from app.services.cache import TTLCache
 from app.services.curiosity import curiosity_prompts
 from app.services.locality import build_place
 from app.services.mood_engine import build_summary, score_mood
+from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,11 @@ _recently_sent = TTLCache(settings.cache_ttl_seconds)
 # allowance (300 on Brevo's free plan), which the daily alerts need too.
 MAX_FORM_EMAILS_PER_DAY = 100
 _form_emails_sent: deque[float] = deque()
+
+# Emails the forms may send to one address in a day. The 10-minute guard alone
+# would let someone send a stranger over a hundred requests a day.
+MAX_FORM_EMAILS_PER_ADDRESS = 5
+_address_limiter = RateLimiter(MAX_FORM_EMAILS_PER_ADDRESS, 86400)
 
 # A paragraph is plain text, or (text, link label, link url)
 Paragraph = str | tuple[str, str, str]
@@ -203,7 +209,8 @@ async def send_once(to: str, email: Email, kind: str, token: str | None = None) 
     at most once per address per cache lifetime (10 minutes by default).
     
     Stops the subscribe and unsubscribe forms being used to flood someone's
-    inbox, and sends nothing once MAX_FORM_EMAILS_PER_DAY is reached. Returns True if the email was sent now or is already on its way
+    inbox, and sends nothing once MAX_FORM_EMAILS_PER_DAY, or
+    MAX_FORM_EMAILS_PER_ADDRESS for this address, is reached. Returns True if the email was sent now or is already on its way
     from a moment ago. `token` is the subscriber's, for the unsubscribe
     headers, if there is one.
     """
@@ -212,6 +219,9 @@ async def send_once(to: str, email: Email, kind: str, token: str | None = None) 
         return True
     if not _form_email_allowance_left():
         logger.warning("Daily limit of %d form emails reached, not sent", MAX_FORM_EMAILS_PER_DAY)
+        return False
+    if not _address_limiter.allow(to):
+        logger.warning("Daily limit of %d form emails to one address reached, not sent", MAX_FORM_EMAILS_PER_ADDRESS)
         return False
     # Marked before sending: a second request arriving during the send must not send again
     _recently_sent.set(cache_key, True)

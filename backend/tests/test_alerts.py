@@ -472,3 +472,14 @@ class TestAlertLoop:
                 await alerts.run_alert_loop()
         
         assert len(pauses) == 2
+
+
+def test_one_address_gets_only_so_many_form_emails_in_a_day(outbox):
+    email = alerts.Email("Subject", "Text", "<p>Text</p>")
+    results = []
+    for _ in range(alerts.MAX_FORM_EMAILS_PER_ADDRESS + 2):
+        results.append(asyncio.run(alerts.send_once("target@example.com", email, "confirm")))
+        alerts._recently_sent.clear()  # As if the 10-minute guard had lifted
+    
+    assert results == [True] * alerts.MAX_FORM_EMAILS_PER_ADDRESS + [False] * 2
+    assert asyncio.run(alerts.send_once("other@example.com", email, "confirm")) is True
