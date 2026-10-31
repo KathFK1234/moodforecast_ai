@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine, inspect, text
 from app.config import Settings
-from app.models.db import create_tables, engine_url
+from app.models.db import connect_args, create_tables, engine_url
 
 
 @pytest.mark.parametrize("url", [
@@ -65,3 +65,11 @@ def test_queries_and_their_values_are_not_logged_unless_asked_for():
 def test_an_alert_hour_that_never_comes_is_refused(hour):
     with pytest.raises(ValidationError):
         Settings(alert_hour=hour, _env_file=None)
+
+
+def test_postgresql_connections_give_up_rather_than_hang():
+    assert connect_args(engine_url("postgres://u:p@db/x")) == {"connect_timeout": 10}
+
+
+def test_sqlite_is_not_given_a_postgresql_option():
+    assert connect_args("sqlite:///./moodforecast.db") == {}

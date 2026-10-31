@@ -7,6 +7,10 @@ from sqlmodel import SQLModel, Field, create_engine
 from app.config import settings
 
 
+# Without a limit an unreachable database holds a request, or startup, for minutes
+DB_CONNECT_TIMEOUT_SECONDS = 10
+
+
 class Subscriber(SQLModel, table=True):
     """
     Daily email alert subscriber table.
@@ -49,6 +53,11 @@ def engine_url(url: str) -> str:
     return url
 
 
+def connect_args(url: str) -> dict[str, int]:
+    """Driver options: how long PostgreSQL gets to answer before a connection attempt gives up."""
+    return {"connect_timeout": DB_CONNECT_TIMEOUT_SECONDS} if url.startswith("postgresql") else {}
+
+
 def utc_now() -> datetime:
     """The time now, in UTC."""
     return datetime.now(timezone.utc)
@@ -83,9 +92,11 @@ class PendingSubscription(SQLModel, table=True):
 @lru_cache
 def get_engine():
     """Get the shared database engine, created from settings on first use."""
+    url = engine_url(settings.database_url)
     return create_engine(
-        engine_url(settings.database_url),
+        url,
         echo=settings.sql_echo,
+        connect_args=connect_args(url),
         # A connection the database closed while idle is replaced, not handed to a request
         pool_pre_ping=True
     )
