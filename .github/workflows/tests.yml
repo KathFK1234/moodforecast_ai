@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # New vulnerabilities are published whether or not anyone is pushing
+  schedule:
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read
