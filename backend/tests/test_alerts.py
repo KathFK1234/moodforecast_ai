@@ -483,3 +483,11 @@ def test_one_address_gets_only_so_many_form_emails_in_a_day(outbox):
     
     assert results == [True] * alerts.MAX_FORM_EMAILS_PER_ADDRESS + [False] * 2
     assert asyncio.run(alerts.send_once("other@example.com", email, "confirm")) is True
+
+
+def test_the_daily_email_says_it_isnt_medical_advice():
+    subscriber = Subscriber(id="1", email="a@example.com", token="t", location="Nairobi", place="Nairobi, KE", lat=-1.3, lon=36.8)
+    forecast = {"current": {"temperature": 20.0, "humidity": 50.0, "wind_speed": 5.0, "is_day": True, "condition": "Clear"}}
+    email = alerts.daily_email(subscriber, forecast)
+    assert "not medical advice" in email.text
+    assert "not medical advice" in email.html

@@ -329,7 +329,11 @@ def daily_email(
         heading=f"{place} today",
         paragraphs=paragraphs,
         token=subscriber.token,
-        footer=f"You get this because you subscribed to daily alerts for {place}.",
+        footer=(
+            f"You get this because you subscribed to daily alerts for {place}. "
+            "These are ideas for your day, not medical advice. "
+            "If you're struggling, please talk to a health professional or someone you trust."
+        ),
     )
 
 
