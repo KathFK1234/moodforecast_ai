@@ -66,7 +66,7 @@ jobs:
         run: docker build -t moodforecast backend
       - name: Start it and check it answers
         run: |
-          docker run -d --name app -p 8000:8000 -e ENVIRONMENT=production moodforecast
+          docker run -d --name app -p 8000:8000 moodforecast
           for attempt in $(seq 1 20); do
             curl -sf http://localhost:8000/health && exit 0
             sleep 1

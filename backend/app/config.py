@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     marine_api_url: str = "https://marine-api.open-meteo.com/v1"
     database_url: str = "sqlite:///./moodforecast.db"
     cache_ttl_seconds: int = 600
-    environment: str = "development"
+    # Prints every query with its values, which include addresses and tokens
+    sql_echo: bool = False
     
     # Email: Brevo's HTTPS API when brevo_api_key is set (works on hosts that block
     # SMTP, such as Railway's Hobby plan), otherwise SMTP. Nothing is sent until

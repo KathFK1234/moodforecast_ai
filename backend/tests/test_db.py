@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
+from app.config import Settings
 from app.models.db import create_tables, engine_url
 
 
@@ -53,3 +54,7 @@ def test_an_older_subscriber_table_gets_the_new_columns(tmp_path):
         row = connection.execute(text("SELECT confirmed, confirm_requested_at FROM alert_subscriber")).one()
     # Existing subscribers start unconfirmed, and haven't been asked yet
     assert row == (0, None)
+
+
+def test_queries_and_their_values_are_not_logged_unless_asked_for():
+    assert Settings(_env_file=None).sql_echo is False

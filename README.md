@@ -112,7 +112,7 @@ All are optional.
 | -------- | ------- | ------- |
 | `DATABASE_URL` | `sqlite:///./moodforecast.db` | SQLite or PostgreSQL connection string |
 | `CACHE_TTL_SECONDS` | `600` | How long weather and geocoding results are cached |
-| `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
+| `SQL_ECHO` | `false` | `true` logs every SQL statement with its values, including email addresses and tokens. For local debugging only |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
 | `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is on the coast; only change this if you self-host it |
 | `BREVO_API_KEY` | (unset) | Brevo API key: email goes through Brevo's HTTPS API instead of SMTP (needed on hosts that block SMTP, such as Railway's Hobby plan). `MAIL_FROM` must be a sender verified in Brevo |

@@ -85,7 +85,7 @@ def get_engine():
     """Get the shared database engine, created from settings on first use."""
     return create_engine(
         engine_url(settings.database_url),
-        echo=settings.environment == "development",
+        echo=settings.sql_echo,
         # A connection the database closed while idle is replaced, not handed to a request
         pool_pre_ping=True
     )

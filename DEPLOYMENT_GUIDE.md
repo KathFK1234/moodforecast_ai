@@ -64,14 +64,13 @@ In the project's "Variables" tab:
 
 | Variable | Value |
 | -------- | ----- |
-| `ENVIRONMENT` | `production` |
 | `CACHE_TTL_SECONDS` | `600` (optional) |
 | `DATABASE_URL` | PostgreSQL URL (recommended, see below) |
 | `PUBLIC_URL` | `https://YOUR_DOMAIN` - used for the confirmation and unsubscribe links in emails |
 | `BREVO_API_KEY`, `MAIL_FROM` | Your Brevo API key, and the sender you verified in Brevo (see below) |
 | `ALERT_HOUR` | `7` (optional) - local hour the daily alert is sent |
 
-Variables left over from the old weather provider, such as `WEATHERAI_API_KEY`, are ignored and can be deleted.
+Variables left over from earlier versions, such as `WEATHERAI_API_KEY` and `ENVIRONMENT`, are ignored and can be deleted.
 
 **Database:** if `DATABASE_URL` is not set, the app uses a SQLite file inside the container. That file is lost on every redeploy, so subscribers will not persist. To keep them, add a PostgreSQL database in Railway and set `DATABASE_URL` to its connection URL. Tables are created on startup.
 
@@ -108,7 +107,7 @@ Then open `https://YOUR_DOMAIN` in a browser, search for a few locations and sub
 ```bash
 cd backend
 docker build -t moodforecast .
-docker run -p 8000:8000 -e ENVIRONMENT=production moodforecast
+docker run -p 8000:8000 moodforecast
 ```
 
 The container listens on `$PORT` if it is set, otherwise 8000.
@@ -121,7 +120,7 @@ All are optional.
 | -------- | ------- | ------- |
 | `DATABASE_URL` | `sqlite:///./moodforecast.db` | SQLite or PostgreSQL connection string |
 | `CACHE_TTL_SECONDS` | `600` | How long weather and geocoding results are cached |
-| `ENVIRONMENT` | `development` | `development` logs SQL statements; use `production` when deployed |
+| `SQL_ECHO` | `false` | `true` logs every SQL statement with its values, including email addresses and tokens. For local debugging only |
 | `WEATHER_API_URL` | `https://api.open-meteo.com/v1` | Only change this if you self-host Open-Meteo |
 | `MARINE_API_URL` | `https://marine-api.open-meteo.com/v1` | Open-Meteo marine API, used to tell whether a place is on the coast; only change this if you self-host it |
 | `PORT` | `8000` | Set by Railway |
