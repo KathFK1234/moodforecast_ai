@@ -3,7 +3,12 @@
 import tomllib
 from pathlib import Path
 
+import pytest
+
 BACKEND = Path(__file__).resolve().parent.parent
+# Railway stops reading it on 2026-12-01, and DEPLOYMENT_GUIDE.md says to remove it once its settings move
+if not (BACKEND / "railway.toml").exists():
+    pytest.skip("no railway.toml", allow_module_level=True)
 CONFIG = tomllib.loads((BACKEND / "railway.toml").read_text())
 # The keys in use today from Railway's published schema, https://railway.com/railway.schema.json
 KNOWN_KEYS = {

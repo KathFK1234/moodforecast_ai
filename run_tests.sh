@@ -249,10 +249,11 @@ else
     fail "Docker configuration missing"
 fi
 
+# Railway stops reading railway.toml on 2026-12-01, so it can go once its settings are moved
 if [ -f "backend/railway.toml" ]; then
-    pass "Railway configuration exists"
+    pass "Railway configuration exists (Railway stops reading it on 2026-12-01)"
 else
-    fail "Railway configuration missing"
+    pass "No railway.toml: Railway takes its settings from the dashboard or .railway/"
 fi
 
 if [ -f "backend/requirements.txt" ]; then

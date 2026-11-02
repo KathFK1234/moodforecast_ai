@@ -112,10 +112,11 @@ else
     fail "Dockerfile missing"
 fi
 
+# Railway stops reading railway.toml on 2026-12-01, so it can go once its settings are moved
 if [ -f "railway.toml" ]; then
-    pass "railway.toml exists"
+    pass "railway.toml exists (Railway stops reading it on 2026-12-01)"
 else
-    fail "railway.toml missing"
+    pass "No railway.toml: Railway takes its settings from the dashboard or .railway/"
 fi
 echo ""
 
