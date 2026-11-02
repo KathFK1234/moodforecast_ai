@@ -9,6 +9,8 @@ on:
   # New vulnerabilities are published whether or not anyone is pushing
   schedule:
     - cron: "23 5 * * 1"
+  # GitHub can delay or drop scheduled runs, so the checks can also be started by hand (Actions tab, Run workflow)
+  workflow_dispatch:
 
 permissions:
   contents: read
