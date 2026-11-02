@@ -78,7 +78,8 @@ jobs:
         run: docker build -t moodforecast backend
       - name: Start it and check it answers
         run: |
-          docker run -d --name app -p 8000:8000 moodforecast
+          # Railway sets PORT, so listen where it says rather than on the default
+          docker run -d --name app -e PORT=8080 -p 8000:8080 moodforecast
           for attempt in $(seq 1 20); do
             curl -sf http://localhost:8000/health && break
             if [ "$attempt" = 20 ]; then docker logs app; exit 1; fi
