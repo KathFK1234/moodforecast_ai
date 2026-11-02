@@ -4,7 +4,7 @@
 # Run all tests and validations before deployment
 
 # Run from the repo root so relative paths work from any directory
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 
 # Backend to test against (override if port 8000 is taken, e.g. BASE_URL=http://localhost:8001)
 BASE_URL="${BASE_URL:-http://localhost:8000}"
@@ -116,7 +116,7 @@ docs=$(curl -s $BASE_URL/docs | grep -o 'swagger')
 # Unit Tests
 test_header "3. Unit Tests"
 
-cd backend
+cd backend || exit 1
 
 # Use the project's virtual environment when it isn't activated
 if [ -x "venv/bin/python" ]; then

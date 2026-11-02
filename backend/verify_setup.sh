@@ -33,7 +33,7 @@ pass() {
 
 # 1. Check Python environment
 echo "1. Python Environment"
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 if [ -d "venv" ]; then
     pass "Virtual environment exists"
 else
