@@ -91,7 +91,7 @@ class DailyForecast(BaseModel):
     condition: str
     temp_max_c: float
     temp_min_c: float
-    precipitation_chance: float | None = Field(None, description="Highest chance of precipitation, %")
+    precipitation_chance: float | None = Field(None, description="The day's highest hourly chance of rain or snow, %")
     uv_index: float | None = None
     sunrise: str | None = Field(None, description="Local time, HH:MM")
     sunset: str | None = Field(None, description="Local time, HH:MM")

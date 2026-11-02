@@ -244,7 +244,7 @@ function displayForecast(days) {
         if (day.precipitation_chance != null) {
             // aria-label needs a role: a plain div's label is ignored
             rainEl.setAttribute('role', 'img');
-            rainEl.setAttribute('aria-label', `${round(day.precipitation_chance)}% chance of rain`);
+            rainEl.setAttribute('aria-label', `${round(day.precipitation_chance)}% chance of rain or snow at some point`);
         }
 
         const tempEl = document.createElement('div');

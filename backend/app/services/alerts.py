@@ -296,7 +296,8 @@ def daily_email(
             f"{round(today['temp_min'])} to {round(today['temp_max'])}°C"
         )
         if today.get("precipitation_chance") is not None:
-            outlook += f", {round(today['precipitation_chance'])}% chance of rain"
+            # The day's highest hourly chance, of snow as well as rain
+            outlook += f", {round(today['precipitation_chance'])}% chance of rain or snow at some point"
         paragraphs.append(outlook + ".")
     
     weather = (place, condition, temperature, humidity, wind, is_day)
