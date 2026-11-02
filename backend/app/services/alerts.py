@@ -285,7 +285,8 @@ def daily_email(
     paragraphs: list[Paragraph] = [
         build_summary(place, condition, temperature, mood["mood_score"], mood["factors"], is_day),
         f"Weather mood score: {mood['mood_score']} out of 100 ({mood['mood_label']}). "
-        f"Days like this tend to bring {mood['energy_level'].lower()} energy, though yours may differ.",
+        # Fixed rules, not fitted to anyone's mood, so this mustn't read as an observed pattern
+        f"As a rule of thumb, days like this suggest {mood['energy_level'].lower()} energy, though yours may differ.",
     ]
     
     daily = forecast.get("daily") or []

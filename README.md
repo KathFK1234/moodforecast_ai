@@ -35,7 +35,7 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 ## Features
 
 - **Live weather** - current conditions, feels-like, rain chance, UV, sunrise and sunset from Open-Meteo
-- **Mood scoring** - rule-based score (0-100) with a mood label, energy and risk levels
+- **Mood scoring** - score (0-100) from fixed, hand-set rules, not fitted to mood data, with a mood label, energy and risk levels
 - **Why this score** - the factors that raised or lowered the score, and by how much
 - **7-day mood outlook** - expected mood for each day of the forecast
 - **Recommendations** - varied activity ideas and wellbeing tips based on condition, temperature, humidity and time of day; they change between visits
