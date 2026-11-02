@@ -1,7 +1,7 @@
-# Environment variables
+# Environment variables: every .env file but the example, as in backend/.dockerignore
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Python
 __pycache__/
