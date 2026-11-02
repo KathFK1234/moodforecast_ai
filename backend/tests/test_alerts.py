@@ -491,3 +491,21 @@ def test_the_daily_email_says_it_isnt_medical_advice():
     email = alerts.daily_email(subscriber, forecast)
     assert "not medical advice" in email.text
     assert "not medical advice" in email.html
+
+
+def _contrast_with_white(colour: str) -> float:
+    """WCAG contrast ratio of a #rrggbb colour against white."""
+    channels = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    return 1.05 / (luminance + 0.05)
+
+
+def test_email_text_and_links_are_readable_on_white():
+    """WCAG AA asks for 4.5:1 for normal-sized text, and the footer's links are 12px."""
+    import re
+    page = alerts.welcome_email(make_subscriber()).html
+    colours = set(re.findall(r"color:(#[0-9a-fA-F]{6})", page))
+    assert colours
+    for colour in colours:
+        assert _contrast_with_white(colour) >= 4.5, colour

@@ -96,11 +96,11 @@ def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str
             text_parts.append(f"{words}\n{label}: {url}")
             content = (
                 f'{html.escape(words)} '
-                f'<a href="{html.escape(url)}" style="color:#3987e5">{html.escape(label)}</a>'
+                f'<a href="{html.escape(url)}" style="color:#2563c9">{html.escape(label)}</a>'
             )
         body += f'<p style="margin:0 0 14px;line-height:1.55">{content}</p>'
     text = "\n\n".join([heading, *text_parts, f"{footer}\nUnsubscribe: {link}" if link else footer])
-    footer_link = f' <a href="{html.escape(link)}" style="color:#3987e5">Unsubscribe</a>' if link else ""
+    footer_link = f' <a href="{html.escape(link)}" style="color:#2563c9">Unsubscribe</a>' if link else ""
     page = (
         '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#1b2233;'
         'max-width:520px;margin:0 auto;padding:24px">'
