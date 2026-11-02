@@ -1,12 +1,13 @@
+# Railway reads this from /backend/railway.toml (its Config File setting), because
+# the service's Root Directory is backend. It stops reading these files on
+# 2026-12-01: see "Railway's config file" in DEPLOYMENT_GUIDE.md.
 [build]
-dockerfile = "backend/Dockerfile"
+builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "sh -c 'exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-graceful-shutdown 10'"
 healthcheckPath = "/health"
-healthcheckTimeout = 10
+# Long enough for a slow container start plus the database's 10 second connect timeout
+healthcheckTimeout = 60
 # Time to finish after the stop signal, a little longer than uvicorn's own limit
 drainingSeconds = 15
-
-[env]
-PYTHONUNBUFFERED = "1"
