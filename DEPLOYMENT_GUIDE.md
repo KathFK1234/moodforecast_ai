@@ -136,7 +136,7 @@ The container listens on `$PORT` if it is set, otherwise 8000.
 
 ## Environment Variables
 
-All are optional.
+All are optional. The email settings (`BREVO_API_KEY`, `MAIL_FROM`, `PUBLIC_URL`, `ALERT_HOUR`, and the `SMTP_*` ones including `SMTP_STARTTLS`) are in [the README's table](README.md#environment-variables); the rest are:
 
 | Variable | Default | Purpose |
 | -------- | ------- | ------- |
