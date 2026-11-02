@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+import re
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
@@ -503,12 +504,17 @@ def _contrast_with_white(colour: str) -> float:
 
 def test_email_text_and_links_are_readable_on_white():
     """WCAG AA asks for 4.5:1 for normal-sized text, and the footer's links are 12px."""
-    import re
-    page = alerts.welcome_email(make_subscriber()).html
-    colours = set(re.findall(r"color:(#[0-9a-fA-F]{6})", page))
-    assert colours
-    for colour in colours:
-        assert _contrast_with_white(colour) >= 4.5, colour
+    subscriber = make_subscriber()
+    pending = PendingSubscription(
+        token="t", email=subscriber.email, location=subscriber.location,
+        place=subscriber.place, lat=subscriber.lat, lon=subscriber.lon,
+    )
+    # The welcome email has the footer's link, the confirmation one a link in the text
+    for email in (alerts.welcome_email(subscriber), alerts.confirm_email(pending, 48)):
+        colours = set(re.findall(r"color:(#[0-9a-fA-F]{6})", email.html))
+        assert len(colours) >= 3, colours
+        for colour in colours:
+            assert _contrast_with_white(colour) >= 4.5, colour
 
 
 def test_emails_tell_screen_readers_their_language():
