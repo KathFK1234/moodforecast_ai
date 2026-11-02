@@ -102,6 +102,16 @@ def test_health_check_answers_head_requests():
     assert client.head("/health").status_code == 200
 
 
+def test_api_schema_operation_ids_are_unique():
+    """Client generators refuse a schema that uses one operation ID twice."""
+    operations = [
+        operation["operationId"]
+        for path in client.get("/openapi.json").json()["paths"].values()
+        for operation in path.values()
+    ]
+    assert len(operations) == len(set(operations))
+
+
 def confirm_token(outbox):
     """The token in the last confirmation link emailed."""
     text = outbox[-1][1].get_body(("plain",)).get_content()

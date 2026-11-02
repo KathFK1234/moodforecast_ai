@@ -237,11 +237,15 @@ def create_app() -> FastAPI:
     app.include_router(locations.router)
     app.include_router(subscribe.router)
     
-    # Health check. HEAD too, which uptime monitors often use: otherwise it falls through to the static files' 404
-    @app.api_route("/health", methods=["GET", "HEAD"])
+    # Health check
+    @app.get("/health")
     async def health() -> HealthResponse:
         """Health check endpoint for Railway deploy probe."""
         return HealthResponse(status="ok")
+    
+    # HEAD too, which uptime monitors often use: otherwise it falls through to the static
+    # files' 404. Kept out of the API schema, where it would repeat GET's operation ID.
+    app.add_api_route("/health", health, methods=["HEAD"], include_in_schema=False)
     
     # Static files (frontend)
     static_path = Path(__file__).parent / "static"
