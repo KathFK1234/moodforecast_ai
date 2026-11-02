@@ -51,12 +51,34 @@ git push origin main
 
 ### 2. Create the Project
 
-1. Visit `https://railway.app`
+1. Visit `https://railway.com`
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Select the `moodforecast_ai` repository
-4. Click "Deploy"
+4. In the service's settings, set **Root Directory** to `backend`, and **Config File** to `/backend/railway.toml` (the config file's path doesn't follow the root directory, so it needs the full path)
+5. Click "Deploy"
 
-The build uses `backend/Dockerfile` and `backend/railway.toml`. Railway redeploys automatically on every push to `main`.
+The Dockerfile builds from `backend/`, so a service without that root directory can't find `requirements.txt`. Railway redeploys automatically on every push to `main`.
+
+#### Railway's config file
+
+Railway has deprecated `railway.toml` and **stops reading these files on 2026-12-01**, in favour of its [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) file, `.railway/railway.ts`. After that date the settings below come from the service's dashboard settings only, so move them before then:
+
+| Setting | Value |
+| ------- | ----- |
+| Start command | Can be empty: the Docker image's own command is the same |
+| Healthcheck path | `/health` |
+| Healthcheck timeout | `60` seconds |
+| Draining seconds | `15` |
+
+Either enter them in the dashboard, or run this from the repository with the [Railway CLI](https://docs.railway.com/cli) logged in, and review the plan before applying it:
+
+```bash
+railway config migrate --apply
+railway config plan
+railway config apply
+```
+
+A service can't be managed by both, so remove `backend/railway.toml` once it's moved.
 
 ### 3. Set Variables
 
@@ -170,6 +192,6 @@ curl -v https://YOUR_DOMAIN/api/forecast/Nairobi
 ## References
 
 - FastAPI: `https://fastapi.tiangolo.com`
-- Railway: `https://docs.railway.app`
+- Railway: `https://docs.railway.com`
 - Open-Meteo: `https://open-meteo.com/en/docs`
 - Nominatim usage policy: `https://operations.osmfoundation.org/policies/nominatim/`
