@@ -10,14 +10,17 @@ FROM python:3.11-alpine
 
 COPY --from=builder /install /usr/local
 
-# Run as an unprivileged user that owns /app, so the SQLite fallback database can be written
+# Run as an unprivileged user that can't change the code: root owns it, and the
+# user can write only data/, where the SQLite fallback database goes
 RUN adduser -D app
 WORKDIR /app
-COPY --chown=app . .
-RUN chown app /app
+COPY . .
+RUN python -m compileall -q app && mkdir data && chown app data
 USER app
 
 ENV PYTHONUNBUFFERED=1
+# Used only when Railway (or docker run -e) doesn't set DATABASE_URL
+ENV DATABASE_URL=sqlite:////app/data/moodforecast.db
 
 EXPOSE 8000
 

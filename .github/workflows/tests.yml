@@ -80,6 +80,10 @@ jobs:
           curl -sf http://localhost:8000/ | grep -q 'property="og:image"'
           curl -sf http://localhost:8000/privacy.html | grep -q 'rel="canonical"'
           curl -sf -o /dev/null http://localhost:8000/og-image.png
+      - name: Check the app's user can write the database but not the code
+        run: |
+          docker exec app test -s /app/data/moodforecast.db
+          if docker exec app sh -c 'touch /app/app/main.py || mv /app/app /app/moved'; then exit 1; fi
       - name: Check it shuts down cleanly when told to stop
         run: |
           docker stop --time 15 app

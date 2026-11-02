@@ -134,6 +134,8 @@ docker run -p 8000:8000 moodforecast
 
 The container listens on `$PORT` if it is set, otherwise 8000.
 
+The app runs as an unprivileged user that can't change its own code. Without `DATABASE_URL` its SQLite database is `/app/data/moodforecast.db`, the only place in the image that user can write.
+
 ## Environment Variables
 
 All are optional. The email settings (`BREVO_API_KEY`, `MAIL_FROM`, `PUBLIC_URL`, `ALERT_HOUR`, and the `SMTP_*` ones including `SMTP_STARTTLS`) are in [the README's table](README.md#environment-variables); the rest are:
