@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import mimetypes
+import os
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -147,6 +148,21 @@ def warn_if_email_links_are_local() -> None:
         )
 
 
+def warn_if_subscribers_would_be_lost() -> None:
+    """
+    Say so when Railway runs the app on the image's own SQLite file: every
+    redeploy starts a new container and deletes it, subscribers and all.
+    """
+    on_railway = bool(os.environ.get("RAILWAY_PROJECT_ID"))
+    volume = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+    url = settings.database_url
+    if on_railway and mailer.is_configured() and url.startswith("sqlite") and not (volume and volume in url):
+        logger.warning(
+            "DATABASE_URL isn't a PostgreSQL database, so subscribers are deleted on every redeploy. "
+            "Add PostgreSQL in Railway and set DATABASE_URL to it"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
@@ -156,6 +172,7 @@ async def lifespan(app: FastAPI):
     print("✓ Weather client ready (Open-Meteo)")
     
     warn_if_email_links_are_local()
+    warn_if_subscribers_would_be_lost()
     
     # Daily alerts run in the background, in this process
     alert_task = None

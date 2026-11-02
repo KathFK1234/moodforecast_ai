@@ -166,7 +166,7 @@ Place lookups use Nominatim, whose usage policy allows one request per second. T
 | "The weather service can't be reached right now" (503) | Open-Meteo or Nominatim is unreachable or rate limiting - retry shortly |
 | Timeout (504) | Upstream service is slow - retry shortly |
 | Frontend shows old content | `backend/app/static/` was not updated from `frontend/`; browser cache |
-| Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used |
+| Subscribers disappear after deploy | `DATABASE_URL` is not set, so SQLite inside the container is being used. The app logs a warning about this when it starts on Railway with email configured |
 | Subscribing says "Email alerts aren't available right now" (503) | `MAIL_FROM` and `BREVO_API_KEY` (or `SMTP_HOST`) are not set; requests can't be confirmed without email, so none are taken |
 | A confirmation link says it has expired or been used | Links work once, for 48 hours; subscribe again for a new one |
 | Subscribing works but no email arrives | The logs for `Could not send email` (Brevo's reason is included: `unauthorized` means a wrong key, `MAIL_FROM is not valid` means it's badly written, a sender error means it isn't a verified Brevo sender); the recipient's spam folder; with SMTP, whether the host allows it |

@@ -11,7 +11,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
-from app.main import HideTokens, api_limiter, app, form_limiter, warn_if_email_links_are_local
+from app.main import (
+    HideTokens, api_limiter, app, form_limiter, warn_if_email_links_are_local, warn_if_subscribers_would_be_lost
+)
 from app.models.db import PendingSubscription, Subscriber
 from app.models.schemas import normalise_email
 from app.services import alerts, mailer
@@ -1023,6 +1025,26 @@ def test_a_site_without_email_is_not_warned_about_its_links(monkeypatch, caplog)
     with patch("app.main.mailer.is_configured", return_value=False):
         warn_if_email_links_are_local()
     assert "PUBLIC_URL" not in caplog.text
+
+
+@pytest.mark.parametrize("railway, url, volume, email, warned", [
+    ("project", "sqlite:////app/data/moodforecast.db", None, True, True),
+    ("project", "postgresql://user:pw@db:5432/railway", None, True, False),
+    ("project", "sqlite:////data/moodforecast.db", "/data", True, False),
+    ("project", "sqlite:////app/data/moodforecast.db", None, False, False),
+    (None, "sqlite:///./moodforecast.db", None, True, False),
+])
+def test_subscribers_kept_only_in_the_container_are_warned_about(monkeypatch, caplog, railway, url, volume, email, warned):
+    """Railway deletes the container's files on every redeploy; locally, a SQLite file is fine."""
+    for name, value in (("RAILWAY_PROJECT_ID", railway), ("RAILWAY_VOLUME_MOUNT_PATH", volume)):
+        if value:
+            monkeypatch.setenv(name, value)
+        else:
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(settings, "database_url", url)
+    with patch("app.main.mailer.is_configured", return_value=email):
+        warn_if_subscribers_would_be_lost()
+    assert ("subscribers are deleted on every redeploy" in caplog.text) is warned
 
 
 @pytest.mark.parametrize("path", ["/api/subscribe", "/api/unsubscribe-link"])
