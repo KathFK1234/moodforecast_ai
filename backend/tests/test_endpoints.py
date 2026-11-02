@@ -97,6 +97,11 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
+def test_health_check_answers_head_requests():
+    """Uptime monitors often send HEAD; a 404 would look like the site is down."""
+    assert client.head("/health").status_code == 200
+
+
 def confirm_token(outbox):
     """The token in the last confirmation link emailed."""
     text = outbox[-1][1].get_body(("plain",)).get_content()

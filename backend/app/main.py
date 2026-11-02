@@ -237,8 +237,8 @@ def create_app() -> FastAPI:
     app.include_router(locations.router)
     app.include_router(subscribe.router)
     
-    # Health check
-    @app.get("/health")
+    # Health check. HEAD too, which uptime monitors often use: otherwise it falls through to the static files' 404
+    @app.api_route("/health", methods=["GET", "HEAD"])
     async def health() -> HealthResponse:
         """Health check endpoint for Railway deploy probe."""
         return HealthResponse(status="ok")
