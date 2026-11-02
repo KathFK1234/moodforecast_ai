@@ -95,7 +95,7 @@ class DailyForecast(BaseModel):
     uv_index: float | None = None
     sunrise: str | None = Field(None, description="Local time, HH:MM")
     sunset: str | None = Field(None, description="Local time, HH:MM")
-    mood_score: int = Field(..., description="Expected mood score for the day, 0-100")
+    mood_score: int = Field(..., description="Mood score from the day's forecast (average temperature and humidity), 0-100")
     mood_label: str
 
 
