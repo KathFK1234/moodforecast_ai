@@ -1,5 +1,5 @@
-# Railway reads this from /backend/railway.toml (its Config File setting), because
-# the service's Root Directory is backend. It stops reading these files on
+# With the service's Root Directory set to backend, Railway reads this only if its
+# Config File setting is /backend/railway.toml. It stops reading these files on
 # 2026-12-01: see "Railway's config file" in DEPLOYMENT_GUIDE.md.
 [build]
 builder = "DOCKERFILE"
