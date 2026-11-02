@@ -509,3 +509,7 @@ def test_email_text_and_links_are_readable_on_white():
     assert colours
     for colour in colours:
         assert _contrast_with_white(colour) >= 4.5, colour
+
+
+def test_emails_tell_screen_readers_their_language():
+    assert alerts.welcome_email(make_subscriber()).html.startswith('<div lang="en"')

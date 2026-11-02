@@ -102,7 +102,8 @@ def _compose(subject: str, heading: str, paragraphs: list[Paragraph], token: str
     text = "\n\n".join([heading, *text_parts, f"{footer}\nUnsubscribe: {link}" if link else footer])
     footer_link = f' <a href="{html.escape(link)}" style="color:#2563c9">Unsubscribe</a>' if link else ""
     page = (
-        '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#1b2233;'
+        # The emails are in English, whatever the subscriber's language setting, so screen readers use English
+        '<div lang="en" style="font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#1b2233;'
         'max-width:520px;margin:0 auto;padding:24px">'
         f'<h1 style="font-size:20px;margin:0 0 16px">{html.escape(heading)}</h1>'
         f"{body}"
