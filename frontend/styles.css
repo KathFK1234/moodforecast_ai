@@ -233,9 +233,10 @@ body {
     white-space: nowrap;
 }
 
+/* Solid white, like every other control's focus outline: a faint one fell below 3:1 on the bright skies */
 .search:focus-within {
-    border-color: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 1px #ffffff;
 }
 
 .search-icon {
