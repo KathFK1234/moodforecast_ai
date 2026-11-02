@@ -69,6 +69,7 @@ tests/
   test_cache.py          # In-memory cache: expiry and size limit
   test_db.py             # Database URL handling (Postgres driver)
   test_dependencies.py   # constraints.txt matches the requirements files
+  test_railway_config.py # railway.toml uses only keys Railway reads
   test_mailer.py         # Mailer tests (fake SMTP)
   test_postgres.py       # Database code on real PostgreSQL (needs TEST_DATABASE_URL)
   test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
