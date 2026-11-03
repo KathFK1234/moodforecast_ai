@@ -70,15 +70,15 @@ Railway has deprecated `railway.toml` and **stops reading these files on 2026-12
 | Healthcheck timeout | `60` seconds |
 | Draining seconds | `15` |
 
-Either enter them in the dashboard, or run this from the repository with the [Railway CLI](https://docs.railway.com/cli) logged in, and review the plan before applying it:
+Either enter them in the dashboard, or move them with the [Railway CLI](https://docs.railway.com/cli). `railway config migrate` on its own only previews, and `--apply` only writes the new file: Railway keeps reading `railway.toml` until the cutover in step 4. Run every command from the repository root:
 
-```bash
-railway config migrate --apply
-railway config plan
-railway config apply
-```
-
-A service can't be managed by both, so remove `backend/railway.toml` once it's moved.
+1. Install and sign in: `bash <(curl -fsSL railway.com/install.sh)` (or `brew install railway`), then `railway login` and `railway link` (pick this project, the `production` environment and the app's service).
+2. `railway config migrate --variables unmanaged` is a dry run: it shows what it would write and changes nothing (if it asks to write the file, say no). It should show the settings in the table above, for the app's service only. `--variables` is required; `unmanaged` leaves the variables (`BREVO_API_KEY`, `DATABASE_URL` and the rest) in the dashboard, out of the file.
+3. `railway config migrate --apply --variables unmanaged` writes `.railway/railway.ts` and nothing else. If it offers to cut over now, say no. Read the file: it should hold the settings in the table above for the app's service, and nothing for any other service. If a later step says the `railway` package is missing, run `npm install --save-dev railway` at the repository root.
+4. Do steps 4 to 6 one straight after another: between them the service runs on its dashboard settings. `railway config migrate cutover --service "<service name>"` stops Railway reading `railway.toml` for the service and redeploys it. `railway config migrate status` shows which services still read it, and `railway config migrate undo` puts it back.
+5. `railway config plan`. **Read every line before going on.** It should only set the settings in the table on the app's service. If it marks anything as destroyed or deleted, above all a PostgreSQL service or a variable, stop and run `railway config migrate undo`: a project file treats a service it leaves out as one to delete.
+6. `railway config apply`, and confirm only if the plan is what you read.
+7. Commit `.railway/` (and `package.json` and `package-lock.json` if step 3 made them) and remove `backend/railway.toml` in the same push, never before step 6: a service can't be managed by both. Then check the deploy finished and `/health` answers, and that the service's dashboard settings show the values above.
 
 ### 3. Set Variables
 
