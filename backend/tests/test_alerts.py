@@ -13,6 +13,8 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.models.db import PendingSubscription, Subscriber
 from app.services import alerts, mailer
+from app.services.activity_advisor import check_activity
+from app.services.locality import build_place
 from app.services.rate_limit import RateLimiter
 
 
@@ -96,6 +98,18 @@ class TestDailyEmail:
         email = alerts.daily_email(make_subscriber(activity="stargazing"), FORECAST)
         assert "stargazing" in email.text
         assert "It's still daytime — but skies are clear, so tonight could be a good one." in email.text
+    
+    def test_a_ruled_out_activity_comes_with_something_else_to_do(self):
+        storm = {**FORECAST, "current": {**FORECAST["current"], "condition": "Thunderstorm", "condition_code": 95}}
+        subscriber = make_subscriber(activity="running")
+        email = alerts.daily_email(subscriber, storm, rng=random.Random(4))
+        advice = check_activity(
+            "running", "Nairobi, KE", "Thunderstorm", 22.4, 55, 9, True, rng=random.Random(4),
+            searched_as="nairobi", place=build_place("Nairobi, KE", subscriber.lat, storm, None)
+        )
+        assert advice["verdict"] == "skip"
+        assert advice["suggestion"]
+        assert " ".join([*advice["reasons"], advice["suggestion"]]) in email.text
     
     def test_random_pick_fits_the_place(self):
         """Nairobi is inland and far from snow, whatever the forecast says."""
