@@ -59,7 +59,7 @@ moodforecast_ai/
 │   │   ├── config.py          # Settings from environment / .env
 │   │   ├── models/            # Database table and request/response schemas
 │   │   ├── routers/           # forecast, wellbeing, activity, locations, subscribe endpoints; API docs pages
-│   │   ├── services/          # weather, geocoding, mood engine, cache
+│   │   ├── services/          # weather, places, mood engine, activities, emails and alerts, limits, cache (see backend/README.md)
 │   │   └── static/            # Deployed copy of frontend/
 │   ├── tests/                 # pytest suite
 │   ├── requirements.txt     # What the app needs to run
