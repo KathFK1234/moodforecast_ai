@@ -57,6 +57,7 @@ app/
   static/             # Deployed copy of ../frontend (served by FastAPI)
 
 browser_tests/        # The page in a real browser (see requirements-browser.txt)
+pytest.ini            # Test settings (pytest-asyncio's event loop scope)
 
 tests/
   test_mood_engine.py    # Mood engine unit tests (no I/O)

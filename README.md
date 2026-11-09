@@ -65,6 +65,7 @@ moodforecast_ai/
 │   ├── requirements.txt     # What the app needs to run
 │   ├── requirements-dev.txt # Plus the test tools
 │   ├── constraints.txt      # Exact versions of everything they install
+│   ├── pytest.ini           # Test settings
 │   ├── .env.example
 │   ├── Dockerfile
 │   ├── railway.toml
