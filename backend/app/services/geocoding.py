@@ -1,13 +1,32 @@
 """Geocoding service - Convert location names to coordinates."""
 
 import asyncio
+import re
 import time
+from typing import Any
 import httpx
 from app.services.cache import cache
 
 
 # What reading a reply of an unexpected shape raises
 UNUSABLE_REPLY = (AttributeError, IndexError, KeyError, TypeError, ValueError)
+
+# Line breaks and other control characters, which have no place in a name shown on
+# the page or put in an email's subject
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def clean_name(value: Any) -> str | None:
+    """
+    A name from a map service with any control characters replaced by spaces; None stays None.
+    
+    Raises TypeError for anything that isn't text, which counts as an unusable reply.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError(f"A name should be text, not {type(value).__name__}")
+    return " ".join(CONTROL_CHARACTERS.sub(" ", value).split())
 
 
 # Popular locations with their coordinates for offline fallback
@@ -167,8 +186,8 @@ def _nominatim_place(data: dict, location: str) -> dict:
             "lat": float(data["lat"]),
             "lon": float(data["lon"]),
             # Prefer the place's proper name over what the user typed
-            "name": (data.get("name") or location).removeprefix("City of "),
-            "country": data.get("address", {}).get("country_code", "").upper(),
+            "name": clean_name(data.get("name") or location).removeprefix("City of "),
+            "country": clean_name(data.get("address", {}).get("country_code", "")).upper(),
             "timezone": "",  # Nominatim doesn't provide timezone
         }
     except UNUSABLE_REPLY as e:
@@ -210,8 +229,8 @@ async def _search_open_meteo(location: str) -> dict | None:
         return {
             "lat": float(match["latitude"]),
             "lon": float(match["longitude"]),
-            "name": match.get("name") or location,
-            "country": match.get("country_code", ""),
+            "name": clean_name(match.get("name") or location),
+            "country": clean_name(match.get("country_code", "")),
             "timezone": match.get("timezone", ""),
         }
     except UNUSABLE_REPLY:
@@ -312,11 +331,11 @@ def _suggestions_from(matches: list[dict], query: str, limit: int) -> list[dict]
     suggestions = []
     seen = set()
     for match in matches:
-        name = match.get("name")
+        name = clean_name(match.get("name"))
         if not name:
             continue
-        region = match.get("admin1")
-        country = match.get("country")
+        region = clean_name(match.get("admin1"))
+        country = clean_name(match.get("country"))
         # "Nairobi, Nairobi County, Kenya" - skip a region that only repeats the name
         parts = [name, region if region != name else None, country]
         label = ", ".join(part for part in parts if part)
@@ -329,7 +348,7 @@ def _suggestions_from(matches: list[dict], query: str, limit: int) -> list[dict]
                 "lat": float(match["latitude"]),
                 "lon": float(match["longitude"]),
                 "name": name,
-                "country": match.get("country_code", ""),
+                "country": clean_name(match.get("country_code", "")),
                 "timezone": match.get("timezone", ""),
             })
         if len(suggestions) == limit:

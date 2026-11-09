@@ -354,3 +354,58 @@ async def test_a_nominatim_reply_of_the_wrong_shape_counts_as_unavailable(monkey
 async def test_a_suggestion_reply_of_the_wrong_shape_means_no_suggestions(monkeypatch, reply):
     mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
     assert await geocoding.suggest_locations("somewhere") == []
+
+
+@pytest.mark.asyncio
+async def test_line_breaks_in_a_found_places_name_are_cleaned_out(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[{
+            "lat": "-0.1", "lon": "34.75", "name": "Kisumu\r\nBcc: someone@example.com",
+            "address": {"country_code": "k\ne"}
+        }])
+    
+    mock_nominatim(monkeypatch, handler)
+    result = await geocoding.get_coordinates("Kisumu")
+    assert result["name"] == "Kisumu Bcc: someone@example.com"
+    assert result["country"] == "K E"
+
+
+@pytest.mark.asyncio
+async def test_line_breaks_in_suggestions_are_cleaned_out(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"results": [{
+            "name": "Kisumu\n", "admin1": "Kisumu\tCounty", "country": "Ken\x00ya",
+            "country_code": "KE", "latitude": -0.1, "longitude": 34.75,
+        }]})
+    
+    mock_nominatim(monkeypatch, handler)
+    suggestions = await geocoding.suggest_locations("kis")
+    assert suggestions == [{
+        "name": "Kisumu", "region": "Kisumu County", "country": "Ken ya",
+        "label": "Kisumu, Kisumu County, Ken ya",
+    }]
+    # Picking it finds the same clean name
+    assert (await geocoding.get_coordinates("Kisumu, Kisumu County, Ken ya"))["name"] == "Kisumu"
+
+
+@pytest.mark.asyncio
+async def test_the_fallback_geocoders_names_are_cleaned_too(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "nominatim.openstreetmap.org":
+            return httpx.Response(503)
+        return httpx.Response(200, json={"results": [{
+            "name": "Kisumu\r\n", "country_code": "KE", "latitude": -0.1, "longitude": 34.75,
+        }]})
+    
+    mock_nominatim(monkeypatch, handler)
+    assert (await geocoding.get_coordinates("Kisumu"))["name"] == "Kisumu"
+
+
+@pytest.mark.parametrize("value, cleaned", [(None, None), ("Nairobi", "Nairobi"), (" Dar  es\x7fSalaam ", "Dar es Salaam")])
+def test_clean_name(value, cleaned):
+    assert geocoding.clean_name(value) == cleaned
+
+
+def test_a_name_that_isnt_text_is_unusable():
+    with pytest.raises(TypeError):
+        geocoding.clean_name(5)
