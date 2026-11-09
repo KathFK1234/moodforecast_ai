@@ -8,6 +8,9 @@ RUN pip install --prefix=/install --no-cache-dir -r requirements.txt -c constrai
 
 FROM python:3.11-alpine
 
+# Alpine's security fixes land between rebuilds of the base image, so take them now
+RUN apk upgrade --no-cache
+
 COPY --from=builder /install /usr/local
 
 # Run as an unprivileged user that can't change the code: root owns it, and the
