@@ -808,14 +808,22 @@ function showConfirmPrompt(token) {
             } catch (e) {
                 throw new Error('Could not reach the server. Check your connection and try again.');
             }
-            if (!res.ok) throw new Error(await errorMessage(res, 'Could not confirm. Please try again.'));
+            if (!res.ok) {
+                const failure = new Error(await errorMessage(res, 'Could not confirm. Please try again.'));
+                // An unknown, used or expired link can't succeed by asking again
+                failure.final = res.status === 404;
+                throw failure;
+            }
             const data = await res.json();
             banner.className = 'notice notice-success';
             banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due. If they land in spam, mark them as not spam.`;
             rememberSubscription({ email: data.email, location: data.location });
         } catch (error) {
+            // The token has left the address, so this button is the only way to try again
             banner.className = 'notice notice-error';
-            banner.textContent = error.message;
+            text.textContent = error.message;
+            if (error.final) confirm.remove();
+            else confirm.disabled = false;
         }
     });
     banner.append(text, confirm);

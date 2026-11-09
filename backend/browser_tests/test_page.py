@@ -181,6 +181,28 @@ def test_a_confirmation_link_asks_first_then_confirms(page, site):
     assert not re.search("confirm=", page.url)
 
 
+def test_a_confirmation_that_did_not_get_through_can_be_tried_again(page, site):
+    # The page fixture refuses every API call it doesn't answer, like a dropped connection
+    open_page(page, site, "?confirm=flaky")
+    banner = page.locator("#emailLinkBanner")
+    banner.get_by_role("button").click()
+    expect(banner).to_contain_text("Could not reach the server")
+    expect(banner.get_by_role("button")).to_be_enabled()
+    
+    page.route("**/api/confirm/flaky", lambda route: route.fulfill(json={**SUBSCRIBED, "status": "subscribed"}))
+    banner.get_by_role("button").click()
+    expect(banner).to_contain_text("Confirmed.")
+
+
+def test_a_used_confirmation_link_says_so_and_offers_no_retry(page, site):
+    page.route("**/api/confirm/used", lambda route: route.fulfill(status=404, json={"detail": "Already used."}))
+    open_page(page, site, "?confirm=used")
+    banner = page.locator("#emailLinkBanner")
+    banner.get_by_role("button").click()
+    expect(banner).to_contain_text("Already used.")
+    expect(banner.get_by_role("button")).to_have_count(0)
+
+
 def test_the_form_points_to_a_field_left_empty(page, site):
     open_page(page, site)
     page.fill("#subLocationInput", "")
