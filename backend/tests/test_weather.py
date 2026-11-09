@@ -470,3 +470,17 @@ async def test_a_sea_temperature_that_isnt_a_number_is_unknown(temperature):
     reply = f'{{"current": {{"wave_height": 1.2, "sea_surface_temperature": {temperature}}}}}'
     client = make_client(lambda request: httpx.Response(200, text=reply))
     assert await client.get_sea(1.0, 2.0) == {"coastal": True, "sea_temp_c": None}
+
+
+@pytest.mark.parametrize("elevation", ["NaN", "Infinity", '"high"', "[1]", "null"])
+@pytest.mark.asyncio
+async def test_an_elevation_that_isnt_a_number_is_unknown(elevation):
+    reply = json.dumps(OPEN_METEO_RESPONSE)[:-1] + f', "elevation": {elevation}}}'
+    client = make_client(lambda request: httpx.Response(200, text=reply))
+    assert (await client.get_forecast(1.0, 2.0))["elevation"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_elevation_is_passed_on():
+    client = make_client(lambda request: httpx.Response(200, json={**OPEN_METEO_RESPONSE, "elevation": 1795}))
+    assert (await client.get_forecast(1.0, 2.0))["elevation"] == 1795

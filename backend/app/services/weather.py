@@ -77,10 +77,10 @@ def optional_number(value: Any) -> float | None:
     return None if value is None else finite(value)
 
 
-def _sea_temperature(reading: dict[str, Any]) -> float | None:
-    """A marine reading's sea temperature, or None if it has no usable one."""
+def number_or_unknown(value: Any) -> float | None:
+    """A number from a reply that is extra detail: None if it is missing or unusable."""
     try:
-        return optional_number(reading.get("sea_surface_temperature"))
+        return optional_number(value)
     except (TypeError, ValueError):
         return None
 
@@ -255,7 +255,7 @@ class WeatherClient:
                 },
                 "daily": self._parse_daily(data.get("daily") or {}),
                 "utc_offset_seconds": int(data.get("utc_offset_seconds") or 0),
-                "elevation": data.get("elevation"),
+                "elevation": number_or_unknown(data.get("elevation")),
             }
         except (AttributeError, KeyError, TypeError, ValueError) as e:
             raise RuntimeError(f"Weather API sent a reply it can't be read from: {e!r}") from e
@@ -344,7 +344,8 @@ class WeatherClient:
                 for place in (data if isinstance(data, list) else [data])
             ]
             at_sea = [r for r in readings if r.get("wave_height") is not None]
-            temps = [t for t in (_sea_temperature(r) for r in at_sea) if t is not None]
+            sea_temps = (number_or_unknown(r.get("sea_surface_temperature")) for r in at_sea)
+            temps = [t for t in sea_temps if t is not None]
         except AttributeError:
             return None
         result = {"coastal": bool(at_sea), "sea_temp_c": temps[0] if temps else None}
