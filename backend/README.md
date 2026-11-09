@@ -51,6 +51,7 @@ app/
     alerts.py         # Confirmation and daily alert emails, and the daily send
     cache.py          # In-memory TTL cache
     rate_limit.py     # In-memory limit per visitor
+    numbers.py        # Rounds numbers in text the way the page does
   
   models/             # Data schemas
     schemas.py        # Pydantic request/response models
@@ -70,6 +71,7 @@ tests/
   test_curiosity.py      # Curiosity prompts (no I/O)
   test_locality.py       # Place facts: country, coast, late night (no I/O)
   test_cache.py          # In-memory cache: expiry, size limit and forgetting old entries
+  test_numbers.py        # Numbers in text rounded as the page rounds them
   test_db.py             # Database URL handling (Postgres driver)
   test_dependencies.py   # constraints.txt matches the requirements files
   test_railway_config.py # railway.toml uses only keys Railway reads

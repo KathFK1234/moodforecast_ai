@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
+from app.services.numbers import shown
 
 
 class Place(NamedTuple):
@@ -176,7 +177,7 @@ def local_issue(needs: str, activity: str, place: Place, snowing: bool = False) 
         if place.coastal is False:
             return (2, f"{where} isn't on the coast, so {activity} would mean a trip to the sea first.")
         if needs == "warm_coast" and place.sea_temp_c is not None and place.sea_temp_c < WARM_SEA_C:
-            return (2, f"The sea off {where} is {round(place.sea_temp_c)}°C — too cold for {activity} without serious kit.")
+            return (2, f"The sea off {where} is {shown(place.sea_temp_c)}°C — too cold for {activity} without serious kit.")
         if needs == "surf" and place.country and place.country not in SURF_COUNTRIES:
             return (1, f"{activity.capitalize()} isn't a big thing around {where}, so waves and board hire may be hard to find.")
     elif needs == "snow":

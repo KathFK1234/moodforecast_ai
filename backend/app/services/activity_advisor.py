@@ -6,6 +6,7 @@ from typing import NamedTuple, TypedDict
 
 from app.services import curiosity
 from app.services.locality import COAST_NEEDS, LOCAL_FAVOURITES, Place, is_late_night, is_local, local_issue
+from app.services.numbers import shown
 
 
 class Activity(NamedTuple):
@@ -481,8 +482,8 @@ def _weather_issues(
 
     issues: list[tuple[int, str]] = []
     condition_lower = condition.lower()
-    temp = round(temperature_c)
-    wind = round(wind_kph)
+    temp = shown(temperature_c)
+    wind = shown(wind_kph)
 
     storm = "storm" in condition_lower or "thunder" in condition_lower
     rain = "rain" in condition_lower
@@ -539,7 +540,7 @@ def _weather_issues(
         # In the sea rather than a pool, the water has its own temperature
         sea = place.sea_temp_c if place is not None and activity.needs else None
         if sea is not None and sea < 17:
-            issues.append((1, f"The sea is {round(sea)}°C — a wetsuit will make all the difference."))
+            issues.append((1, f"The sea is {shown(sea)}°C — a wetsuit will make all the difference."))
     elif category == "paddle":
         # Falling in is part of the sport, so the water's chill matters as much as the air's
         if temperature_c < 5:
@@ -587,7 +588,7 @@ def _weather_issues(
 
     # Open flames in hot, dry air
     if activity.fire and temperature_c >= 28 and humidity < 30:
-        issues.append((1, f"It's hot and dry ({round(humidity)}% humidity) — check for fire bans and keep water close."))
+        issues.append((1, f"It's hot and dry ({shown(humidity)}% humidity) — check for fire bans and keep water close."))
 
     # Darkness
     if not is_day and activity.day_only:
@@ -612,8 +613,8 @@ def _good_news(
     place: Place | None = None
 ) -> str:
     """Say why the conditions suit the activity."""
-    temp = round(temperature_c)
-    wind = round(wind_kph)
+    temp = shown(temperature_c)
+    wind = shown(wind_kph)
     condition_lower = condition.lower()
     category = activity.category
 
@@ -631,7 +632,7 @@ def _good_news(
         return f"A steady {wind} km/h breeze — just right."
     if category == "water":
         if place is not None and activity.needs and place.sea_temp_c is not None:
-            return f"{condition.capitalize()} and {temp}°C, with the sea at {round(place.sea_temp_c)}°C — good conditions for it."
+            return f"{condition.capitalize()} and {temp}°C, with the sea at {shown(place.sea_temp_c)}°C — good conditions for it."
         return f"{condition.capitalize()} and {temp}°C — good conditions for getting in the water."
     return f"{condition.capitalize()} and {temp}°C with {wind} km/h of wind — hard to ask for more."
 

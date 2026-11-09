@@ -24,6 +24,7 @@ from app.services.locality import build_place
 from app.services.mood_engine import build_summary, score_mood
 from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
+from app.services.numbers import shown
 
 logger = logging.getLogger(__name__)
 
@@ -300,11 +301,11 @@ def daily_email(
         today = daily[0]
         outlook = (
             f"Today: {today['condition'].lower()}, "
-            f"{round(today['temp_min'])} to {round(today['temp_max'])}°C"
+            f"{shown(today['temp_min'])} to {shown(today['temp_max'])}°C"
         )
         if today.get("precipitation_chance") is not None:
             # The day's highest hourly chance, of snow as well as rain
-            outlook += f", {round(today['precipitation_chance'])}% chance of rain or snow at some point"
+            outlook += f", {shown(today['precipitation_chance'])}% chance of rain or snow at some point"
         paragraphs.append(outlook + ".")
     
     weather = (place, condition, temperature, humidity, wind, is_day)
@@ -334,7 +335,7 @@ def daily_email(
     )
     
     return _compose(
-        subject=f"{place}: {mood['mood_label']} today, {round(temperature)}°C and {condition.lower()}",
+        subject=f"{place}: {mood['mood_label']} today, {shown(temperature)}°C and {condition.lower()}",
         heading=f"{place} today",
         paragraphs=paragraphs,
         token=subscriber.token,

@@ -2,6 +2,7 @@
 
 import random
 from typing import TypedDict
+from app.services.numbers import shown
 
 
 class MoodFactor(TypedDict):
@@ -381,7 +382,7 @@ def build_summary(
     is_day: bool = True
 ) -> str:
     """Describe the conditions and what is driving the mood score, in plain language."""
-    summary = f"{condition.capitalize()} and {round(temperature_c)}°C in {location}."
+    summary = f"{condition.capitalize()} and {shown(temperature_c)}°C in {location}."
     
     lifts = [f["label"].lower() for f in factors if f["delta"] > 0]
     drags = [f["label"].lower() for f in factors if f["delta"] < 0]
