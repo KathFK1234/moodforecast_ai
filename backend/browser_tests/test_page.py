@@ -203,6 +203,19 @@ def test_a_used_confirmation_link_says_so_and_offers_no_retry(page, site):
     expect(banner.get_by_role("button")).to_have_count(0)
 
 
+@pytest.mark.parametrize("link, button", [
+    ("?confirm=offline", "#emailLinkBanner button"),
+    ("?unsubscribe=offline", "#optOutConfirm"),
+])
+def test_a_button_gets_keyboard_focus_back_after_its_request(page, site, link, button):
+    # The page fixture refuses these requests, like a dropped connection
+    open_page(page, site, link)
+    page.focus(button)
+    page.keyboard.press("Enter")
+    expect(page.get_by_text("Could not reach the server").first).to_be_visible()
+    expect(page.locator(button)).to_be_focused()
+
+
 def test_the_form_points_to_a_field_left_empty(page, site):
     open_page(page, site)
     page.fill("#subLocationInput", "")

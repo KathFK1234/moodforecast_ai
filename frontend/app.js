@@ -65,6 +65,20 @@ function applyTheme(condition, isDay) {
 }
 
 const el = (id) => document.getElementById(id);
+
+// Disable a button while its request runs. A disabled button loses keyboard focus and the
+// browser doesn't give it back, which would send a keyboard user to the top of the page, so
+// the returned function enables it again and puts focus back if it was there and nothing
+// else has taken it since.
+function holdButton(button) {
+    const hadFocus = document.activeElement === button;
+    button.disabled = true;
+    return () => {
+        button.disabled = false;
+        const focusLost = !document.activeElement || document.activeElement === document.body;
+        if (hadFocus && focusLost && button.isConnected && button.getClientRects().length) button.focus();
+    };
+}
 const round = (value) => Math.round(value);
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -112,7 +126,7 @@ async function handleSearch(location, record = true) {
     hideError();
     showLoading(true);
     el('searchStatus').textContent = `Loading the weather for ${location}.`;
-    el('searchButton').disabled = true;
+    const releaseSearch = holdButton(el('searchButton'));
 
     try {
         const encoded = encodeURIComponent(location);
@@ -151,7 +165,7 @@ async function handleSearch(location, record = true) {
     } finally {
         if (token === searchToken) {
             showLoading(false);
-            el('searchButton').disabled = false;
+            releaseSearch();
         }
     }
 }
@@ -518,7 +532,7 @@ async function loadActivity(path, fallback) {
     const buttons = [el('activityButton'), el('surpriseButton')];
     const token = ++activityToken;
     error.classList.add('hidden');
-    buttons.forEach((button) => { button.disabled = true; });
+    const releases = buttons.map(holdButton);
     el('activityResult').classList.add('is-refreshing');
 
     try {
@@ -532,7 +546,7 @@ async function loadActivity(path, fallback) {
         showNotice(error, e.message, true);
     } finally {
         if (token === activityToken) {
-            buttons.forEach((button) => { button.disabled = false; });
+            releases.forEach((release) => release());
             el('activityResult').classList.remove('is-refreshing');
         }
     }
@@ -655,7 +669,7 @@ async function handleSubscribe(event) {
     }
 
     const btn = el('subscribeBtn');
-    btn.disabled = true;
+    const releaseButton = holdButton(btn);
     btn.textContent = 'Subscribing…';
 
     try {
@@ -693,8 +707,8 @@ async function handleSubscribe(event) {
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
-        btn.disabled = false;
         btn.textContent = 'Subscribe';
+        releaseButton();
     }
 }
 
@@ -757,8 +771,7 @@ async function handleOptOut(event) {
         return;
     }
 
-    const btn = el('optOutBtn');
-    btn.disabled = true;
+    const releaseButton = holdButton(el('optOutBtn'));
     try {
         const saved = savedSubscription();
         // Only subscriptions saved before email confirmation have a token here
@@ -785,7 +798,7 @@ async function handleOptOut(event) {
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
-        btn.disabled = false;
+        releaseButton();
     }
 }
 
@@ -800,7 +813,7 @@ function showConfirmPrompt(token) {
     confirm.className = 'banner-button';
     confirm.textContent = 'Yes, start my alerts';
     confirm.addEventListener('click', async () => {
-        confirm.disabled = true;
+        const releaseConfirm = holdButton(confirm);
         try {
             let res;
             try {
@@ -823,7 +836,7 @@ function showConfirmPrompt(token) {
             banner.className = 'notice notice-error';
             text.textContent = error.message;
             if (error.final) confirm.remove();
-            else confirm.disabled = false;
+            else releaseConfirm();
         }
     });
     banner.append(text, confirm);
@@ -839,7 +852,7 @@ function showUnsubscribePrompt(token) {
     prompt.classList.remove('hidden');
     confirm.classList.remove('hidden');
     confirm.addEventListener('click', async () => {
-        confirm.disabled = true;
+        const releaseConfirm = holdButton(confirm);
         try {
             const data = await postUnsubscribe(token);
             prompt.classList.add('hidden');
@@ -850,7 +863,7 @@ function showUnsubscribePrompt(token) {
         } catch (error) {
             showNotice(msg, error.message, true);
         } finally {
-            confirm.disabled = false;
+            releaseConfirm();
         }
     });
     el('optOutDialog').showModal();
