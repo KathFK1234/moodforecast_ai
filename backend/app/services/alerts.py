@@ -505,6 +505,22 @@ async def run_alert_loop() -> None:
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 
+async def run_cleanup_loop() -> None:
+    """
+    With email off, still delete what will never be used again, every
+    CHECK_INTERVAL_SECONDS until cancelled, as the privacy page promises.
+    """
+    while True:
+        try:
+            # In a worker thread: the database calls would otherwise hold up every request
+            deleted = await asyncio.to_thread(delete_unused_data)
+            if deleted:
+                logger.info("Deleted %d record(s) no longer needed", deleted)
+        except Exception:
+            logger.exception("Deleting records no longer needed failed")
+        await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+
+
 if __name__ == "__main__":
     # python -m app.services.alerts          send the alerts that are due now
     # python -m app.services.alerts --all    send to every active, confirmed subscriber now

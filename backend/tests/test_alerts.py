@@ -504,6 +504,59 @@ class TestForgettingAddresses:
         assert list(alerts._address_limiter._uses) == ["amina@example.com"]
 
 
+class TestCleanupLoop:
+    """With email off, what the privacy page says is deleted still is."""
+    
+    @pytest.mark.asyncio
+    async def test_it_deletes_unused_data_then_waits(self):
+        pauses = []
+        
+        async def pause(seconds):
+            pauses.append(seconds)
+            if len(pauses) == 2:
+                raise asyncio.CancelledError
+        
+        with patch("app.services.alerts.asyncio.sleep", pause), \
+                patch("app.services.alerts.delete_unused_data", return_value=3) as deleted:
+            with pytest.raises(asyncio.CancelledError):
+                await alerts.run_cleanup_loop()
+        assert deleted.call_count == 2
+        assert pauses == [alerts.CHECK_INTERVAL_SECONDS] * 2
+    
+    @pytest.mark.asyncio
+    async def test_a_failure_does_not_stop_it(self):
+        pauses = []
+        
+        async def pause(seconds):
+            pauses.append(seconds)
+            if len(pauses) == 2:
+                raise asyncio.CancelledError
+        
+        with patch("app.services.alerts.asyncio.sleep", pause), \
+                patch("app.services.alerts.delete_unused_data", side_effect=[RuntimeError("database down"), 0]) as deleted:
+            with pytest.raises(asyncio.CancelledError):
+                await alerts.run_cleanup_loop()
+        assert deleted.call_count == 2
+    
+    @pytest.mark.asyncio
+    async def test_it_deletes_expired_requests_from_the_database(self, engine):
+        old = PendingSubscription(
+            token="old", email="amina@example.com", location="nairobi", place="Nairobi, KE",
+            lat=-1.29, lon=36.82, created_at=datetime.now(timezone.utc) - timedelta(hours=alerts.CONFIRM_HOURS + 1),
+        )
+        add(engine, old)
+        
+        async def stop(seconds):
+            raise asyncio.CancelledError
+        
+        with patch("app.services.alerts.get_engine", return_value=engine), \
+                patch("app.services.alerts.asyncio.sleep", stop):
+            with pytest.raises(asyncio.CancelledError):
+                await alerts.run_cleanup_loop()
+        with Session(engine) as session:
+            assert session.exec(select(PendingSubscription)).all() == []
+
+
 class TestAlertLoop:
     """Test the background loop."""
     

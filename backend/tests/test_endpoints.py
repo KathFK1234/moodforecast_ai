@@ -1155,6 +1155,7 @@ def test_forgetting_runs_while_the_app_is_up_even_without_email(monkeypatch):
             raise
     
     monkeypatch.setattr("app.main.forget_old_addresses", forget)
+    monkeypatch.setattr(alerts, "run_cleanup_loop", AsyncMock())
     with patch("app.main.create_tables"), \
             patch("app.main.mailer.is_configured", return_value=False), \
             patch("app.main.get_weather_client") as weather_client:
@@ -1164,14 +1165,26 @@ def test_forgetting_runs_while_the_app_is_up_even_without_email(monkeypatch):
         assert stopped == [True]
 
 
-def test_without_email_no_alert_loop_is_started(monkeypatch):
+def test_without_email_only_the_cleanup_runs_while_the_app_is_up(monkeypatch):
+    started, stopped = asyncio.Event(), []
+    
+    async def cleanup_loop():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            stopped.append(True)
+            raise
+    
     monkeypatch.setattr(alerts, "run_alert_loop", AsyncMock(side_effect=AssertionError("started")))
+    monkeypatch.setattr(alerts, "run_cleanup_loop", cleanup_loop)
     with patch("app.main.create_tables"), \
          patch("app.main.mailer.is_configured", return_value=False), \
          patch("app.main.get_weather_client") as weather_client:
         weather_client.return_value.close = AsyncMock()
-        with TestClient(app):
-            pass
+        with TestClient(app) as running:
+            running.portal.call(started.wait)
+        assert stopped == [True]
     alerts.run_alert_loop.assert_not_called()
 
 
