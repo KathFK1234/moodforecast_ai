@@ -1,5 +1,6 @@
 """Subscribe router - GET /api/alerts; POST /api/subscribe, /api/confirm/{token}, /api/unsubscribe/{token} and /api/unsubscribe-link"""
 
+import asyncio
 import re
 import secrets
 import uuid
@@ -34,6 +35,10 @@ CONFIRM_HOURS = alerts.CONFIRM_HOURS
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 EMAIL_UNAVAILABLE_MESSAGE = "Email alerts aren't available right now. Please try again later."
+
+# The database calls below are blocking, so the routes run them in a worker thread
+# (asyncio.to_thread): on the event loop, a slow or unreachable database would hold
+# up every other request, /health included.
 
 
 @router.get("/alerts")
@@ -95,10 +100,7 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
         activity=request.activity,
         language=request.language,
     )
-    with Session(get_engine()) as session:
-        session.add(pending)
-        session.commit()
-        session.refresh(pending)
+    await asyncio.to_thread(_store, pending)
     
     confirmation_sent = await alerts.send_once(
         pending.email, alerts.confirm_email(pending, CONFIRM_HOURS), "confirm"
@@ -106,9 +108,7 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
     
     # Without the email nobody holds the link, so there is no reason to keep the details
     if not confirmation_sent:
-        with Session(get_engine()) as session:
-            session.delete(session.merge(pending))
-            session.commit()
+        await asyncio.to_thread(_forget, pending)
     
     return SubscribeResponse(
         email=pending.email,
@@ -116,6 +116,21 @@ async def subscribe(request: SubscribeRequest) -> SubscribeResponse:
         activity=pending.activity,
         confirmation_sent=confirmation_sent
     )
+
+
+def _store(pending: PendingSubscription) -> None:
+    """Save a subscription request."""
+    with Session(get_engine()) as session:
+        session.add(pending)
+        session.commit()
+        session.refresh(pending)
+
+
+def _forget(pending: PendingSubscription) -> None:
+    """Delete a subscription request."""
+    with Session(get_engine()) as session:
+        session.delete(session.merge(pending))
+        session.commit()
 
 
 @router.post("/confirm/{token}")
@@ -128,6 +143,18 @@ async def confirm(token: str) -> ConfirmResponse:
     for the same address are dropped. Returns 404 for an unknown, used or
     expired token.
     """
+    subscriber, status = await asyncio.to_thread(_confirm, token)
+    await alerts.send(subscriber, alerts.welcome_email(subscriber))
+    return ConfirmResponse(
+        email=subscriber.email,
+        location=subscriber.place,
+        activity=subscriber.activity,
+        status=status
+    )
+
+
+def _confirm(token: str) -> tuple[Subscriber, str]:
+    """Apply the request with this token; returns the subscriber and "subscribed" or "updated"."""
     with Session(get_engine()) as session:
         pending = session.get(PendingSubscription, token) if TOKEN_PATTERN.fullmatch(token) else None
         if pending is None or as_utc(pending.created_at) < utc_now() - timedelta(hours=CONFIRM_HOURS):
@@ -171,14 +198,7 @@ async def confirm(token: str) -> ConfirmResponse:
             session.delete(request)
         session.commit()
         session.refresh(subscriber)
-    
-    await alerts.send(subscriber, alerts.welcome_email(subscriber))
-    return ConfirmResponse(
-        email=subscriber.email,
-        location=subscriber.place,
-        activity=subscriber.activity,
-        status=status
-    )
+    return subscriber, status
 
 
 @router.post("/unsubscribe/{token}")
@@ -191,6 +211,11 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
     a new token. Returns 404 for an unknown token, which includes one already
     used.
     """
+    return UnsubscribeResponse(email=await asyncio.to_thread(_unsubscribe, token))
+
+
+def _unsubscribe(token: str) -> str:
+    """Delete the subscriber with this token, and their waiting requests; returns their address."""
     with Session(get_engine()) as session:
         subscriber = None
         if TOKEN_PATTERN.fullmatch(token):
@@ -208,7 +233,7 @@ async def unsubscribe(token: str) -> UnsubscribeResponse:
             session.delete(request)
         session.delete(subscriber)
         session.commit()
-        return UnsubscribeResponse(email=email)
+        return email
 
 
 @router.get("/unsubscribe/{token}", include_in_schema=False)
@@ -239,12 +264,7 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest, background: Bac
             detail="Unsubscribing here isn't available right now. Use the Unsubscribe link in any alert email instead."
         )
     
-    engine = get_engine()
-    with Session(engine) as session:
-        subscriber = session.exec(
-            select(Subscriber).where(Subscriber.email == request.email, Subscriber.active == True)  # noqa: E712
-        ).first()
-    
+    subscriber = await asyncio.to_thread(_active_subscriber, request.email)
     if subscriber is not None:
         background.add_task(
             alerts.send_once,
@@ -252,3 +272,11 @@ async def send_unsubscribe_link(request: UnsubscribeLinkRequest, background: Bac
         )
     
     return UnsubscribeLinkResponse()
+
+
+def _active_subscriber(email: str) -> Subscriber | None:
+    """The active subscriber with this address, if there is one."""
+    with Session(get_engine()) as session:
+        return session.exec(
+            select(Subscriber).where(Subscriber.email == email, Subscriber.active == True)  # noqa: E712
+        ).first()

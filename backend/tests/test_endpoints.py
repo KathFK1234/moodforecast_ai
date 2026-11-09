@@ -1199,3 +1199,29 @@ def test_a_docs_file_that_is_not_where_expected_is_an_error():
 def test_the_docs_pages_stay_out_of_the_api_description():
     paths = client.get("/openapi.json").json()["paths"]
     assert "/docs" not in paths and "/redoc" not in paths
+
+
+def test_the_subscribe_routes_use_the_database_off_the_event_loop(mock_weather, outbox):
+    """A slow or unreachable database must not hold up every other request."""
+    engine = memory_engine()
+    on_the_loop = []
+    
+    def checked_engine():
+        try:
+            asyncio.get_running_loop()
+            on_the_loop.append(True)
+        except RuntimeError:
+            pass  # A worker thread, as it should be
+        return engine
+    
+    with patch("app.routers.subscribe.get_engine", checked_engine):
+        assert subscribe_and_confirm(outbox, email="amina@example.com", location="Nairobi").status_code == 200
+        assert client.post("/api/unsubscribe-link", json={"email": "amina@example.com"}).status_code == 202
+        token = re.search(r"\?unsubscribe=([\w-]+)", outbox[-1][1].get_body(("plain",)).get_content()).group(1)
+        assert client.post(f"/api/unsubscribe/{token}").status_code == 200
+        assert client.post("/api/confirm/unknown-token").status_code == 404
+        # A request whose email fails is removed again, also off the loop
+        with patch("app.routers.subscribe.alerts.send_once", AsyncMock(return_value=False)):
+            alerts._recently_sent.clear()
+            assert client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"}).status_code == 202
+    assert on_the_loop == []
