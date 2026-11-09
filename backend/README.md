@@ -309,6 +309,7 @@ Health check used by the Railway deploy probe. Returns `{"status": "ok"}`.
 
 ```bash
 pytest tests/ -v
+python -m pyflakes app tests browser_tests   # unused imports and undefined names, as CI checks
 ```
 
 All network calls are mocked, so the tests are deterministic and run offline.

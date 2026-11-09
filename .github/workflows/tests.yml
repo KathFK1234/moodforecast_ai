@@ -46,6 +46,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements-dev.txt -c constraints.txt
+      - name: Check for unused imports and undefined names
+        run: python -m pyflakes app tests browser_tests
       - name: Run tests
         run: python -m pytest tests -q
 
