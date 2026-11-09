@@ -795,6 +795,8 @@ async function handleOptOut(event) {
             showNotice(msg, `Check your inbox and spam folder. If ${email} is subscribed, we've sent a link to finish unsubscribing.`, false);
         }
         el('optOutForm').classList.add('hidden');
+        // The form's button has gone, so focus would leave the dialog: Close is what's left to do
+        el('optOutClose').focus();
     } catch (error) {
         showNotice(msg, error.message, true);
     } finally {
@@ -829,6 +831,9 @@ function showConfirmPrompt(token) {
             }
             const data = await res.json();
             banner.className = 'notice notice-success';
+            // The button goes, so keep the reader's place on the message instead
+            banner.tabIndex = -1;
+            banner.focus();
             banner.textContent = `Confirmed. ${data.email} will get a daily email for ${data.location}, starting with the next one due. If they land in spam, mark them as not spam.`;
             rememberSubscription({ email: data.email, location: data.location });
         } catch (error) {
@@ -858,6 +863,7 @@ function showUnsubscribePrompt(token) {
             prompt.classList.add('hidden');
             confirm.classList.add('hidden');
             showNotice(msg, `${data.email} has been unsubscribed. No more daily alerts will be sent.`, false);
+            el('optOutClose').focus();
             const saved = savedSubscription();
             if (saved && saved.email === data.email) rememberSubscription(null);
         } catch (error) {

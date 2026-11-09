@@ -115,6 +115,8 @@ def test_the_unsubscribe_pop_up_opens_closes_and_sends_a_link(page, site):
     page.click("#optOutBtn")
     expect(page.locator("#optOutMessage")).to_contain_text("spam folder")
     expect(page.locator("#optOutForm")).to_be_hidden()
+    # The form's button has gone, so focus stays in the dialog, on what's left to do
+    expect(page.locator("#optOutClose")).to_be_focused()
     
     page.click("#optOutClose")
     expect(dialog).to_be_hidden()
@@ -144,6 +146,7 @@ def test_an_email_link_unsubscribes_from_the_pop_up_and_clears_the_saved_subscri
     page.click("#optOutConfirm")
     expect(page.locator("#optOutMessage")).to_contain_text("has been unsubscribed")
     expect(page.locator("#optOutConfirm")).to_be_hidden()
+    expect(page.locator("#optOutClose")).to_be_focused()
     assert "unsubscribe" not in page.url
     assert page.evaluate("localStorage.getItem('moodforecast:subscription')") is None
 
@@ -178,6 +181,7 @@ def test_a_confirmation_link_asks_first_then_confirms(page, site):
     banner.get_by_role("button").click()
     expect(banner).to_contain_text("Confirmed.")
     expect(banner).to_contain_text("spam")
+    expect(banner).to_be_focused()
     assert not re.search("confirm=", page.url)
 
 
