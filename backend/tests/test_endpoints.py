@@ -1018,6 +1018,10 @@ def test_the_font_is_served_as_a_font():
     ("http://localhost:8000", True),
     ("http://127.0.0.1:8000/", True),
     ("https://moodforecast.test", False),
+    ("http://moodforecast.test/", False),
+    ("moodforecastai-production.up.railway.app", True),
+    ("ftp://moodforecast.test", True),
+    ("https://", True),
 ])
 def test_email_links_to_this_machine_are_warned_about(monkeypatch, caplog, url, warned):
     monkeypatch.setattr(settings, "public_url", url)

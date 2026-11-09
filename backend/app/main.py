@@ -152,8 +152,20 @@ async def forget_old_addresses() -> None:
 
 
 def warn_if_email_links_are_local() -> None:
-    """Say so when emails would link to this machine: their links would work for nobody."""
-    if mailer.is_configured() and urlsplit(settings.public_url).hostname in ("localhost", "127.0.0.1"):
+    """
+    Say so when emails' links would work for nobody: they point to this machine,
+    or PUBLIC_URL isn't a full web address (no https://), so mail apps can't open them.
+    """
+    if not mailer.is_configured():
+        return
+    url = urlsplit(settings.public_url)
+    if url.scheme not in ("http", "https") or not url.hostname:
+        logger.warning(
+            "PUBLIC_URL is %s, which isn't a full web address: emails' links won't open. "
+            "Set it to the site's address, starting with https://",
+            settings.public_url
+        )
+    elif url.hostname in ("localhost", "127.0.0.1"):
         logger.warning(
             "PUBLIC_URL is %s, so the confirmation and unsubscribe links in emails won't work for anyone else",
             settings.public_url
