@@ -18,7 +18,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.config import settings
 from app.models.db import create_tables
-from app.routers import forecast, wellbeing, activity, locations, subscribe
+from app.routers import docs, forecast, wellbeing, activity, locations, subscribe
 from app.models.schemas import HealthResponse
 from app.services import alerts, mailer
 from app.services.rate_limit import RateLimiter
@@ -213,7 +213,10 @@ def create_app() -> FastAPI:
         title="MoodForecast AI",
         description="Where environmental intelligence meets psychological wellbeing",
         version="1.0.0",
-        lifespan=lifespan
+        lifespan=lifespan,
+        # Served by routers/docs.py instead, with their scripts pinned and checked
+        docs_url=None,
+        redoc_url=None,
     )
     
     # app.js and styles.css are 40 KB and more, which is slow on a mobile connection
@@ -268,6 +271,7 @@ def create_app() -> FastAPI:
     app.include_router(activity.router)
     app.include_router(locations.router)
     app.include_router(subscribe.router)
+    app.include_router(docs.router)
     
     # Health check
     @app.get("/health")

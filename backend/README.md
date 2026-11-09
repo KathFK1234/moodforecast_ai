@@ -36,6 +36,7 @@ app/
     common.py         # Location lookup, weather model and error handling shared by the routes
     activity.py       # GET /api/activity, /api/random-activity, /api/activities[/{location}]
     locations.py      # GET /api/locations
+    docs.py           # GET /docs and /redoc, with their CDN scripts pinned and hash-checked
     subscribe.py      # GET /api/alerts; POST /api/subscribe, /api/confirm/{token},
                       # /api/unsubscribe/{token} (GET redirects to the page), /api/unsubscribe-link
   

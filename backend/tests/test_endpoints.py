@@ -16,6 +16,7 @@ from app.main import (
     warn_if_email_links_are_local, warn_if_subscribers_would_be_lost
 )
 from app.models.db import PendingSubscription, Subscriber
+from app.routers import docs
 from app.models.schemas import normalise_email
 from app.services import alerts, mailer
 from app.services.cache import cache
@@ -1164,3 +1165,33 @@ def test_without_email_no_alert_loop_is_started(monkeypatch):
         with TestClient(app):
             pass
     alerts.run_alert_loop.assert_not_called()
+
+
+@pytest.mark.parametrize("path, files", [
+    ("/docs", [docs.SWAGGER_JS, docs.SWAGGER_CSS]),
+    ("/redoc", [docs.REDOC_JS]),
+])
+def test_the_docs_pages_load_only_pinned_files_checked_by_their_hashes(path, files):
+    page = client.get(path)
+    assert page.status_code == 200
+    for url, digest in files:
+        assert re.search(r"@\d+\.\d+\.\d+/", url)
+        assert f'"{url}" integrity="{digest}" crossorigin="anonymous"' in page.text
+    # Nothing else from another site: no fonts, favicon or validator elsewhere
+    other_sites = set(re.findall(r"https?://[^/\"']+", page.text)) - {"https://cdn.jsdelivr.net"}
+    assert other_sites == set()
+
+
+def test_swagger_ui_does_not_send_the_api_description_to_its_validator():
+    assert '"validatorUrl": null' in client.get("/docs").text
+
+
+def test_a_docs_file_that_is_not_where_expected_is_an_error():
+    page = docs.get_redoc_html(openapi_url="/openapi.json", title="x", redoc_js_url="https://example.com/r.js")
+    with pytest.raises(RuntimeError):
+        docs.with_integrity(page, docs.REDOC_JS)
+
+
+def test_the_docs_pages_stay_out_of_the_api_description():
+    paths = client.get("/openapi.json").json()["paths"]
+    assert "/docs" not in paths and "/redoc" not in paths
