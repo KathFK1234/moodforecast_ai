@@ -48,17 +48,21 @@ def send_email(
     if not (settings.smtp_host and settings.mail_from):
         raise MailError(NOT_CONFIGURED)
     
-    message = EmailMessage()
-    message["From"] = settings.mail_from
-    message["To"] = to
-    message["Subject"] = subject
-    message["Date"] = formatdate(localtime=False)
-    message["Message-ID"] = make_msgid()
-    for name, value in (headers or {}).items():
-        message[name] = value
-    message.set_content(text)
-    if html:
-        message.add_alternative(html, subtype="html")
+    try:
+        message = EmailMessage()
+        message["From"] = settings.mail_from
+        message["To"] = to
+        message["Subject"] = subject
+        message["Date"] = formatdate(localtime=False)
+        message["Message-ID"] = make_msgid()
+        for name, value in (headers or {}).items():
+            message[name] = value
+        message.set_content(text)
+        if html:
+            message.add_alternative(html, subtype="html")
+    except ValueError as e:
+        # A line break in a header (which stops header injection), say: a failure like any other
+        raise MailError(_failure(to, f"the email couldn't be put together ({e})")) from e
     
     try:
         if settings.smtp_port == 465:

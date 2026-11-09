@@ -69,6 +69,14 @@ def test_a_mail_server_quoting_the_address_doesnt_put_it_in_the_log(outbox, monk
     assert "amina" not in str(raised.value)
 
 
+def test_an_email_that_cant_be_put_together_becomes_a_mail_error(outbox):
+    # Python refuses a line break in a header, which is what stops header injection
+    with pytest.raises(mailer.MailError, match="couldn't be put together") as raised:
+        mailer.send_email("amina@example.com", "Hello\r\nBcc: someone@example.com", "Hi")
+    assert "amina" not in str(raised.value)
+    assert outbox == []
+
+
 def test_connection_failure_becomes_a_mail_error(outbox, monkeypatch):
     def unreachable(host, port, **kwargs):
         raise ConnectionRefusedError("nothing listening")

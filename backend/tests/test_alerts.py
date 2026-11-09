@@ -301,6 +301,18 @@ class TestSendDueAlerts:
         assert stored(engine).last_sent_on is None
     
     @pytest.mark.asyncio
+    async def test_an_email_the_mail_server_cant_take_only_costs_that_subscriber(self, engine, weather, outbox):
+        add(
+            engine,
+            make_subscriber(place="Nairobi\r\nBcc: someone@example.com, KE"),
+            make_subscriber(id="sub-2", email="ben@example.com", token="tok-2"),
+        )
+        with patch("app.services.alerts.get_engine", return_value=engine):
+            assert await alerts.send_due_alerts(MORNING) == 1
+        assert [message["To"] for _, message in outbox] == ["ben@example.com"]
+        assert stored(engine).last_sent_on is None
+    
+    @pytest.mark.asyncio
     async def test_a_failed_send_is_retried_on_the_next_run(self, engine, weather, outbox, monkeypatch):
         add(engine, make_subscriber())
         working_smtp = mailer.smtplib.SMTP
