@@ -77,6 +77,14 @@ def optional_number(value: Any) -> float | None:
     return None if value is None else finite(value)
 
 
+def _sea_temperature(reading: dict[str, Any]) -> float | None:
+    """A marine reading's sea temperature, or None if it has no usable one."""
+    try:
+        return optional_number(reading.get("sea_surface_temperature"))
+    except (TypeError, ValueError):
+        return None
+
+
 class RateLimitedError(RuntimeError):
     """Open-Meteo is refusing requests for now; asking again straight away would not help."""
 
@@ -276,11 +284,15 @@ class WeatherClient:
             # Open-Meteo sends null when a day has no data
             if temp_max is None or temp_min is None:
                 continue
+            high, low = float(temp_max), float(temp_min)
+            # NaN or infinity is no data either, and JSON responses can't carry it
+            if not (math.isfinite(high) and math.isfinite(low)):
+                continue
             days.append({
                 "date": date,
                 "condition": self._get_condition_text(code),
-                "temp_max": float(temp_max),
-                "temp_min": float(temp_min),
+                "temp_max": high,
+                "temp_min": low,
                 "humidity": optional_number(humidity),
                 "precipitation_chance": optional_number(rain_chance),
                 "uv_index": optional_number(uv_index),
@@ -332,7 +344,7 @@ class WeatherClient:
                 for place in (data if isinstance(data, list) else [data])
             ]
             at_sea = [r for r in readings if r.get("wave_height") is not None]
-            temps = [r["sea_surface_temperature"] for r in at_sea if r.get("sea_surface_temperature") is not None]
+            temps = [t for t in (_sea_temperature(r) for r in at_sea) if t is not None]
         except AttributeError:
             return None
         result = {"coastal": bool(at_sea), "sea_temp_c": temps[0] if temps else None}

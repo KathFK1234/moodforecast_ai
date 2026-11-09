@@ -449,3 +449,24 @@ async def test_a_recent_forecast_stands_in_for_a_reply_of_the_wrong_shape():
 async def test_a_sea_reply_of_the_wrong_shape_is_no_sea_information(reply):
     client = make_client(lambda request: httpx.Response(200, json=reply))
     assert await client.get_sea(1.0, 2.0) is None
+
+
+@pytest.mark.asyncio
+async def test_a_day_without_a_real_temperature_is_left_out():
+    # Python's JSON parser reads NaN and Infinity, which a JSON response can't carry
+    reply = (
+        json.dumps(OPEN_METEO_RESPONSE)
+        .replace("[28.3, 27.6, 25.4]", "[NaN, 27.6, 25.4]")
+        .replace("[16.0, 16.1, 15.6]", "[16.0, 16.1, Infinity]")
+    )
+    client = make_client(lambda request: httpx.Response(200, text=reply))
+    result = await client.get_forecast(1.0, 2.0)
+    assert [day["date"] for day in result["daily"]] == ["2026-10-06"]
+
+
+@pytest.mark.parametrize("temperature", ["NaN", "Infinity", '"warm"'])
+@pytest.mark.asyncio
+async def test_a_sea_temperature_that_isnt_a_number_is_unknown(temperature):
+    reply = f'{{"current": {{"wave_height": 1.2, "sea_surface_temperature": {temperature}}}}}'
+    client = make_client(lambda request: httpx.Response(200, text=reply))
+    assert await client.get_sea(1.0, 2.0) == {"coastal": True, "sea_temp_c": None}
