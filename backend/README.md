@@ -36,7 +36,8 @@ app/
     common.py         # Location lookup, weather model and error handling shared by the routes
     activity.py       # GET /api/activity, /api/random-activity, /api/activities[/{location}]
     locations.py      # GET /api/locations
-    subscribe.py      # POST /api/subscribe, /api/unsubscribe/{token}, /api/unsubscribe-link
+    subscribe.py      # GET /api/alerts; POST /api/subscribe, /api/confirm/{token},
+                      # /api/unsubscribe/{token} (GET redirects to the page), /api/unsubscribe-link
   
   services/           # Business logic
     weather.py        # Open-Meteo API client with caching
@@ -67,7 +68,7 @@ tests/
   test_activity_advisor.py  # Activity rules and random picks (no I/O)
   test_curiosity.py      # Curiosity prompts (no I/O)
   test_locality.py       # Place facts: country, coast, late night (no I/O)
-  test_cache.py          # In-memory cache: expiry and size limit
+  test_cache.py          # In-memory cache: expiry, size limit and forgetting old entries
   test_db.py             # Database URL handling (Postgres driver)
   test_dependencies.py   # constraints.txt matches the requirements files
   test_railway_config.py # railway.toml uses only keys Railway reads
