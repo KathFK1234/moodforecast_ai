@@ -840,8 +840,14 @@ function showConfirmPrompt(token) {
             // The token has left the address, so this button is the only way to try again
             banner.className = 'notice notice-error';
             text.textContent = error.message;
-            if (error.final) confirm.remove();
-            else releaseConfirm();
+            if (error.final) {
+                // The button goes, so keep the reader's place on the message, as on success
+                banner.tabIndex = -1;
+                banner.focus();
+                confirm.remove();
+            } else {
+                releaseConfirm();
+            }
         }
     });
     banner.append(text, confirm);

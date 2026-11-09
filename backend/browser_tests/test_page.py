@@ -205,6 +205,7 @@ def test_a_used_confirmation_link_says_so_and_offers_no_retry(page, site):
     banner.get_by_role("button").click()
     expect(banner).to_contain_text("Already used.")
     expect(banner.get_by_role("button")).to_have_count(0)
+    expect(banner).to_be_focused()
 
 
 @pytest.mark.parametrize("link, button", [
