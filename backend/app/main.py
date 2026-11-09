@@ -146,9 +146,13 @@ async def forget_old_addresses() -> None:
     """Every FORGET_INTERVAL_SECONDS, drop the addresses the limits no longer need, even when nobody is using the site."""
     while True:
         await asyncio.sleep(FORGET_INTERVAL_SECONDS)
-        api_limiter.forget_old()
-        form_limiter.forget_old()
-        alerts.forget_old_addresses()
+        try:
+            api_limiter.forget_old()
+            form_limiter.forget_old()
+            alerts.forget_old_addresses()
+        except Exception:
+            # Logged and tried again next time: stopping would keep addresses in memory for good
+            logger.exception("Forgetting old addresses failed")
 
 
 def warn_if_email_links_are_local() -> None:

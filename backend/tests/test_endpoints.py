@@ -1143,6 +1143,26 @@ async def test_addresses_the_limits_no_longer_need_are_forgotten_regularly():
     assert api.call_count == forms.call_count == emails.call_count == 2
 
 
+@pytest.mark.asyncio
+async def test_a_failure_to_forget_is_logged_and_does_not_stop_the_forgetting(caplog):
+    pauses = []
+    
+    async def pause(seconds):
+        pauses.append(seconds)
+        if len(pauses) == 3:
+            raise asyncio.CancelledError
+    
+    with patch("app.main.asyncio.sleep", pause), \
+            patch.object(api_limiter, "forget_old", side_effect=[RuntimeError("odd"), None]) as api, \
+            patch.object(form_limiter, "forget_old"), \
+            patch("app.main.alerts.forget_old_addresses"):
+        with pytest.raises(asyncio.CancelledError):
+            await forget_old_addresses()
+    
+    assert api.call_count == 2
+    assert "Forgetting old addresses failed" in caplog.text
+
+
 def test_forgetting_runs_while_the_app_is_up_even_without_email(monkeypatch):
     started, stopped = asyncio.Event(), []
     
