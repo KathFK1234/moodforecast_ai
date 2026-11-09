@@ -12,7 +12,8 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.main import (
-    HideTokens, api_limiter, app, form_limiter, warn_if_email_links_are_local, warn_if_subscribers_would_be_lost
+    FORGET_INTERVAL_SECONDS, HideTokens, api_limiter, app, forget_old_addresses, form_limiter,
+    warn_if_email_links_are_local, warn_if_subscribers_would_be_lost
 )
 from app.models.db import PendingSubscription, Subscriber
 from app.models.schemas import normalise_email
@@ -1111,6 +1112,47 @@ def test_startup_and_shutdown_run_the_alert_loop_only_while_the_app_is_up(monkey
         assert stopped == [True]
         weather_client.return_value.close.assert_awaited_once()
     create_tables.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_addresses_the_limits_no_longer_need_are_forgotten_regularly():
+    pauses = []
+    
+    async def pause(seconds):
+        pauses.append(seconds)
+        if len(pauses) == 3:
+            raise asyncio.CancelledError
+    
+    with patch("app.main.asyncio.sleep", pause), \
+            patch.object(api_limiter, "forget_old") as api, \
+            patch.object(form_limiter, "forget_old") as forms, \
+            patch("app.main.alerts.forget_old_addresses") as emails:
+        with pytest.raises(asyncio.CancelledError):
+            await forget_old_addresses()
+    
+    assert pauses == [FORGET_INTERVAL_SECONDS] * 3
+    assert api.call_count == forms.call_count == emails.call_count == 2
+
+
+def test_forgetting_runs_while_the_app_is_up_even_without_email(monkeypatch):
+    started, stopped = asyncio.Event(), []
+    
+    async def forget():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            stopped.append(True)
+            raise
+    
+    monkeypatch.setattr("app.main.forget_old_addresses", forget)
+    with patch("app.main.create_tables"), \
+            patch("app.main.mailer.is_configured", return_value=False), \
+            patch("app.main.get_weather_client") as weather_client:
+        weather_client.return_value.close = AsyncMock()
+        with TestClient(app) as running:
+            running.portal.call(started.wait)
+        assert stopped == [True]
 
 
 def test_without_email_no_alert_loop_is_started(monkeypatch):

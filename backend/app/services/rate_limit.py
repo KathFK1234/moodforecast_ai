@@ -30,6 +30,12 @@ class RateLimiter:
             del self._uses[next(iter(self._uses))]
         return allowed
     
+    def forget_old(self) -> None:
+        """Forget every visitor whose last use is a whole window ago: the limit no longer needs them."""
+        cutoff = time.monotonic() - self.window_seconds
+        for key in [key for key, uses in self._uses.items() if not uses or uses[-1] <= cutoff]:
+            del self._uses[key]
+    
     def clear(self) -> None:
         """Forget every visitor."""
         self._uses.clear()

@@ -33,3 +33,18 @@ def test_setting_a_key_again_makes_it_the_newest():
     assert cache.get("a") == 3
     assert cache.get("b") is None
     assert cache.get("c") == 4
+
+
+def test_entries_older_than_asked_are_removed(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr("app.services.cache.time.time", lambda: now[0])
+    cache = TTLCache(ttl_seconds=60)
+    cache.set("a", 1)
+    now[0] += 30
+    cache.set("b", 2)
+    now[0] += 40
+    cache.forget_older_than(60)
+    assert len(cache) == 1
+    assert cache.get("b") == 2
+    cache.forget_older_than(5)
+    assert len(cache) == 0

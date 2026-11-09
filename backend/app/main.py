@@ -56,6 +56,9 @@ form_limiter = RateLimiter(20, 3600)
 # The API's requests are a few short fields
 MAX_BODY_BYTES = 4096
 FORM_PATHS = ("/api/subscribe", "/api/unsubscribe-link")
+# How often network and email addresses the limits no longer need are forgotten.
+# The privacy page says they are kept for up to a day.
+FORGET_INTERVAL_SECONDS = 600
 TOO_MANY_REQUESTS_MESSAGE = "That's a lot of requests in a short time. Please wait a few minutes and try again."
 
 
@@ -139,6 +142,15 @@ class LimitApiBodySize:
         await self.app(scope, replay, send)
 
 
+async def forget_old_addresses() -> None:
+    """Every FORGET_INTERVAL_SECONDS, drop the addresses the limits no longer need, even when nobody is using the site."""
+    while True:
+        await asyncio.sleep(FORGET_INTERVAL_SECONDS)
+        api_limiter.forget_old()
+        form_limiter.forget_old()
+        alerts.forget_old_addresses()
+
+
 def warn_if_email_links_are_local() -> None:
     """Say so when emails would link to this machine: their links would work for nobody."""
     if mailer.is_configured() and urlsplit(settings.public_url).hostname in ("localhost", "127.0.0.1"):
@@ -174,6 +186,8 @@ async def lifespan(app: FastAPI):
     warn_if_email_links_are_local()
     warn_if_subscribers_would_be_lost()
     
+    forget_task = asyncio.create_task(forget_old_addresses())
+    
     # Daily alerts run in the background, in this process
     alert_task = None
     if mailer.is_configured():
@@ -185,6 +199,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
+    forget_task.cancel()
     if alert_task:
         alert_task.cancel()
     client = get_weather_client()

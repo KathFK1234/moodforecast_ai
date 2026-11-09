@@ -432,6 +432,52 @@ class TestRateLimiter:
         assert list(limiter._uses) == ["b", "c"]
 
 
+    def test_a_visitor_is_forgotten_once_their_window_has_passed(self):
+        limiter = RateLimiter(2, 60)
+        with patch("app.services.rate_limit.time.monotonic", side_effect=[0, 31, 50, 90]):
+            limiter.allow("a")
+            limiter.allow("b")
+            limiter.allow("c")
+            limiter.forget_old()
+        assert list(limiter._uses) == ["b", "c"]
+    
+    def test_a_refused_visitor_is_kept_while_their_uses_count(self):
+        limiter = RateLimiter(1, 60)
+        with patch("app.services.rate_limit.time.monotonic", side_effect=[0, 50, 59, 61]):
+            limiter.allow("a")
+            assert limiter.allow("a") is False
+            limiter.forget_old()
+            assert list(limiter._uses) == ["a"]
+            limiter.forget_old()
+        assert list(limiter._uses) == []
+
+
+class TestForgettingAddresses:
+    """The form limits keep email addresses only as long as they need them."""
+    
+    def test_addresses_past_their_limits_are_forgotten(self):
+        with patch("app.services.rate_limit.time.monotonic", return_value=0), \
+                patch("app.services.cache.time.time", return_value=0):
+            alerts._address_limiter.allow("amina@example.com")
+            alerts._recently_sent.set("confirm:amina@example.com", True)
+        with patch("app.services.rate_limit.time.monotonic", return_value=86400), \
+                patch("app.services.cache.time.time", return_value=86400):
+            alerts.forget_old_addresses()
+        assert len(alerts._recently_sent) == 0
+        assert alerts._address_limiter._uses == {}
+    
+    def test_addresses_still_in_use_are_kept(self):
+        with patch("app.services.rate_limit.time.monotonic", return_value=0), \
+                patch("app.services.cache.time.time", return_value=0):
+            alerts._address_limiter.allow("amina@example.com")
+            alerts._recently_sent.set("confirm:amina@example.com", True)
+        with patch("app.services.rate_limit.time.monotonic", return_value=300), \
+                patch("app.services.cache.time.time", return_value=300):
+            alerts.forget_old_addresses()
+        assert len(alerts._recently_sent) == 1
+        assert list(alerts._address_limiter._uses) == ["amina@example.com"]
+
+
 class TestAlertLoop:
     """Test the background loop."""
     

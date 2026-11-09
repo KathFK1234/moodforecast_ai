@@ -53,6 +53,13 @@ class TTLCache:
     def __len__(self) -> int:
         return len(self._cache)
     
+    def forget_older_than(self, seconds: float) -> None:
+        """Remove every entry set over `seconds` ago."""
+        cutoff = time.time() - seconds
+        # Oldest first, so the expired entries are all at the front
+        while self._cache and next(iter(self._cache.values()))[1] < cutoff:
+            del self._cache[next(iter(self._cache))]
+    
     def delete(self, key: str) -> None:
         """Remove a key from cache."""
         self._cache.pop(key, None)

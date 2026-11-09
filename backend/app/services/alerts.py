@@ -199,6 +199,12 @@ def _form_email_allowance_left() -> bool:
     return len(_form_emails_sent) < MAX_FORM_EMAILS_PER_DAY
 
 
+def forget_old_addresses() -> None:
+    """Drop the email addresses the form limits no longer need, so none stays in memory beyond its limit's window."""
+    _recently_sent.forget_older_than(_recently_sent.ttl_seconds)
+    _address_limiter.forget_old()
+
+
 def recently_sent(to: str, kind: str) -> bool:
     """Whether send_once sent this kind of email to this address within the last cache lifetime."""
     return bool(_recently_sent.get(f"{kind}:{to}"))
