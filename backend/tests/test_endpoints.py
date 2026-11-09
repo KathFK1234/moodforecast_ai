@@ -17,6 +17,8 @@ from app.main import (
 )
 from app.models.db import PendingSubscription, Subscriber
 from app.routers import docs
+from app.services.activity_advisor import _pitch, find_activity
+from app.services.locality import build_place
 from app.models.schemas import normalise_email
 from app.services import alerts, mailer
 from app.services.cache import cache
@@ -642,7 +644,9 @@ def test_random_activity_endpoint(mock_weather):
     assert data["location"] == "Nairobi, KE"
     assert data["verdict"] == "go"
     assert data["activity"] in data["headline"]
-    assert len(data["reasons"]) == 2
+    # The weather's reason, any caveat the activity carries (ice skating's safety note), then its pitch
+    assert len(data["reasons"]) >= 2
+    assert data["reasons"][-1] == _pitch(find_activity(data["activity"]), build_place("Nairobi, KE", -1.2921))
     
     again = client.get("/api/random-activity/Nairobi", params={"exclude": data["activity"]})
     assert again.json()["activity"] != data["activity"]
