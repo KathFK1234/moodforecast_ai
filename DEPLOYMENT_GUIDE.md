@@ -180,6 +180,15 @@ To see request details:
 curl -v https://YOUR_DOMAIN/api/forecast/Nairobi
 ```
 
+### When a deploy breaks the site
+
+A new deployment only goes live once `/health` answers, so one that fails to start leaves the previous one running. If a deployment goes live and then misbehaves:
+
+1. **Roll back.** In Railway, the service's Deployments tab: click the three dots at the end of the last good deployment and confirm the rollback. It brings back that deployment's image **and its variables**, so a variable changed since (a new `BREVO_API_KEY`, say) goes back too: set it again afterwards. A removed deployment can be rolled back only within your plan's image retention period (72 hours on Hobby); after that, use Redeploy on it, which rebuilds it from its source.
+2. **Fix it in Git.** A rollback doesn't change `main`, and the next push deploys over it. Revert the change (`git revert <commit>`, then push) or push a fix.
+
+The database is safe to roll back over: the app only ever adds columns at startup, never removes or changes them, so an older version runs on a database a newer one has upgraded.
+
 ## After Deployment Checklist
 
 - [ ] `/health` returns `{"status":"ok"}`
