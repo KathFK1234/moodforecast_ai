@@ -100,7 +100,7 @@ jobs:
           if docker exec app sh -c 'touch /app/app/main.py || mv /app/app /app/moved'; then exit 1; fi
       - name: Check it shuts down cleanly when told to stop
         run: |
-          docker stop --time 15 app
+          docker stop --timeout 15 app
           docker logs app 2>&1 | grep -q 'Shutdown complete'
 
   browser:
