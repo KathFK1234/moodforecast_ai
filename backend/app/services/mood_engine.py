@@ -2,6 +2,7 @@
 
 import random
 from typing import TypedDict
+from app.services.activity_advisor import FROSTBITE_WIND_CHILL, wind_chill
 from app.services.numbers import shown
 
 
@@ -247,6 +248,18 @@ COLD_IDEAS = (
     "Keep warm and keep sipping water — it's easy to forget to drink when it's cold.",
 )
 
+# Cold enough for frostbite: every outdoor activity is ruled out, so the tips stay in too
+FROSTBITE_IDEAS = (
+    "Dangerously cold out — exposed skin can get frostbite in minutes, so stay in where it's warm.",
+    "Too cold to be out today: warm drinks, warm socks and something good to watch or read.",
+    "If you must go out, cover every bit of skin and keep it short — then thaw out with something hot.",
+    "Keep moving indoors — a stretch, a dance or a home workout warms you up from the inside.",
+    "Check in on anyone who lives alone or feels the cold more than most — a quick call can matter today.",
+)
+
+# The cold tips without the one that sends you out for a walk
+COLD_INDOOR_IDEAS = tuple(idea for idea in COLD_IDEAS if "walk" not in idea)
+
 HOT_IDEAS = (
     "Prioritize hydration and breaks indoors or in the shade. Heat stress reduces mental clarity.",
     "Keep a water bottle within reach — add ice, lemon or mint to make it interesting.",
@@ -310,21 +323,27 @@ def generate_recommendations(
     temperature_c: float,
     humidity: float,
     is_day: bool = True,
-    rng: random.Random | None = None
+    rng: random.Random | None = None,
+    wind_kph: float = 0.0
 ) -> list[str]:
     """
     Generate wellbeing recommendations based on weather parameters.
     
     Each recommendation is picked at random from the pool that fits the conditions.
-    Pass a seeded rng for repeatable picks.
+    Pass a seeded rng for repeatable picks. Cold that, with the wind, can cause
+    frostbite keeps every tip indoors, as the activity advice does.
     """
     pick = (rng or random).choice
     recommendations = []
     
     condition_lower = condition.lower()
     
+    frostbite = wind_chill(temperature_c, wind_kph) <= FROSTBITE_WIND_CHILL
+    
     # Light-based recommendations (daylight advice only applies during the day)
-    if not is_day:
+    if frostbite:
+        recommendations.append(pick(FROSTBITE_IDEAS))
+    elif not is_day:
         if "sunny" in condition_lower or "clear" in condition_lower:
             recommendations.append(pick(CLEAR_NIGHT_IDEAS))
         else:
@@ -352,7 +371,7 @@ def generate_recommendations(
     
     # Temperature-based recommendations
     if temperature_c < 10:
-        recommendations.append(pick(COLD_IDEAS))
+        recommendations.append(pick(COLD_INDOOR_IDEAS if frostbite else COLD_IDEAS))
     elif temperature_c > 30:
         recommendations.append(pick(HOT_IDEAS))
     elif is_day:
@@ -431,10 +450,11 @@ def score_mood(
     condition: str,
     temperature_c: float,
     humidity: float,
-    is_day: bool = True
+    is_day: bool = True,
+    wind_kph: float = 0.0
 ) -> MoodEngineOutput:
     """
-    Main entry point: score mood from weather parameters.
+    Main entry point: score mood from weather parameters. The wind only affects the recommendations.
     
     Returns: mood_score, mood_label, energy_level, risk_level, factors, recommendations.
     """
@@ -443,7 +463,7 @@ def score_mood(
     energy_level = classify_energy_level(mood_score)
     risk_level = classify_risk_level(mood_score)
     recommendations = generate_recommendations(
-        mood_score, condition, temperature_c, humidity, is_day
+        mood_score, condition, temperature_c, humidity, is_day, wind_kph=wind_kph
     )
     
     return {

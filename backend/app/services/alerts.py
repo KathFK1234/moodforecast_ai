@@ -288,7 +288,7 @@ def daily_email(
     wind = float(current.get("wind_speed", 0))
     is_day = current.get("is_day", True)
     
-    mood = score_mood(condition, temperature, humidity, is_day)
+    mood = score_mood(condition, temperature, humidity, is_day, wind)
     paragraphs: list[Paragraph] = [
         build_summary(place, condition, temperature, mood["mood_score"], mood["factors"], is_day),
         f"Weather mood score: {mood['mood_score']} out of 100 ({mood['mood_label']}). "

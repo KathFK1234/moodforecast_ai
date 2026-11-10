@@ -400,7 +400,7 @@ The mood engine applies additive deltas to a baseline of 65, then clamps to 0-10
 | 25-34 | Drained |
 | 0-24 | Heavy |
 
-Recommendations also depend on the time of day: daylight advice is replaced with wind-down advice at night.
+Recommendations also depend on the time of day: daylight advice is replaced with wind-down advice at night. Freezing rain, and cold that can cause frostbite once the wind is counted (a wind chill of -27°C or below), keep every recommendation indoors.
 
 ## Local Fit
 

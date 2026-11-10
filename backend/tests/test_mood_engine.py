@@ -149,6 +149,31 @@ class TestRecommendationGeneration:
                 assert recs[0] in mood_engine.ICE_IDEAS
         assert not any("walk" in idea for idea in mood_engine.ICE_IDEAS)
     
+    def test_frostbite_cold_keeps_every_tip_indoors(self):
+        """With the wind, cold that can cause frostbite rules out going out, as the activity advice does."""
+        for condition, temp, wind, is_day in [
+            ("Clear", -30, 5, True), ("Clear", -25, 30, False), ("Snow", -22, 40, True), ("Overcast", -35, 0, True)
+        ]:
+            for seed in range(20):
+                recs = generate_recommendations(
+                    20, condition, temp, 60, is_day, rng=random.Random(seed), wind_kph=wind
+                )
+                assert recs[0] in mood_engine.FROSTBITE_IDEAS
+                assert recs[1] in mood_engine.COLD_INDOOR_IDEAS
+        outdoors = ("walk", "outside", "sunshine", "snowman", "run")
+        for idea in mood_engine.FROSTBITE_IDEAS + mood_engine.COLD_INDOOR_IDEAS:
+            assert not any(word in idea for word in outdoors), idea
+
+    def test_cold_short_of_frostbite_keeps_the_usual_tips(self):
+        recs = generate_recommendations(60, "Clear", -10, 50, rng=random.Random(1), wind_kph=10)
+        assert recs[0] in mood_engine.COLD_SUN_IDEAS
+        assert recs[1] in mood_engine.COLD_IDEAS
+
+    def test_score_mood_passes_the_wind_to_the_tips(self):
+        assert score_mood("Clear", -25, 60, wind_kph=30)["recommendations"][0] in mood_engine.FROSTBITE_IDEAS
+        # The wind changes the advice, not the score
+        assert score_mood("Clear", -25, 60, wind_kph=30)["mood_score"] == score_mood("Clear", -25, 60)["mood_score"]
+
     def test_storm_and_snow_have_their_own_ideas(self):
         assert generate_recommendations(40, "Thunderstorm", 18, 70)[0] in mood_engine.STORM_IDEAS
         assert generate_recommendations(40, "Snow Showers", 0, 70)[0] in mood_engine.SNOW_IDEAS

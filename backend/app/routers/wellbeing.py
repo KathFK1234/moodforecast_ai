@@ -28,7 +28,7 @@ async def get_wellbeing(location: LocationPath) -> WellbeingResponse:
     
     # Calculate mood
     mood_result = score_mood(
-        weather.condition, weather.temp_c, weather.humidity, weather.is_day
+        weather.condition, weather.temp_c, weather.humidity, weather.is_day, weather.wind_kph
     )
     
     return WellbeingResponse(

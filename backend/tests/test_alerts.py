@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.models.db import PendingSubscription, Subscriber
-from app.services import alerts, mailer
+from app.services import alerts, mailer, mood_engine
 from app.services.activity_advisor import check_activity
 from app.services.locality import build_place
 from app.services.rate_limit import RateLimiter
@@ -617,6 +617,17 @@ def test_the_daily_email_says_it_isnt_medical_advice():
     email = alerts.daily_email(subscriber, forecast)
     assert "not medical advice" in email.text
     assert "not medical advice" in email.html
+
+
+def test_the_daily_email_never_says_go_out_in_frostbite_cold():
+    """The activity says stay in, so the wellbeing tip mustn't suggest a walk in the sun."""
+    subscriber = make_subscriber(activity="running")
+    forecast = {"current": {"temperature": -25.0, "humidity": 60.0, "wind_speed": 30.0, "is_day": True, "condition": "Clear"}}
+    for seed in range(10):
+        email = alerts.daily_email(subscriber, forecast, rng=random.Random(seed))
+        assert "frostbite" in email.text
+        assert any(idea in email.text for idea in mood_engine.FROSTBITE_IDEAS)
+        assert not any(idea in email.text for idea in mood_engine.COLD_SUN_IDEAS)
 
 
 def _contrast_with_white(colour: str) -> float:
