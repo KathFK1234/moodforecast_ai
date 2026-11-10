@@ -10,10 +10,12 @@ Browser
 FastAPI (backend/app)
    ├── Static frontend      backend/app/static
    ├── Routers              forecast, wellbeing, activity, locations, subscribe
-   ├── Services             weather, geocoding, mood engine, cache
-   └── Database             SQLite or PostgreSQL (alert_subscriber table)
+   ├── Services             weather, geocoding, mood engine, activities, cache, rate limits
+   ├── Daily alerts         a background task in the same process, every 15 minutes
+   └── Database             SQLite or PostgreSQL (alert_subscriber and alert_pending tables)
    ↕
-Open-Meteo (weather)  +  Nominatim / OpenStreetMap (geocoding)
+Open-Meteo (weather, sea, place suggestions)  +  Nominatim / OpenStreetMap (geocoding)
+Brevo's API, or any SMTP server (email)
 ```
 
 Request flow for a search:
@@ -23,7 +25,7 @@ Location name → geocoding → latitude/longitude → Open-Meteo
              → current conditions + 7-day forecast → mood engine → response
 ```
 
-Neither external service needs an API key.
+The weather and place services need no API key. Email needs a Brevo API key, or an SMTP server's details (see Set Variables).
 
 ## Before You Deploy
 
