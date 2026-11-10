@@ -122,17 +122,12 @@ echo ""
 
 # 8. Check backend server
 echo "8. Backend Server"
-if pgrep -f "uvicorn app.main" > /dev/null; then
-    pass "Backend server running"
-    
-    # Test endpoints
-    health=$(curl -s $BASE_URL/health 2>/dev/null)
-    if echo "$health" | grep -q '"status"'; then
-        pass "Health endpoint working"
-    else
-        fail "Health endpoint not responding"
-    fi
-    
+# Asked over HTTP rather than by process name, so a backend in Docker counts too
+health=$(curl -s --max-time 10 $BASE_URL/health 2>/dev/null)
+if echo "$health" | grep -q '"status"'; then
+    pass "Backend server running at $BASE_URL"
+    pass "Health endpoint working"
+
     # Test live weather endpoint
     forecast=$(curl -s $BASE_URL/api/forecast/Nairobi 2>/dev/null)
     if echo "$forecast" | grep -q '"location"'; then
@@ -141,7 +136,7 @@ if pgrep -f "uvicorn app.main" > /dev/null; then
         fail "Forecast endpoint not responding"
     fi
 else
-    fail "Backend server not running"
+    fail "Backend server not answering at $BASE_URL"
     echo "   Start with: cd backend && source venv/bin/activate && uvicorn app.main:app --reload"
 fi
 echo ""
