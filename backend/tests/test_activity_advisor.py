@@ -5,7 +5,7 @@ import random
 import pytest
 from app.services import activity_advisor
 from app.services.activity_advisor import (
-    ACTIVITIES, check_activity, find_activity, local_activities, random_activity
+    ACTIVITIES, check_activity, find_activity, local_activities, random_activity, wind_chill
 )
 from app.services.locality import SPORT_COUNTRIES, Place
 
@@ -133,6 +133,41 @@ class TestVerdicts:
         assert advise("cycling", temp=38)["verdict"] == "skip"
         assert advise("cycling", temp=32)["verdict"] == "maybe"
     
+    def test_wind_chill_matches_the_published_table(self):
+        # Environment Canada's wind chill index, rounded as it publishes it
+        assert round(wind_chill(-10, 20)) == -18
+        assert round(wind_chill(-20, 30)) == -33
+        assert round(wind_chill(-30, 50)) == -49
+        # Only defined at 10°C or below with some wind
+        assert wind_chill(15, 40) == 15
+        assert wind_chill(-30, 2) == -30
+
+    @pytest.mark.parametrize("question", ["run", "a walk", "hike", "ski", "picnic", "kayaking", "go stargazing"])
+    def test_frostbite_cold_rules_out_everything_outdoors(self, question):
+        for temp, wind, is_day in [(-25, 30, True), (-40, 0, True), (-30, 5, False)]:
+            advice = advise(question, condition="Clear", temp=temp, wind=wind, is_day=is_day)
+            assert advice["verdict"] == "skip"
+            assert "frostbite" in advice["reasons"][0]
+
+    def test_the_frostbite_reason_gives_the_feel_in_the_wind(self):
+        assert advise("run", temp=-25, wind=30)["reasons"] == [
+            "At -25°C, feeling like -39°C in the wind, exposed skin can get frostbite within half an hour — stay in until it eases."
+        ]
+        assert advise("run", temp=-30, wind=0)["reasons"] == [
+            "At -30°C, exposed skin can get frostbite within half an hour — stay in until it eases."
+        ]
+
+    def test_cold_short_of_frostbite_is_still_a_caveat_for_exercise(self):
+        assert advise("run", temp=-10, wind=10)["verdict"] == "maybe"
+        assert advise("ski", condition="Snow", temp=-15, wind=10)["verdict"] == "go"
+
+    def test_frostbite_cold_leaves_indoor_activities_and_picks_alone(self):
+        assert advise("read a book", temp=-40, wind=30)["verdict"] == "go"
+        for seed in range(20):
+            pick = random_activity("Nairobi, KE", "Clear", -35, 50, 20, True, rng=random.Random(seed))
+            assert pick["verdict"] == "go"
+            assert find_activity(pick["activity"]).category == "indoor"
+
     def test_swimming_needs_warmth(self):
         assert advise("swim", temp=28)["verdict"] == "go"
         assert advise("swim", temp=18)["verdict"] == "maybe"

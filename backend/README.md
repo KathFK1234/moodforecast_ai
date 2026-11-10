@@ -184,6 +184,8 @@ curl "http://localhost:8000/api/activity/Nairobi?activity=Can+I+have+a+picnic"
 
 `verdict` is `go`, `maybe` (possible, with the caveats in `reasons`) or `skip`. `suggestion` is only set for `skip`. The rules live in `activity_advisor.py`: outdoor exercise, outdoor leisure, swimming, paddling, snow sports, stargazing, wind sports and indoor activities are each judged against the condition, temperature, humidity, wind and daylight.
 
+A thunderstorm, freezing rain or drizzle, or cold that can cause frostbite (a wind chill of -27°C or below, the American College of Sports Medicine's threshold for frostbite within 30 minutes) is a `skip` for everything outdoors.
+
 Some activities have rules of their own on top:
 
 - Wet surfaces (rain, drizzle, snow) rule out skateboarding, roller skating and rock climbing.

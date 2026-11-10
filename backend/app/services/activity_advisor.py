@@ -468,6 +468,23 @@ def _issues(
     )
 
 
+# The American College of Sports Medicine puts the risk of frostbite to exposed skin
+# within 30 minutes at a wind chill of -27°C or below
+FROSTBITE_WIND_CHILL = -27
+
+
+def wind_chill(temperature_c: float, wind_kph: float) -> float:
+    """
+    How cold it feels in the wind, °C: the formula Environment Canada and the US
+    National Weather Service use. It only applies at 10°C or below with some wind;
+    otherwise this is the air temperature.
+    """
+    if temperature_c > 10 or wind_kph < 4.8:
+        return temperature_c
+    speed = wind_kph ** 0.16
+    return 13.12 + 0.6215 * temperature_c - 11.37 * speed + 0.3965 * temperature_c * speed
+
+
 def _weather_issues(
     activity: Activity,
     condition: str,
@@ -495,6 +512,10 @@ def _weather_issues(
     # Freezing rain or drizzle glazes paths, roads and pitches in ice
     if "freezing" in condition_lower:
         return [(2, f"{condition.capitalize()} is coating everything in ice — stay off paths and roads until it thaws.")]
+    chill = wind_chill(temperature_c, wind_kph)
+    if chill <= FROSTBITE_WIND_CHILL:
+        feels = f"{temp}°C, feeling like {shown(chill)}°C in the wind" if shown(chill) != temp else f"{temp}°C"
+        return [(2, f"At {feels}, exposed skin can get frostbite within half an hour — stay in until it eases.")]
 
     # Sky: all that matters is darkness and cloud
     if category == "sky":
