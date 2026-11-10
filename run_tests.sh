@@ -179,8 +179,13 @@ if [ -f "backend/moodforecast.db" ]; then
     pass "SQLite database initialized"
     
     # Check record count
-    record_count=$(cd backend && sqlite3 moodforecast.db "SELECT COUNT(*) FROM alert_subscriber;" 2>/dev/null || echo "0")
-    pass "Database has $record_count subscriber record(s)"
+    # Python's own sqlite3 module (the sqlite3 command isn't always installed), opening the file read-only
+    record_count=$(cd backend && python3 -c 'import sqlite3; print(sqlite3.connect("file:moodforecast.db?mode=ro", uri=True).execute("SELECT COUNT(*) FROM alert_subscriber").fetchone()[0])' 2>/dev/null)
+    if [ -n "$record_count" ]; then
+        pass "Database has $record_count subscriber record(s)"
+    else
+        skip "Couldn't count the subscribers in backend/moodforecast.db"
+    fi
 else
     skip "SQLite database not found - created on first run, or DATABASE_URL points elsewhere"
 fi
