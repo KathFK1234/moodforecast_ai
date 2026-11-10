@@ -250,7 +250,7 @@ COLD_IDEAS = (
 
 # Cold enough for frostbite: every outdoor activity is ruled out, so the tips stay in too
 FROSTBITE_IDEAS = (
-    "Dangerously cold out — exposed skin can get frostbite in minutes, so stay in where it's warm.",
+    "Dangerously cold out — exposed skin can get frostbite within half an hour, so stay in where it's warm.",
     "Too cold to be out today: warm drinks, warm socks and something good to watch or read.",
     "If you must go out, cover every bit of skin and keep it short — then thaw out with something hot.",
     "Keep moving indoors — a stretch, a dance or a home workout warms you up from the inside.",
