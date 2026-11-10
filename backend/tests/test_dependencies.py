@@ -17,10 +17,10 @@ def pins(filename: str) -> dict[str, str]:
 
 
 def test_every_requirement_is_constrained_to_the_same_version():
-    """After changing requirements.txt or requirements-dev.txt, refresh constraints.txt (see its header)."""
-    requirements = pins("requirements.txt") | pins("requirements-dev.txt")
+    """After changing any requirements file, refresh constraints.txt (see its header)."""
+    requirements = pins("requirements.txt") | pins("requirements-dev.txt") | pins("requirements-browser.txt")
     constraints = pins("constraints.txt")
-    assert {"fastapi", "pytest"} <= set(requirements)
+    assert {"fastapi", "pytest", "playwright"} <= set(requirements)
     for name, version in requirements.items():
         assert constraints.get(name) == version, f"{name}: requirements {version}, constraints {constraints.get(name)}"
 
