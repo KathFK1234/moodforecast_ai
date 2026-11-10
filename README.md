@@ -53,17 +53,20 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 
 ```text
 moodforecast_ai/
+├── .github/workflows/tests.yml  # CI: tests, vulnerability audit, Docker image, browser
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # App factory, CORS, static files
 │   │   ├── config.py          # Settings from environment / .env
-│   │   ├── models/            # Database table and request/response schemas
+│   │   ├── models/            # Database tables and request/response schemas
 │   │   ├── routers/           # forecast, wellbeing, activity, locations, subscribe endpoints; API docs pages
 │   │   ├── services/          # weather, places, mood engine, activities, emails and alerts, limits, cache (see backend/README.md)
 │   │   └── static/            # Deployed copy of frontend/
 │   ├── tests/                 # pytest suite
+│   ├── browser_tests/         # The page in a real browser (CI runs it)
 │   ├── requirements.txt     # What the app needs to run
 │   ├── requirements-dev.txt # Plus the test tools
+│   ├── requirements-browser.txt # Plus the browser tests' Playwright
 │   ├── constraints.txt      # Exact versions of everything they install
 │   ├── pytest.ini           # Test settings
 │   ├── .env.example
