@@ -43,7 +43,30 @@ const Learner = (() => {
         } catch (e) {
             // Storage blocked or unreadable: start afresh
         }
+        if (prune(memory, Date.now())) save();
         return memory;
+    }
+
+    // Delete votes that have faded to almost nothing (about ten months on), rather than keep them for good
+    function prune(state, now) {
+        let changed = false;
+        [state.a, state.f].forEach((table) => {
+            Object.keys(table).forEach((key) => {
+                const cells = isCells(table[key]) ? table[key] : {};
+                Object.keys(cells).forEach((ctx) => {
+                    const [likes, dislikes] = decayed(cells[ctx], now);
+                    if (likes < 0.01 && dislikes < 0.01) {
+                        delete cells[ctx];
+                        changed = true;
+                    }
+                });
+                if (!isCells(table[key]) || !Object.keys(cells).length) {
+                    delete table[key];
+                    changed = true;
+                }
+            });
+        });
+        return changed;
     }
 
     function isCells(table) {

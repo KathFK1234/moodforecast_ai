@@ -624,3 +624,18 @@ def test_the_why_line_only_names_likes_that_outweigh_dislikes(page, site):
         "You've liked cycling before.",
         "You tend to like riding and skating.",
     ]
+
+
+def test_faded_votes_are_deleted(page, site):
+    page.route("**/api/**", lambda route: route.abort())
+    long_ago = "Date.now() - 2 * 365 * 24 * 3600 * 1000"
+    page.add_init_script(f"""localStorage.setItem('moodforecast:tastes', JSON.stringify({{
+        v: 1,
+        a: {{cycling: {{'mild-dry-day': [3, 0, {long_ago}], 'warm-dry-day': [1, 0, Date.now()]}}, reading: {{'cold-wet-evening': [2, 1, {long_ago}]}}}},
+        f: {{'quiet time in': {{'cold-wet-evening': [2, 1, {long_ago}]}}}}
+    }}))""")
+    page.goto(f"{site}/")
+    assert page.evaluate("Learner.hasLearned()")
+    stored = page.evaluate("JSON.parse(localStorage.getItem('moodforecast:tastes'))")
+    assert stored["a"] == {"cycling": {"warm-dry-day": [1, 0, stored["a"]["cycling"]["warm-dry-day"][2]]}}
+    assert stored["f"] == {}
