@@ -279,6 +279,7 @@ async def _search_nominatim(query: str) -> list[dict]:
 # nearby points share one cached answer
 COORDINATE_DECIMALS = 2
 NO_PLACE_THERE = "There's no named place there. Try a spot on land, or nearer a town."
+WARD = re.compile(r"\s+ward$", re.IGNORECASE)
 
 
 async def place_at(lat: float, lon: float) -> dict:
@@ -362,7 +363,9 @@ async def _reverse_nominatim(lat: float, lon: float) -> dict:
         )
         if not name:
             return {"error": NO_PLACE_THERE}
-        name = name.removeprefix("City of ")
+        # Kenya's electoral wards are mapped as cities and named after their
+        # neighbourhoods: "Tudor ward" is Tudor, in Mombasa
+        name = WARD.sub("", name.removeprefix("City of ")) or name
         region = clean_name(address.get("state") or address.get("county"))
         country = clean_name(address.get("country"))
         parts = [name, region if region != name else None, country if country != name else None]

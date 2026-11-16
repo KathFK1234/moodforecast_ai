@@ -506,3 +506,13 @@ async def test_a_search_that_looks_like_a_point_key_does_not_share_its_lookup(mo
     mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=[]))
     result = await geocoding.get_coordinates("rev:-0.71:36.43")
     assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_a_kenyan_ward_is_named_after_its_neighbourhood(monkeypatch):
+    reply = {
+        "lat": "-4.05", "lon": "39.67", "name": "Tudor ward",
+        "address": {"city": "Tudor ward", "county": "Mvita", "state": "Mombasa County", "country": "Kenya", "country_code": "ke"},
+    }
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
+    assert (await geocoding.place_at(-4.04, 39.67))["label"] == "Tudor, Mombasa County, Kenya"
