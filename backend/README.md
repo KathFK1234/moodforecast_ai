@@ -35,7 +35,7 @@ app/
     wellbeing.py      # GET /api/wellbeing/{location}
     common.py         # Location lookup, weather model and error handling shared by the routes
     activity.py       # GET /api/activity, /api/random-activity, /api/activities[/{location}]
-    locations.py      # GET /api/locations
+    locations.py      # GET /api/locations, POST /api/place
     docs.py           # GET /docs and /redoc, with their CDN scripts pinned and hash-checked
     subscribe.py      # GET /api/alerts; POST /api/subscribe, /api/confirm/{token},
                       # /api/unsubscribe/{token} (GET redirects to the page), /api/unsubscribe-link
@@ -234,6 +234,16 @@ curl "http://localhost:8000/api/locations?q=kis"
 
 `label` is the text to search for. A label that came from this endpoint resolves to exactly that place.
 
+### POST /api/place
+
+The town or city at a point, for "Use my location" and choosing on the map. Body: `{"lat": -0.7172, "lon": 36.431}`.
+
+```json
+{"name": "Naivasha", "region": "Nakuru County", "country": "Kenya", "label": "Naivasha, Nakuru County, Kenya", "lat": -0.7167, "lon": 36.4333}
+```
+
+Search for `label` to get the weather there: it resolves to exactly this place without another lookup. `lat` and `lon` are the place's own coordinates, not the point's. It is a POST so the coordinates travel in the body, never in an address, the browser's history or a request log. They are rounded to 2 decimal places (about 1 km) before anything else, and the rounded point is only kept as the key of the cached answer (`rev:{lat}:{lon}`, for the cache lifetime). Uses Nominatim's reverse lookup at town level, within the app's one request a second; each visitor can make 30 a minute. 422 if there's no named place there (out at sea), 503/504 if Nominatim can't be reached; there is no fallback for this one.
+
 ### GET /api/activities
 
 The names of every activity the advisor knows: `["running", "a walk", "cycling", ...]`.
@@ -364,6 +374,8 @@ Location names are resolved in `app/services/geocoding.py`:
 - Otherwise `GET https://nominatim.openstreetmap.org/search` (OpenStreetMap, no API key)
 - If Nominatim can't be reached, Open-Meteo's geocoder is tried instead
 
+Places at a point (`POST /api/place`) come from `GET https://nominatim.openstreetmap.org/reverse` at town level, with the point rounded to about 1 km.
+
 Lookups for the same name made at the same moment share one request, which keeps the app within Nominatim's limit of one request per second for a single search.
 
 Suggestions while typing come from `GET https://geocoding-api.open-meteo.com/v1/search` instead, because Nominatim's usage policy does not allow autocomplete.
@@ -432,7 +444,7 @@ Limits worth knowing:
 
 - In-memory, per process; cleared when the server restarts
 - TTL of 10 minutes by default (`CACHE_TTL_SECONDS`)
-- Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}` and `suggest:{query}`
+- Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}`, `suggest:{query}` and `rev:{lat}:{lon}` (a point rounded to about 1 km)
 - `/api/forecast` and `/api/wellbeing` share the same cached weather for a location
 - Requests for the same forecast made at the same moment share one call to Open-Meteo
 - A forecast request that times out or hits a server error is retried once. If Open-Meteo still can't be reached, the last forecast for that place is served if it is under an hour old
@@ -465,7 +477,7 @@ Five emails exist, all composed in `app/services/alerts.py` as plain text with a
 - **Daily alert** - only to confirmed subscribers: current weather, the mood score and summary, today's outlook, the subscriber's activity judged against the weather (or a random pick that suits it), a recommendation, and a question about another place
 - **Unsubscribe link** - sent on request from `/api/unsubscribe-link`
 
-The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default). Each visitor can use the two forms 20 times an hour and the rest of the API 300 times a minute (429 beyond that). Together the forms are limited to 100 emails a day across all addresses (`MAX_FORM_EMAILS_PER_DAY` in `app/services/alerts.py`), so they can't use up the mail provider's daily allowance.
+The confirmation request and the unsubscribe link can be triggered by anyone typing an address into the site, so each is sent at most once per address per cache lifetime (`CACHE_TTL_SECONDS`, 10 minutes by default). Each visitor can use the two forms 20 times an hour, `POST /api/place` 30 times a minute (it shares Nominatim's one request a second with everyone's searches) and the rest of the API 300 times a minute (429 beyond that). Together the forms are limited to 100 emails a day across all addresses (`MAX_FORM_EMAILS_PER_DAY` in `app/services/alerts.py`), so they can't use up the mail provider's daily allowance.
 
 Every email to a subscriber ends with an unsubscribe link to `PUBLIC_URL/?unsubscribe=<token>`, where the page asks for confirmation, and carries `List-Unsubscribe` headers so mail apps can show their own unsubscribe button.
 

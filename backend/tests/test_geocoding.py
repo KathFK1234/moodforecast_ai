@@ -409,3 +409,100 @@ def test_clean_name(value, cleaned):
 def test_a_name_that_isnt_text_is_unusable():
     with pytest.raises(TypeError):
         geocoding.clean_name(5)
+
+
+NAIVASHA_REVERSE = {
+    "lat": "-0.7167", "lon": "36.4333", "name": "Naivasha",
+    "address": {"town": "Naivasha", "county": "Nakuru County", "state": "Nakuru County", "country": "Kenya", "country_code": "ke"},
+}
+
+
+@pytest.mark.asyncio
+async def test_place_at_a_point_rounds_it_and_remembers_the_place(monkeypatch):
+    asked = []
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(200, json=NAIVASHA_REVERSE)
+    
+    mock_nominatim(monkeypatch, handler)
+    place = await geocoding.place_at(-0.712345678, 36.431111111)
+    assert place["label"] == "Naivasha, Nakuru County, Kenya"
+    assert (place["lat"], place["lon"]) == (-0.7167, 36.4333)
+    # The exact point never leaves the server: only the rounded one, at town level
+    params = asked[0].url.params
+    assert asked[0].url.path == "/reverse"
+    assert (params["lat"], params["lon"], params["zoom"]) == ("-0.71", "36.43", "10")
+    assert asked[0].headers["User-Agent"] == geocoding.NOMINATIM_USER_AGENT
+    
+    # A point nearby is answered from the cache, and searching for the label needs no lookup
+    assert (await geocoding.place_at(-0.7149, 36.4321))["label"] == place["label"]
+    found = await geocoding.get_coordinates("Naivasha, Nakuru County, Kenya")
+    assert (found["lat"], found["lon"], found["country"]) == (-0.7167, 36.4333, "KE")
+    assert len(asked) == 1
+
+
+@pytest.mark.asyncio
+async def test_no_place_at_sea_is_cached_too(monkeypatch):
+    asked = []
+    
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        return httpx.Response(200, json={"error": "Unable to geocode"})
+    
+    mock_nominatim(monkeypatch, handler)
+    assert (await geocoding.place_at(0, -30))["error"] == geocoding.NO_PLACE_THERE
+    assert (await geocoding.place_at(0.001, -30.001))["error"] == geocoding.NO_PLACE_THERE
+    assert len(asked) == 1
+
+
+@pytest.mark.asyncio
+async def test_place_at_a_point_uses_the_address_when_unnamed_and_skips_repeats(monkeypatch):
+    reply = {"lat": "1.3", "lon": "103.8", "address": {"city": "Singapore", "country": "Singapore", "country_code": "sg"}}
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
+    place = await geocoding.place_at(1.3, 103.8)
+    assert place["label"] == "Singapore"
+    assert place["region"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply", [[], {"lat": "x", "lon": "1", "name": "Somewhere"}, {"name": 5}])
+async def test_an_odd_reverse_reply_counts_as_unavailable(monkeypatch, reply):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
+    with pytest.raises(RuntimeError):
+        await geocoding.place_at(10, 10)
+
+
+@pytest.mark.asyncio
+async def test_reverse_lookup_failures_raise(monkeypatch):
+    def handler(request):
+        if request.url.params["lat"] == "10.0":
+            raise httpx.ReadTimeout("slow")
+        return httpx.Response(500)
+    mock_nominatim(monkeypatch, handler)
+    with pytest.raises(TimeoutError):
+        await geocoding.place_at(10, 10)
+    with pytest.raises(RuntimeError):
+        await geocoding.place_at(11, 11)
+
+
+@pytest.mark.asyncio
+async def test_simultaneous_reverse_lookups_share_one_request(monkeypatch):
+    asked = []
+    
+    async def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request)
+        await asyncio.sleep(0.01)
+        return httpx.Response(200, json=NAIVASHA_REVERSE)
+    
+    mock_nominatim(monkeypatch, handler)
+    first, second = await asyncio.gather(geocoding.place_at(-0.71, 36.43), geocoding.place_at(-0.711, 36.431))
+    assert first == second
+    assert len(asked) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_search_that_looks_like_a_point_key_does_not_share_its_lookup(monkeypatch):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=[]))
+    result = await geocoding.get_coordinates("rev:-0.71:36.43")
+    assert "error" in result

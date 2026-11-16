@@ -45,7 +45,8 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     # Email links carry a subscriber's token, which must not reach other sites
     "Referrer-Policy": "no-referrer",
-    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    # The page's own "Use my location" button may ask; nothing embedded can
+    "Permissions-Policy": "camera=(), geolocation=(self), microphone=()",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
 
@@ -53,6 +54,10 @@ SECURITY_HEADERS = {
 # up the weather services' allowance, or the form emails for everyone else
 api_limiter = RateLimiter(300, 60)
 form_limiter = RateLimiter(20, 3600)
+# Finding the place at a point uses Nominatim, which allows the whole site one request
+# a second, so one visitor clicking around the map can't hold up everyone's searches
+place_limiter = RateLimiter(30, 60)
+PLACE_PATH = "/api/place"
 # The API's requests are a few short fields
 MAX_BODY_BYTES = 4096
 FORM_PATHS = ("/api/subscribe", "/api/unsubscribe-link")
@@ -149,6 +154,7 @@ async def forget_old_addresses() -> None:
         try:
             api_limiter.forget_old()
             form_limiter.forget_old()
+            place_limiter.forget_old()
             alerts.forget_old_addresses()
         except Exception:
             # Logged and tried again next time: stopping would keep addresses in memory for good
@@ -258,7 +264,12 @@ def create_app() -> FastAPI:
         if path.startswith("/api/"):
             # Railway's proxy says who the visitor is; without one there's the connection
             visitor = request.headers.get("x-real-ip") or (request.client.host if request.client else "")
-            limiter = form_limiter if path in FORM_PATHS and request.method == "POST" else api_limiter
+            if path in FORM_PATHS and request.method == "POST":
+                limiter = form_limiter
+            elif path == PLACE_PATH:
+                limiter = place_limiter
+            else:
+                limiter = api_limiter
             if not limiter.allow(visitor):
                 return JSONResponse(
                     {"detail": TOO_MANY_REQUESTS_MESSAGE},

@@ -64,6 +64,8 @@ MAX_SUGGESTED = 2000
 # A search asks for the forecast and the wellbeing score at the same moment, and
 # Nominatim allows one request per second.
 _pending: dict[str, asyncio.Future] = {}
+# The same for reverse lookups of a (rounded) point
+_pending_points: dict[str, asyncio.Future] = {}
 
 
 # Nominatim's usage policy allows one request per second from the whole app.
@@ -270,6 +272,111 @@ async def _search_nominatim(query: str) -> list[dict]:
     if not isinstance(matches, list):
         raise RuntimeError("Geocoding service sent an unusable reply")
     return matches
+
+
+# Coordinates are rounded to this many decimal places (about 1 km) before anything is
+# done with them, so a reverse lookup never carries a visitor's exact position, and
+# nearby points share one cached answer
+COORDINATE_DECIMALS = 2
+NO_PLACE_THERE = "There's no named place there. Try a spot on land, or nearer a town."
+
+
+async def place_at(lat: float, lon: float) -> dict:
+    """
+    Find the town or city at a point, for "Use my location" and the map.
+    
+    The point is rounded to about 1 km first. Uses Nominatim's reverse lookup
+    at city level, within its one-request-per-second limit, and caches the
+    answer (cache key rev:{lat}:{lon}, rounded). The place is remembered under
+    its label, at the place's own coordinates, so searching for the label next
+    finds exactly this place without another lookup.
+    
+    Raises TimeoutError / RuntimeError if the lookup fails.
+    
+    Returns: {"name", "region", "country", "label", "lat", "lon"} with the
+    place's own coordinates, or {"error": str} if there is no place there.
+    """
+    lat, lon = round(float(lat), COORDINATE_DECIMALS), round(float(lon), COORDINATE_DECIMALS)
+    cache_key = f"rev:{lat:.{COORDINATE_DECIMALS}f}:{lon:.{COORDINATE_DECIMALS}f}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached.copy()
+    
+    pending = _pending_points.get(cache_key)
+    if pending is None:
+        pending = asyncio.ensure_future(_reverse_nominatim(lat, lon))
+        _pending_points[cache_key] = pending
+        pending.add_done_callback(lambda _: _pending_points.pop(cache_key, None))
+    result = await asyncio.shield(pending)
+    
+    cache.set(cache_key, result)
+    if "error" not in result:
+        _remember(result["label"], {
+            "lat": result["lat"],
+            "lon": result["lon"],
+            "name": result["name"],
+            "country": result["country_code"],
+            "timezone": "",
+        })
+    return result.copy()
+
+
+async def _reverse_nominatim(lat: float, lon: float) -> dict:
+    """Ask Nominatim which town or city a point is in."""
+    await _wait_for_nominatim()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "lat": lat,
+                    "lon": lon,
+                    "format": "jsonv2",
+                    # Town or city level: the weather doesn't need the street
+                    "zoom": 10,
+                    "addressdetails": 1,
+                    "accept-language": "en",
+                },
+                headers={"User-Agent": NOMINATIM_USER_AGENT},
+                timeout=5.0
+            )
+            response.raise_for_status()
+            data = response.json()
+    except httpx.TimeoutException:
+        raise TimeoutError("Geocoding request timed out")
+    except (httpx.HTTPError, ValueError) as e:
+        raise RuntimeError(f"Geocoding service unavailable: {e}")
+    if not isinstance(data, dict):
+        raise RuntimeError("Geocoding service sent an unusable reply")
+    if "error" in data:
+        # The sea, or somewhere with no named place nearby
+        return {"error": NO_PLACE_THERE}
+    try:
+        address = data.get("address") or {}
+        name = clean_name(
+            data.get("name") or next(
+                (address[key] for key in ("city", "town", "village", "municipality", "county", "state", "country")
+                 if address.get(key)),
+                None
+            )
+        )
+        if not name:
+            return {"error": NO_PLACE_THERE}
+        name = name.removeprefix("City of ")
+        region = clean_name(address.get("state") or address.get("county"))
+        country = clean_name(address.get("country"))
+        parts = [name, region if region != name else None, country if country != name else None]
+        return {
+            "name": name,
+            "region": region,
+            "country": country,
+            "label": ", ".join(part for part in parts if part),
+            "lat": float(data["lat"]),
+            "lon": float(data["lon"]),
+            "country_code": clean_name(address.get("country_code", "")).upper(),
+        }
+    except UNUSABLE_REPLY as e:
+        raise RuntimeError(f"Geocoding service sent an unusable reply: {e!r}") from e
 
 
 async def suggest_locations(query: str, limit: int = 5) -> list[dict]:

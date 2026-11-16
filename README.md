@@ -91,6 +91,7 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
 | GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
 | GET | `/api/locations?q=...` | Places matching what has been typed so far |
+| POST | `/api/place` | The town or city at a point (`{"lat", "lon"}`), for "Use my location" and the map |
 | GET | `/api/activities` | The names of every activity the advisor knows |
 | GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
 | GET | `/api/alerts` | Whether daily email alerts can be signed up for (email is configured) |

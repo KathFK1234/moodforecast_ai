@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 from app.config import settings
 from app.main import (
-    FORGET_INTERVAL_SECONDS, HideTokens, api_limiter, app, forget_old_addresses, form_limiter,
+    FORGET_INTERVAL_SECONDS, HideTokens, api_limiter, app, forget_old_addresses, form_limiter, place_limiter,
     warn_if_email_links_are_local, warn_if_subscribers_would_be_lost
 )
 from app.models.db import PendingSubscription, Subscriber
@@ -886,6 +886,8 @@ class TestSecurityHeaders:
         assert response.headers["referrer-policy"] == "no-referrer"
         assert response.headers["strict-transport-security"] == "max-age=31536000"
         assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+        # The page's "Use my location" may ask for the position; nothing embedded can
+        assert "geolocation=(self)" in response.headers["permissions-policy"]
     
     def test_the_api_docs_keep_working_without_the_content_policy(self):
         response = client.get("/docs")
@@ -1165,12 +1167,13 @@ async def test_addresses_the_limits_no_longer_need_are_forgotten_regularly():
     with patch("app.main.asyncio.sleep", pause), \
             patch.object(api_limiter, "forget_old") as api, \
             patch.object(form_limiter, "forget_old") as forms, \
+            patch.object(place_limiter, "forget_old") as places, \
             patch("app.main.alerts.forget_old_addresses") as emails:
         with pytest.raises(asyncio.CancelledError):
             await forget_old_addresses()
     
     assert pauses == [FORGET_INTERVAL_SECONDS] * 3
-    assert api.call_count == forms.call_count == emails.call_count == 2
+    assert api.call_count == forms.call_count == places.call_count == emails.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -1292,3 +1295,62 @@ def test_the_subscribe_routes_use_the_database_off_the_event_loop(mock_weather, 
             alerts._recently_sent.clear()
             assert client.post("/api/subscribe", json={"email": "ben@example.com", "location": "Nairobi"}).status_code == 202
     assert on_the_loop == []
+
+
+class TestPlaceAtPoint:
+    """POST /api/place: the town at a point, for "Use my location" and the map."""
+    
+    NAIVASHA = {
+        "name": "Naivasha", "region": "Nakuru County", "country": "Kenya", "label": "Naivasha, Nakuru County, Kenya",
+        "lat": -0.7167, "lon": 36.4333, "country_code": "KE",
+    }
+    
+    def test_finds_the_place(self):
+        with patch("app.routers.locations.place_at", AsyncMock(return_value=dict(self.NAIVASHA))) as lookup:
+            response = client.post("/api/place", json={"lat": -0.71234, "lon": 36.43111})
+        assert response.status_code == 200
+        assert response.json() == {
+            "name": "Naivasha", "region": "Nakuru County", "country": "Kenya",
+            "label": "Naivasha, Nakuru County, Kenya", "lat": -0.7167, "lon": 36.4333,
+        }
+        lookup.assert_awaited_once_with(-0.71234, 36.43111)
+    
+    def test_no_place_there(self):
+        with patch("app.routers.locations.place_at", AsyncMock(return_value={"error": "There's no named place there."})):
+            response = client.post("/api/place", json={"lat": 0, "lon": -30})
+        assert response.status_code == 422
+        assert response.json()["detail"] == "There's no named place there."
+    
+    @pytest.mark.parametrize("body", [
+        {"lat": 91, "lon": 0}, {"lat": 0, "lon": -181}, {"lat": "x", "lon": 0}, {"lat": 0},
+        {"lat": float("nan"), "lon": 0}, {"lat": float("inf"), "lon": 0},
+    ])
+    def test_refuses_a_point_that_isnt_one(self, body):
+        with patch("app.routers.locations.place_at", AsyncMock()) as lookup:
+            response = client.post("/api/place", content=json.dumps(body), headers={"Content-Type": "application/json"})
+        assert response.status_code == 422
+        lookup.assert_not_awaited()
+    
+    def test_is_a_post_so_coordinates_stay_out_of_addresses_and_logs(self):
+        # GET falls through to the static files, which have no such page
+        assert client.get("/api/place", params={"lat": 1, "lon": 2}).status_code in (404, 405)
+    
+    def test_service_trouble_says_try_again(self):
+        with patch("app.routers.locations.place_at", AsyncMock(side_effect=RuntimeError("busy"))):
+            assert client.post("/api/place", json={"lat": 1, "lon": 2}).status_code == 503
+        with patch("app.routers.locations.place_at", AsyncMock(side_effect=TimeoutError())):
+            assert client.post("/api/place", json={"lat": 1, "lon": 2}).status_code == 504
+    
+    def test_one_visitor_has_a_limit_of_its_own(self, monkeypatch):
+        monkeypatch.setattr(place_limiter, "limit", 2)
+        with patch("app.routers.locations.place_at", AsyncMock(return_value=dict(self.NAIVASHA))):
+            codes = [client.post("/api/place", json={"lat": 1, "lon": 2}).status_code for _ in range(3)]
+        assert codes == [200, 200, 429]
+        # The rest of the API is unaffected
+        assert client.get("/api/alerts").status_code == 200
+    
+    def test_other_sites_cannot_use_it(self):
+        response = client.options("/api/place", headers={
+            "Origin": "https://elsewhere.example", "Access-Control-Request-Method": "POST",
+        })
+        assert response.status_code == 400

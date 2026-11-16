@@ -85,6 +85,18 @@ class LocationSuggestion(BaseModel):
     label: str = Field(..., description="Text to search for, e.g. 'Kisumu, Kisumu County, Kenya'")
 
 
+class PointRequest(BaseModel):
+    """A point on the map, or where the visitor's browser says they are."""
+    lat: float = Field(..., ge=-90, le=90, allow_inf_nan=False)
+    lon: float = Field(..., ge=-180, le=180, allow_inf_nan=False)
+
+
+class PlaceAtPoint(LocationSuggestion):
+    """The town or city at a point, with its own coordinates (not the point's)."""
+    lat: float
+    lon: float
+
+
 class DailyForecast(BaseModel):
     """Forecast for a single day."""
     date: str = Field(..., description="Local date, YYYY-MM-DD")

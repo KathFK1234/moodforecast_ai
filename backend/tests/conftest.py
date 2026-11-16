@@ -3,7 +3,7 @@
 import httpx
 import pytest
 from app.config import settings
-from app.main import api_limiter, form_limiter
+from app.main import api_limiter, form_limiter, place_limiter
 from app.services import alerts, geocoding, mailer
 from app.services.cache import cache
 
@@ -43,6 +43,7 @@ def empty_cache():
     alerts._address_limiter.clear()
     api_limiter.clear()
     form_limiter.clear()
+    place_limiter.clear()
     geocoding._suggested.clear()
     yield
     cache.clear()
@@ -51,6 +52,7 @@ def empty_cache():
     alerts._address_limiter.clear()
     api_limiter.clear()
     form_limiter.clear()
+    place_limiter.clear()
     geocoding._suggested.clear()
 
 
