@@ -400,7 +400,7 @@ FAMILIES = {
         "football", "basketball", "tennis", "cricket", "baseball", "rugby", "volleyball", "frisbee",
         "netball", "kabaddi", "sepak takraw", "Gaelic football", "Aussie rules", "golf",
     ),
-    "rides and wheels": ("cycling", "skateboarding", "roller skating", "horse riding"),
+    "riding and skating": ("cycling", "skateboarding", "roller skating", "horse riding"),
     "climbing": ("rock climbing", "indoor climbing"),
     "time on the water": (
         "swimming", "a beach day", "surfing", "snorkelling", "a water park", "kayaking",

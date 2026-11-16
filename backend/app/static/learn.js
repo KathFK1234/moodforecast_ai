@@ -240,7 +240,7 @@ const Learner = (() => {
         );
         if (liked >= 0.5 && liked > disliked) return `You've liked ${choice.name} before.`;
         const { likes, dislikes } = evidence(choice.name, choice.family, ctx, now);
-        if (choice.family && likes >= 0.3 && likes > dislikes) return `You've liked other ${choice.family}.`;
+        if (choice.family && likes >= 0.3 && likes > dislikes) return `You tend to like ${choice.family}.`;
         return '';
     }
 

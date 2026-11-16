@@ -253,9 +253,9 @@ CHOICES = [
     {"name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": True,
      "family": "runs, walks and workouts", "suited": True},
     {"name": "cycling", "prompt": "Ride a bike", "group": "Sport and exercise", "favourite": False,
-     "family": "rides and wheels", "suited": True},
+     "family": "riding and skating", "suited": True},
     {"name": "skateboarding", "prompt": "Go skateboarding", "group": "Sport and exercise", "favourite": False,
-     "family": "rides and wheels", "suited": False},
+     "family": "riding and skating", "suited": False},
     {"name": "kayaking", "prompt": "Go kayaking", "group": "On the water", "favourite": False,
      "family": "time on the water", "suited": False},
     {"name": "reading", "prompt": "Read a book", "group": "Indoors", "favourite": False,
@@ -316,7 +316,7 @@ def test_learning_does_not_trap_the_visitor_in_one_activity(page, site):
     page.route("**/api/**", lambda route: route.abort())
     page.goto(f"{site}/")
     counts = page.evaluate("""(choices) => {
-        for (let i = 0; i < 50; i++) Learner.vote({ name: 'cycling', family: 'rides and wheels', ctx: 'mild-dry-day' }, 1);
+        for (let i = 0; i < 50; i++) Learner.vote({ name: 'cycling', family: 'riding and skating', ctx: 'mild-dry-day' }, 1);
         // As the page does it: each "Surprise me" leaves out the pick on screen
         const counts = {};
         let shown = '';
@@ -371,7 +371,7 @@ def test_a_vote_is_kept_shown_and_can_be_forgotten(page, site):
 def test_a_learned_pick_is_asked_for_and_says_why(page, site):
     page.add_init_script(SEEDED_RANDOM)
     page.add_init_script("""localStorage.setItem('moodforecast:tastes', JSON.stringify({
-        v: 1, a: {cycling: {'mild-dry-day': [5, 0, Date.now()]}}, f: {'rides and wheels': {'mild-dry-day': [5, 0, Date.now()]}}
+        v: 1, a: {cycling: {'mild-dry-day': [5, 0, Date.now()]}}, f: {'riding and skating': {'mild-dry-day': [5, 0, Date.now()]}}
     }))""")
     picks = []
     serve_place(page, picks)
@@ -595,7 +595,7 @@ def test_the_why_line_only_names_likes_that_outweigh_dislikes(page, site):
     page.route("**/api/**", lambda route: route.abort())
     page.goto(f"{site}/")
     reasons = page.evaluate("""() => {
-        const cycling = { name: 'cycling', family: 'rides and wheels' };
+        const cycling = { name: 'cycling', family: 'riding and skating' };
         const vote = (value, ctx = 'mild-dry-day') => Learner.vote({ ...cycling, ctx }, value);
         const why = () => Learner.reason(cycling, 'mild-dry-day');
         const seen = [why()];
@@ -607,7 +607,7 @@ def test_the_why_line_only_names_likes_that_outweigh_dislikes(page, site):
         vote(1, 'warm-dry-day');
         seen.push(why());
         Learner.forget();
-        Learner.vote({ name: 'skateboarding', family: 'rides and wheels', ctx: 'mild-dry-day' }, 1);
+        Learner.vote({ name: 'skateboarding', family: 'riding and skating', ctx: 'mild-dry-day' }, 1);
         seen.push(why());
         return seen;
     }""")
@@ -616,5 +616,5 @@ def test_the_why_line_only_names_likes_that_outweigh_dislikes(page, site):
         "You've liked cycling on mild, dry days.",
         "",
         "You've liked cycling before.",
-        "You've liked other rides and wheels.",
+        "You tend to like riding and skating.",
     ]

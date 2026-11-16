@@ -76,7 +76,7 @@ Errors show the message returned by the API.
 - **Cold start**: until the first vote nothing changes. Picks are the server's random ones, and quick picks show local favourites first.
 - **Safety**: it only chooses among the activities `/api/activities/{location}` marks `suited`, and sends the choice as `choose=` to `/api/random-activity`, which takes it only if the same rules allow it (thunderstorms, freezing rain, frostbite, heat, wind, wet ground, daylight, the hour, local fit). The rules always win.
 - **Where it's used**: "Surprise me" and the first pick after a search, and the order of the quick picks (liked first, disliked last). The daily email's random pick is chosen on the server and doesn't learn, and neither does the mood score.
-- **Transparency and control**: a learned pick says why ("You've liked cycling on mild, dry days."). "Forget what I've liked" clears everything. Stored under `moodforecast:tastes`; if storage is blocked, learning lasts for the visit.
+- **Transparency and control**: a learned pick says why ("You've liked cycling on mild, dry days.", or for its family "You tend to like ball games."), only where likes outweigh dislikes. "Forget what I've liked" clears everything. Stored under `moodforecast:tastes`; if storage is blocked, learning lasts for the visit.
 
 ## Design
 
