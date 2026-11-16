@@ -91,11 +91,11 @@ More detail: [backend/README.md](backend/README.md), [frontend/README.md](fronte
 | GET | `/api/forecast/{location}` | Current weather and 7-day forecast with a mood outlook per day |
 | GET | `/api/wellbeing/{location}` | Current weather, mood score and the factors behind it, energy, risk, recommendations |
 | GET | `/api/activity/{location}?activity=...` | Whether the current weather suits an activity: go, maybe or skip, with reasons |
-| GET | `/api/random-activity/{location}` | A random activity that the current weather suits |
+| GET | `/api/random-activity/{location}` | A random activity that the current weather suits; `choose=` asks for one, taken only if the rules allow it |
 | GET | `/api/locations?q=...` | Places matching what has been typed so far |
 | POST | `/api/place` | The town or city at a point (`{"lat", "lon"}`), for "Use my location" and the map |
 | GET | `/api/activities` | The names of every activity the advisor knows |
-| GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first |
+| GET | `/api/activities/{location}` | The activities that are practical at a location, local favourites first, with which suit the weather now |
 | GET | `/api/alerts` | Whether daily email alerts can be signed up for (email is configured) |
 | POST | `/api/subscribe` | Ask for daily alerts, or a change to them; emails a confirmation link and nothing starts until it is followed |
 | POST | `/api/confirm/{token}` | Confirm a request from its emailed link: starts or changes the alerts |
