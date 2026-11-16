@@ -589,3 +589,32 @@ def test_a_map_that_cannot_load_says_so(page, site):
     expect(page.locator("#errorState")).to_contain_text("The map couldn't load")
     expect(page.locator("#mapPanel")).to_be_hidden()
     expect(page.locator("#mapButton")).to_have_attribute("aria-expanded", "false")
+
+
+def test_the_why_line_only_names_likes_that_outweigh_dislikes(page, site):
+    page.route("**/api/**", lambda route: route.abort())
+    page.goto(f"{site}/")
+    reasons = page.evaluate("""() => {
+        const cycling = { name: 'cycling', family: 'rides and wheels' };
+        const vote = (value, ctx = 'mild-dry-day') => Learner.vote({ ...cycling, ctx }, value);
+        const why = () => Learner.reason(cycling, 'mild-dry-day');
+        const seen = [why()];
+        vote(1);
+        seen.push(why());
+        vote(-1); vote(-1);
+        seen.push(why());
+        Learner.forget();
+        vote(1, 'warm-dry-day');
+        seen.push(why());
+        Learner.forget();
+        Learner.vote({ name: 'skateboarding', family: 'rides and wheels', ctx: 'mild-dry-day' }, 1);
+        seen.push(why());
+        return seen;
+    }""")
+    assert reasons == [
+        "",
+        "You've liked cycling on mild, dry days.",
+        "",
+        "You've liked cycling before.",
+        "You've liked other rides and wheels.",
+    ]

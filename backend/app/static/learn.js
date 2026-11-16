@@ -224,16 +224,23 @@ const Learner = (() => {
             .map((entry) => entry.choice);
     }
 
-    // One short line on why a learned pick was made, or '' when there's nothing honest to say
+    // One short line on why a learned pick was made, or '' when there's nothing honest to
+    // say: it names likes only where they outweigh dislikes
     function reason(choice, ctx, now = Date.now()) {
         const state = load();
-        const [ownHere] = decayed(cellsOf(state.a, choice.name)[ctx], now);
-        if (ownHere >= 0.5) return `You've liked ${choice.name} on ${describeContext(ctx)}.`;
-        const ownAnywhere = Object.values(cellsOf(state.a, choice.name))
-            .reduce((sum, cell) => sum + decayed(cell, now)[0], 0);
-        if (ownAnywhere >= 0.5) return `You've liked ${choice.name} before.`;
-        const { likes } = evidence(choice.name, choice.family, ctx, now);
-        if (choice.family && likes >= 0.3) return `You've liked other ${choice.family}.`;
+        const own = cellsOf(state.a, choice.name);
+        const [likedHere, dislikedHere] = decayed(own[ctx], now);
+        if (likedHere >= 0.5 && likedHere > dislikedHere) return `You've liked ${choice.name} on ${describeContext(ctx)}.`;
+        const [liked, disliked] = Object.values(own).reduce(
+            ([l, d], cell) => {
+                const [cl, cd] = decayed(cell, now);
+                return [l + cl, d + cd];
+            },
+            [0, 0]
+        );
+        if (liked >= 0.5 && liked > disliked) return `You've liked ${choice.name} before.`;
+        const { likes, dislikes } = evidence(choice.name, choice.family, ctx, now);
+        if (choice.family && likes >= 0.3 && likes > dislikes) return `You've liked other ${choice.family}.`;
         return '';
     }
 
