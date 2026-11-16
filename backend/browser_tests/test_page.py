@@ -639,3 +639,46 @@ def test_faded_votes_are_deleted(page, site):
     stored = page.evaluate("JSON.parse(localStorage.getItem('moodforecast:tastes'))")
     assert stored["a"] == {"cycling": {"warm-dry-day": [1, 0, stored["a"]["cycling"]["warm-dry-day"][2]]}}
     assert stored["f"] == {}
+
+
+def test_learning_finds_what_a_visitor_likes_and_follows_a_change_of_taste(page, site):
+    """A simulated visitor votes on picks; the share of picks they like should rise, then follow them."""
+    page.route("**/api/**", lambda route: route.abort())
+    page.goto(f"{site}/")
+    shares = page.evaluate("""() => {
+        const families = ['time on the water', 'ball games', 'quiet time in', 'going out', 'nature and sights'];
+        const choices = [];
+        families.forEach((family) => {
+            for (let i = 0; i < 4; i++) choices.push({ name: `${family} ${i}`, family, group: family === 'quiet time in' ? 'Indoors' : 'Out', suited: true });
+        });
+        let seed = 7;
+        const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        const day = 24 * 3600 * 1000;
+        const ctx = 'warm-dry-day';
+        // The server's own random pick, when learning leaves it to chance
+        const serverPick = (exclude) => choices.filter((c) => c.name !== exclude)[Math.floor(random() * (choices.length - 1))].name;
+        const run = (likes, start, rounds) => {
+            let shown = '';
+            let hits = 0;
+            for (let i = 0; i < rounds; i++) {
+                const now = start + i * day / 4;
+                const name = Learner.choose(choices, ctx, shown, random, now) || serverPick(shown);
+                const choice = choices.find((c) => c.name === name);
+                const liked = choice.family === likes;
+                if (i >= rounds / 2) hits += liked;
+                Learner.vote({ ...choice, ctx }, liked ? 1 : -1, 0, now);
+                shown = name;
+            }
+            return hits / (rounds / 2);
+        };
+        const start = Date.now();
+        const first = run('time on the water', start, 120);
+        // Half a year later they've gone off the water and like ball games
+        const second = run('ball games', start + 200 * day, 120);
+        return [first, second];
+    }""")
+    # Chance alone gives one in five; learning should do much better, after a change too
+    assert shares[0] > 0.5, shares
+    assert shares[1] > 0.5, shares
+    # ...but never only the favourite family: there's still exploring
+    assert shares[0] < 0.97 and shares[1] < 0.97, shares
