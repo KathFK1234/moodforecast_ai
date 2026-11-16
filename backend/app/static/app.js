@@ -544,6 +544,11 @@ function createMap() {
         attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
     }).addTo(map);
     map.on('click', (event) => pickOnMap(event.latlng, false));
+    // The tapped town's dot goes with its pop-up, so only the place on screen stays marked
+    map.on('popupclose', () => {
+        if (pickMarker) pickMarker.remove();
+        pickMarker = null;
+    });
     map.getContainer().addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && event.target === map.getContainer()) {
             event.preventDefault();
@@ -558,8 +563,10 @@ function createMap() {
     map.setView(currentPlace ? [currentPlace.lat, currentPlace.lon] : [0, 20], currentPlace ? MAP_START_ZOOM : 2);
 }
 
-function dot(latlng, fill) {
-    return L.circleMarker(latlng, { radius: 8, color: '#ffffff', weight: 3, fillColor: fill, fillOpacity: 1, interactive: false });
+function dot(latlng, fill, kind) {
+    return L.circleMarker(latlng, {
+        radius: 8, color: '#ffffff', weight: 3, fillColor: fill, fillOpacity: 1, interactive: false, className: `map-dot-${kind}`,
+    });
 }
 
 // Mark the place on screen, and bring it into view when asked
@@ -567,7 +574,7 @@ function showPlaceOnMap(recentre = false) {
     if (!map || !currentPlace) return;
     const at = [currentPlace.lat, currentPlace.lon];
     if (placeMarker) placeMarker.setLatLng(at);
-    else placeMarker = dot(at, '#3987e5').addTo(map);
+    else placeMarker = dot(at, '#3987e5', 'place').addTo(map);
     if (recentre || !map.getBounds().contains(at)) map.setView(at, Math.max(map.getZoom(), MAP_START_ZOOM), { animate: !reducedMotion });
 }
 
@@ -626,7 +633,7 @@ async function pickOnMap(latlng, fromKeyboard) {
         if (!map.hasLayer(popup)) return;  // Closed meanwhile
         const at = [place.lat, place.lon];
         if (pickMarker) pickMarker.setLatLng(at);
-        else pickMarker = dot(at, '#ffffff').addTo(map);
+        else pickMarker = dot(at, '#ffffff', 'pick').addTo(map);
         popup.setLatLng(at).setContent(popupSummary(place, data));
         status.textContent = `${place.name}: ${data.weather.condition}, ${round(data.weather.temp_c)}°C, mood ${data.mood_score}, ${data.mood_label}. The pop-up has a button to see the full forecast.`;
         if (fromKeyboard) popup.getElement().querySelector('.map-popup-button').focus();

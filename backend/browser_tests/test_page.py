@@ -532,8 +532,14 @@ def test_a_tap_on_the_map_shows_a_summary_and_opens_the_full_forecast(page, site
     # Rounded to about 1 km before it leaves the browser
     assert all(round(value, 2) == value for value in points[0].values())
     expect(page.locator("#mapStatus")).to_contain_text("Naivasha")
+    # The place on screen and the tapped town each have a dot
+    expect(page.locator("#map .map-dot-place")).to_have_count(1)
+    expect(page.locator("#map .map-dot-pick")).to_have_count(1)
     
     page.click(".map-popup-button")
+    # Only the place on screen stays marked once the pop-up has gone
+    expect(page.locator("#map .map-dot-pick")).to_have_count(0)
+    expect(page.locator("#map .map-dot-place")).to_have_count(1)
     expect(page.locator("#mapPanel")).to_be_hidden()
     expect(page.locator("#mapButton")).to_be_focused()
     expect(page.locator("#mapButton")).to_have_attribute("aria-expanded", "false")
