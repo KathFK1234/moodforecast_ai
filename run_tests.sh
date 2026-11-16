@@ -84,9 +84,17 @@ activity=$(curl -s "$BASE_URL/api/activity/Nairobi?activity=run" | grep -o '"ver
 random_pick=$(curl -s $BASE_URL/api/random-activity/Nairobi | grep -o '"verdict":"go"')
 [ -n "$random_pick" ] && pass "Random activity endpoint working" || fail "Random activity endpoint not working"
 
-# Activities that fit a place
-local_activities=$(curl -s $BASE_URL/api/activities/Nairobi | grep -o '"prompt"' | head -1)
+# A pick the page learned: taken when the rules allow it (reading always qualifies)
+chosen_pick=$(curl -s "$BASE_URL/api/random-activity/Nairobi?choose=reading" | grep -o '"activity":"reading"')
+[ -n "$chosen_pick" ] && pass "Random activity takes a learned choice" || fail "Random activity ignored an allowed choice"
+
+# Activities that fit a place, and which suit the weather now
+local_activities=$(curl -s $BASE_URL/api/activities/Nairobi | grep -o '"suited"' | head -1)
 [ -n "$local_activities" ] && pass "Local activities endpoint working" || fail "Local activities endpoint not working"
+
+# The town at a point (Use my location, the map): one Nominatim lookup
+place=$(curl -s -X POST "$BASE_URL/api/place" -H "Content-Type: application/json" -d '{"lat": -1.29, "lon": 36.82}' | grep -o '"label"')
+[ -n "$place" ] && pass "Place at a point working" || fail "Place at a point not working"
 
 # Location suggestions
 suggestions=$(curl -s "$BASE_URL/api/locations?q=nai" | grep -o '"label"' | head -1)
@@ -165,6 +173,14 @@ if [ -f "backend/app/static/app.js" ]; then
 else
     fail "Frontend JavaScript missing"
 fi
+
+for file in learn.js leaflet.js leaflet.css; do
+    if [ -f "backend/app/static/$file" ]; then
+        pass "Frontend $file deployed"
+    else
+        fail "Frontend $file missing"
+    fi
+done
 
 if [ -f "backend/app/static/styles.css" ]; then
     pass "Frontend CSS deployed"
