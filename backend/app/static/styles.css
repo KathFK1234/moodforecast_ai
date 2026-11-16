@@ -326,6 +326,154 @@ body {
     50% { opacity: 0.35; transform: scale(0.85); }
 }
 
+/* Map: opened from the search box, under it */
+.map-panel {
+    max-width: 760px;
+    margin: 14px auto 0;
+    padding: 16px;
+}
+
+.map-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.map-panel .map {
+    height: 340px;
+    margin-top: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--card-line);
+    background: #141b33;
+    font: inherit;
+}
+
+/* Dimmed a little, so the bright map sits in the page's night sky */
+.map-panel .map .leaflet-tile-pane {
+    filter: brightness(0.82) saturate(0.85);
+}
+
+.map-panel .map:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+/* The keyboard instructions show while the map has keyboard focus; screen readers always get them */
+.map-keys {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.map-panel:has(.map:focus-visible) .map-keys {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    white-space: normal;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--ink-3);
+}
+
+.map-panel .map .leaflet-bar a {
+    background: #141b33;
+    color: var(--ink);
+    border-color: var(--field-line);
+}
+
+.map-panel .map .leaflet-bar a:hover {
+    background: #1f2847;
+}
+
+.map-panel .map .leaflet-control-attribution {
+    background: rgba(12, 17, 34, 0.85);
+    color: var(--ink-2);
+}
+
+.map-panel .map .leaflet-control-attribution a {
+    color: var(--accent-ink);
+}
+
+.map-panel .map .leaflet-popup-content-wrapper,
+.map-panel .map .leaflet-popup-tip {
+    background: #141b33;
+    color: var(--ink);
+    border: 1px solid var(--field-line);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.map-panel .map .leaflet-popup-content {
+    margin: 14px 16px;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.map-panel .map .leaflet-popup-content p {
+    margin: 0;
+}
+
+.map-panel .map a.leaflet-popup-close-button {
+    color: var(--ink-3);
+}
+
+.map-popup-place {
+    font-weight: 700;
+}
+
+.map-popup-weather {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-2);
+}
+
+.map-popup-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+}
+
+.map-popup-mood {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-2);
+}
+
+.map-popup-mood::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--level, var(--level-medium));
+}
+
+.map-popup-mood[data-level="high"] { --level: var(--level-high); }
+.map-popup-mood[data-level="low"] { --level: var(--level-low); }
+.map-popup-mood[data-level="verylow"] { --level: var(--level-verylow); }
+
+.map-popup-button {
+    margin-top: 10px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #0c1122;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.map-popup-note {
+    color: var(--ink-2);
+}
+
 .search button:disabled,
 .activity-form button:disabled,
 .opt-out-form button:disabled,
@@ -1421,6 +1569,18 @@ body {
 
     .search button {
         padding: 11px 16px;
+    }
+
+    .search .icon-button {
+        width: 36px;
+    }
+
+    .map-panel .map {
+        height: 300px;
+    }
+
+    .map-panel {
+        padding: 14px;
     }
 
     .stats {

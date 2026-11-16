@@ -69,8 +69,21 @@
                 value="Nairobi"
             >
             <button type="button" class="icon-button" id="locateButton" aria-label="Use my location" title="Use my location"></button>
+            <button type="button" class="icon-button" id="mapButton" aria-label="Choose on map" title="Choose on map" aria-expanded="false" aria-controls="mapPanel"></button>
             <button type="submit" id="searchButton">Search</button>
         </form>
+
+        <!-- Choosing a place on a map. Nothing of the map loads until it is first opened -->
+        <section id="mapPanel" class="card map-panel hidden" aria-labelledby="mapHeading">
+            <div class="map-head">
+                <h2 class="card-title" id="mapHeading">Choose a place on the map</h2>
+                <button type="button" class="link-button" id="mapClose">Close</button>
+            </div>
+            <p class="card-note">Tap anywhere to see its weather.</p>
+            <div id="map" class="map" role="region" aria-label="Map" aria-describedby="mapKeys"></div>
+            <p id="mapKeys" class="map-keys">On the map: arrow keys move it, + and − zoom, Enter picks the middle. Or type a place in the search box.</p>
+            <p id="mapStatus" class="visually-hidden" role="status"></p>
+        </section>
         <nav class="chips" id="cityChips" aria-label="Popular locations"></nav>
 
         <noscript>

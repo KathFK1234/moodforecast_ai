@@ -887,6 +887,10 @@ class TestSecurityHeaders:
         assert response.headers["referrer-policy"] == "no-referrer"
         assert response.headers["strict-transport-security"] == "max-age=31536000"
         assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+        # Only OpenStreetMap's map tiles come from elsewhere; scripts and styles never do
+        policy = response.headers["content-security-policy"]
+        assert "img-src 'self' data: https://tile.openstreetmap.org;" in policy
+        assert "default-src 'self';" in policy and "script-src" not in policy and "style-src" not in policy
         # The page's "Use my location" may ask for the position; nothing embedded can
         assert "geolocation=(self)" in response.headers["permissions-policy"]
     

@@ -45,6 +45,7 @@ If port 8000 is already in use, pick another one: `uvicorn app.main:app --reload
 - **Local fit** - suggestions match the place as well as the weather: no beach days inland, skiing in the tropics or safaris outside wildlife country, sports such as cricket, kabaddi or Gaelic football only where they are commonly played, and local favourites first
 - **Stay curious** - questions about the weather in other places, one tap away
 - **Location suggestions** - matching places appear as you type in either location field
+- **Choose on map** - open a map, tap anywhere for a short summary of its weather and mood, then the full forecast; the map loads only when opened
 - **Use my location** - one tap, with the browser's permission, for the forecast where you are; the position is rounded to about 1 km and never saved or logged
 - **Weather-aware design** - the page's background follows the weather and day or night
 - **Any location** - place names are resolved with OpenStreetMap's Nominatim

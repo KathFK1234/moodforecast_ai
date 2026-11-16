@@ -21,6 +21,7 @@ const ICONS = {
     'storm': CLOUD_HIGH + '<path d="M12.5 16.500l-2.5 3.500h3.500L11 23.5"/>',
     'search': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
     'check': '<path d="M5 12.5l4.5 4.500L19 7.5"/>',
+    'map': '<path d="M9 4L3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5L9 4z"/><path d="M9 4v13.5M15 6.5V20"/>',
     'locate': '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>',
 };
 
@@ -93,6 +94,7 @@ let currentWeather = null; // The weather on screen, which learned picks are jud
 let localChoices = null;   // What can be done at the current place, from /api/activities
 let choicesReady = Promise.resolve(null);  // The request for localChoices, for picks made before it's back
 let currentPick = null;    // The random pick on screen, for its 👍 / 👎
+let currentPlace = null;   // Where the place on screen is, from /api/forecast, to show on the map
 
 // Read the API's error message, whatever shape it comes in
 async function errorMessage(response, fallback) {
@@ -151,6 +153,8 @@ async function handleSearch(location, record = true) {
         el('subLocationInput').value = location;
         currentLocation = location;
         currentWeather = wellbeingData.weather;
+        currentPlace = forecastData.lat == null ? null : { lat: forecastData.lat, lon: forecastData.lon };
+        showPlaceOnMap();
         localChoices = null;
         choicesReady = choicesRequest;
         el('activityPlace').textContent = wellbeingData.location;
@@ -458,6 +462,180 @@ function useMyLocation() {
         // A town-level answer is all that's needed, so a recent, rough position is fine
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 }
     );
+}
+
+// The map: Leaflet (self-hosted) and OpenStreetMap's tiles load only when it is first
+// opened, to keep the page light. A tap finds the town there and shows a short summary.
+const LEAFLET_VERSION = '1.9.4';
+const MAP_PICK_GAP_MS = 1000;  // Taps closer together than this are ignored, to spare the map services
+const MAP_START_ZOOM = 8;
+let leafletLoading = null;
+let map = null;
+let placeMarker = null;  // The place on screen
+let pickMarker = null;   // The town found at the last tap
+let mapBusy = false;
+let lastMapPick = 0;
+
+function loadFile(tag, attributes) {
+    return new Promise((resolve, reject) => {
+        const node = document.createElement(tag);
+        Object.assign(node, attributes, { onload: resolve, onerror: reject });
+        document.head.appendChild(node);
+    });
+}
+
+function loadLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (!leafletLoading) {
+        leafletLoading = Promise.all([
+            loadFile('link', { rel: 'stylesheet', href: `leaflet.css?v=${LEAFLET_VERSION}` }),
+            loadFile('script', { src: `leaflet.js?v=${LEAFLET_VERSION}` }),
+        ]).catch(() => {
+            leafletLoading = null;
+            throw new Error("The map couldn't load. Check your connection, or search for a place instead.");
+        });
+    }
+    return leafletLoading;
+}
+
+async function openMap() {
+    el('mapButton').setAttribute('aria-expanded', 'true');
+    el('mapPanel').classList.remove('hidden');
+    try {
+        await loadLeaflet();
+    } catch (error) {
+        closeMap(false);
+        showError(error.message);
+        return;
+    }
+    if (el('mapPanel').classList.contains('hidden')) return;  // Closed while loading
+    if (!map) createMap();
+    else map.invalidateSize();
+    showPlaceOnMap(true);
+}
+
+function closeMap(returnFocus = true) {
+    el('mapButton').setAttribute('aria-expanded', 'false');
+    el('mapPanel').classList.add('hidden');
+    if (map) map.closePopup();
+    if (returnFocus) el('mapButton').focus();
+}
+
+function createMap() {
+    // A tap while a place is being found is ignored rather than closing its pop-up;
+    // each new pick replaces the pop-up, and its × and Escape still close it
+    map = L.map('map', {
+        worldCopyJump: true,
+        minZoom: 2,
+        maxZoom: 12,
+        closePopupOnClick: false,
+        // Still when the visitor's system asks for reduced motion
+        zoomAnimation: !reducedMotion,
+        fadeAnimation: !reducedMotion,
+        markerZoomAnimation: !reducedMotion,
+        inertia: !reducedMotion,
+    });
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+    // OpenStreetMap's tile policy asks for the site's address as the Referer; the page
+    // sends none anywhere else, so these images send its origin and nothing more
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        referrerPolicy: 'strict-origin',
+        attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+    }).addTo(map);
+    map.on('click', (event) => pickOnMap(event.latlng, false));
+    map.getContainer().addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && event.target === map.getContainer()) {
+            event.preventDefault();
+            pickOnMap(map.getCenter(), true);
+        } else if (event.key === 'Escape' && event.target.closest('.leaflet-popup')) {
+            // Leaflet only does this while the map itself has focus; from inside the pop-up,
+            // close it and put focus back on the map
+            map.closePopup();
+            map.getContainer().focus();
+        }
+    });
+    map.setView(currentPlace ? [currentPlace.lat, currentPlace.lon] : [0, 20], currentPlace ? MAP_START_ZOOM : 2);
+}
+
+function dot(latlng, fill) {
+    return L.circleMarker(latlng, { radius: 8, color: '#ffffff', weight: 3, fillColor: fill, fillOpacity: 1, interactive: false });
+}
+
+// Mark the place on screen, and bring it into view when asked
+function showPlaceOnMap(recentre = false) {
+    if (!map || !currentPlace) return;
+    const at = [currentPlace.lat, currentPlace.lon];
+    if (placeMarker) placeMarker.setLatLng(at);
+    else placeMarker = dot(at, '#3987e5').addTo(map);
+    if (recentre || !map.getBounds().contains(at)) map.setView(at, Math.max(map.getZoom(), MAP_START_ZOOM), { animate: !reducedMotion });
+}
+
+function popupMessage(text) {
+    const node = document.createElement('p');
+    node.className = 'map-popup-note';
+    node.textContent = text;
+    return node;
+}
+
+// The town, its weather and mood in a line each, and one way on: the full forecast
+function popupSummary(place, data) {
+    const box = document.createElement('div');
+    box.className = 'map-popup';
+    const name = document.createElement('p');
+    name.className = 'map-popup-place';
+    name.textContent = [place.name, place.country].filter(Boolean).join(', ');
+    const weather = document.createElement('p');
+    weather.className = 'map-popup-weather';
+    const glyph = document.createElement('span');
+    glyph.className = 'map-popup-icon';
+    glyph.innerHTML = conditionIcon(data.weather.condition, data.weather.is_day);
+    weather.append(glyph, `${data.weather.condition} · ${round(data.weather.temp_c)}°C`);
+    const mood = document.createElement('p');
+    mood.className = 'map-popup-mood';
+    mood.dataset.level = scoreLevel(data.mood_score);
+    mood.textContent = `Mood ${data.mood_score} · ${data.mood_label}`;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'map-popup-button';
+    button.textContent = 'See full forecast';
+    button.addEventListener('click', () => {
+        closeMap();
+        searchPlace(place.label);
+    });
+    box.append(name, weather, mood, button);
+    return box;
+}
+
+async function pickOnMap(latlng, fromKeyboard) {
+    const now = Date.now();
+    if (mapBusy || now - lastMapPick < MAP_PICK_GAP_MS) return;
+    mapBusy = true;
+    lastMapPick = now;
+    const point = latlng.wrap();
+    const status = el('mapStatus');
+    // Kept clear of the zoom buttons in the top left corner
+    const popup = L.popup({ maxWidth: 260, autoPanPaddingTopLeft: [60, 16], autoPanPaddingBottomRight: [16, 16] })
+        .setLatLng(point)
+        .setContent(popupMessage('Finding the place…'))
+        .openOn(map);
+    status.textContent = 'Finding the place.';
+    try {
+        const place = await placeAt(point.lat, point.lng);
+        const data = await fetchJson(`/api/wellbeing/${encodeURIComponent(place.label)}`, "Couldn't load the weather there.");
+        if (!map.hasLayer(popup)) return;  // Closed meanwhile
+        const at = [place.lat, place.lon];
+        if (pickMarker) pickMarker.setLatLng(at);
+        else pickMarker = dot(at, '#ffffff').addTo(map);
+        popup.setLatLng(at).setContent(popupSummary(place, data));
+        status.textContent = `${place.name}: ${data.weather.condition}, ${round(data.weather.temp_c)}°C, mood ${data.mood_score}, ${data.mood_label}. The pop-up has a button to see the full forecast.`;
+        if (fromKeyboard) popup.getElement().querySelector('.map-popup-button').focus();
+    } catch (error) {
+        if (map.hasLayer(popup)) popup.setContent(popupMessage(error.message));
+        status.textContent = error.message;
+    } finally {
+        mapBusy = false;
+    }
 }
 
 // Search a suggested place, by default bringing the results back into view
@@ -1192,6 +1370,12 @@ function init() {
     el('searchIcon').innerHTML = icon('search');
     el('locateButton').innerHTML = icon('locate');
     el('locateButton').addEventListener('click', useMyLocation);
+    el('mapButton').innerHTML = icon('map');
+    el('mapButton').addEventListener('click', () => {
+        if (el('mapPanel').classList.contains('hidden')) openMap();
+        else closeMap();
+    });
+    el('mapClose').addEventListener('click', () => closeMap());
     buildChips();
 
     el('searchForm').addEventListener('submit', (event) => {

@@ -30,11 +30,12 @@ logger = logging.getLogger(__name__)
 # Python's own list doesn't have this on every system
 mimetypes.add_type("font/woff2", ".woff2")
 
-# The page loads only its own files. /docs and /redoc need more, so they go
-# without the content policy.
+# The page loads only its own files, plus OpenStreetMap's map tiles. /docs and
+# /redoc need more, so they go without the content policy.
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
-    "img-src 'self' data:; "
+    # OpenStreetMap's map tiles, loaded by the visitor's browser once the map is opened
+    "img-src 'self' data: https://tile.openstreetmap.org; "
     "base-uri 'none'; "
     "form-action 'self'; "
     "frame-ancestors 'none'"

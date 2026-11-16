@@ -456,3 +456,136 @@ def test_no_place_at_my_location_says_so(page, site):
     open_page(page, site)
     page.click("#locateButton")
     expect(page.locator("#errorState")).to_have_text("There's no named place there.")
+
+
+# A 1x1 PNG, standing in for OpenStreetMap's tiles
+TILE = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+    "1f15c4890000000d49444154789c6360f8cfc0f01f0005fe02fea7d6a4ef0000000049454e44ae426082"
+)
+NAIVASHA = {"name": "Naivasha", "region": "Nakuru County", "country": "Kenya",
+            "label": "Naivasha, Nakuru County, Kenya", "lat": -0.7167, "lon": 36.4333}
+
+
+def serve_map(page, requests, problems):
+    """Answer a search for Nairobi and the map's tiles and lookups; note what was asked and any CSP complaint."""
+    serve_place(page, [])
+    page.route("https://tile.openstreetmap.org/**", lambda route: route.fulfill(body=TILE, content_type="image/png"))
+    
+    def place(route):
+        requests.append(route.request.post_data_json)
+        route.fulfill(json=NAIVASHA)
+    page.route("**/api/place", place)
+    page.on("console", lambda message: problems.append(message.text) if message.type == "error" else None)
+    page.on("request", lambda request: requests.append(request.url))
+
+
+def test_the_map_loads_nothing_until_opened(page, site):
+    requests, problems = [], []
+    serve_map(page, requests, problems)
+    page.goto(f"{site}/")
+    expect(page.locator("#locationName")).to_have_text("Nairobi, KE")
+    expect(page.locator("#mapPanel")).to_be_hidden()
+    assert not [url for url in requests if isinstance(url, str) and ("leaflet" in url or "openstreetmap" in url)]
+    
+    page.click("#mapButton")
+    expect(page.locator("#mapButton")).to_have_attribute("aria-expanded", "true")
+    expect(page.get_by_role("region", name="Map", exact=True)).to_be_visible()
+    expect(page.locator(".leaflet-tile-loaded").first).to_be_attached()
+    expect(page.locator(".leaflet-control-attribution")).to_contain_text("OpenStreetMap contributors")
+    tiles = [request for request in requests if isinstance(request, str) and "tile.openstreetmap.org" in request]
+    assert tiles and len(tiles) < 40
+    assert problems == []
+
+
+def test_tiles_send_only_the_sites_origin_as_referer(page, site):
+    referers = []
+    serve_place(page, [])
+    
+    def tile(route):
+        referers.append(route.request.headers.get("referer"))
+        route.fulfill(body=TILE, content_type="image/png")
+    page.route("https://tile.openstreetmap.org/**", tile)
+    page.goto(f"{site}/")
+    page.click("#mapButton")
+    expect(page.locator(".leaflet-tile-loaded").first).to_be_attached()
+    assert referers and set(referers) == {f"{site}/"}
+
+
+def test_a_tap_on_the_map_shows_a_summary_and_opens_the_full_forecast(page, site):
+    requests, problems = [], []
+    serve_map(page, requests, problems)
+    page.goto(f"{site}/")
+    page.click("#mapButton")
+    expect(page.locator(".leaflet-tile-loaded").first).to_be_attached()
+    
+    box = page.locator("#map").bounding_box()
+    page.mouse.click(box["x"] + box["width"] * 0.4, box["y"] + box["height"] * 0.6)
+    # A second tap straight away is ignored, to spare the map services
+    page.mouse.click(box["x"] + box["width"] * 0.6, box["y"] + box["height"] * 0.6)
+    popup = page.locator(".map-popup")
+    expect(popup).to_contain_text("Naivasha, Kenya")
+    expect(popup).to_contain_text("Partly Cloudy · 18°C")
+    expect(popup).to_contain_text("Mood 80 · Upbeat")
+    points = [request for request in requests if isinstance(request, dict)]
+    assert len(points) == 1
+    # Rounded to about 1 km before it leaves the browser
+    assert all(round(value, 2) == value for value in points[0].values())
+    expect(page.locator("#mapStatus")).to_contain_text("Naivasha")
+    
+    page.click(".map-popup-button")
+    expect(page.locator("#mapPanel")).to_be_hidden()
+    expect(page.locator("#mapButton")).to_be_focused()
+    expect(page.locator("#mapButton")).to_have_attribute("aria-expanded", "false")
+    page.wait_for_url(re.compile("q=Naivasha"))
+    assert problems == []
+
+
+def test_the_map_can_be_used_from_the_keyboard_and_lets_focus_go(page, site):
+    requests, problems = [], []
+    serve_map(page, requests, problems)
+    page.goto(f"{site}/")
+    page.focus("#mapButton")
+    page.keyboard.press("Enter")
+    expect(page.locator(".leaflet-tile-loaded").first).to_be_attached()
+    page.focus("#map")
+    expect(page.locator("#mapKeys")).to_be_visible()
+    page.keyboard.press("Enter")
+    # Enter picks the middle of the map, and the way on gets focus
+    expect(page.locator(".map-popup-button")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(page.locator(".map-popup")).to_have_count(0)
+    expect(page.locator("#map")).to_be_focused()
+    # Tab carries on out of the map: no trap
+    page.focus("#map")
+    for _ in range(12):
+        page.keyboard.press("Tab")
+        if not page.evaluate("document.getElementById('mapPanel').contains(document.activeElement)"):
+            break
+    assert not page.evaluate("document.getElementById('mapPanel').contains(document.activeElement)")
+    
+    page.click("#mapClose")
+    expect(page.locator("#mapPanel")).to_be_hidden()
+    expect(page.locator("#mapButton")).to_be_focused()
+    assert problems == []
+
+
+def test_no_place_on_the_map_says_so_in_the_popup(page, site):
+    requests, problems = [], []
+    serve_map(page, requests, problems)
+    page.route("**/api/place", lambda route: route.fulfill(status=422, json={"detail": "There's no named place there."}))
+    page.goto(f"{site}/")
+    page.click("#mapButton")
+    expect(page.locator(".leaflet-tile-loaded").first).to_be_attached()
+    page.locator("#map").click(position={"x": 120, "y": 150})
+    expect(page.locator(".map-popup-note")).to_have_text("There's no named place there.")
+
+
+def test_a_map_that_cannot_load_says_so(page, site):
+    serve_place(page, [])
+    page.route("**/leaflet.js*", lambda route: route.abort())
+    page.goto(f"{site}/")
+    page.click("#mapButton")
+    expect(page.locator("#errorState")).to_contain_text("The map couldn't load")
+    expect(page.locator("#mapPanel")).to_be_hidden()
+    expect(page.locator("#mapButton")).to_have_attribute("aria-expanded", "false")

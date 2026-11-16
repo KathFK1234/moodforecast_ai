@@ -18,6 +18,7 @@ The frontend is intentionally minimal:
 | `index.html` | Page structure |
 | `app.js` | Search, rendering and subscribe logic |
 | `learn.js` | Learns which activities the visitor likes, in their browser only |
+| `leaflet.js`, `leaflet.css`, `leaflet-LICENSE.txt` | [Leaflet](https://leafletjs.com) 1.9.4 (BSD 2-Clause) for the map, served from here and loaded only when the map is opened. From the npm tarball, which matches npm's sha512 and the SRI hashes on leafletjs.com |
 | `styles.css` | Styling |
 | `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | Icons |
 | `privacy.html` | What the site does with people's details |
@@ -52,7 +53,7 @@ API calls use relative paths, so the page must be opened through the backend rat
 
 ## How It Works
 
-1. **Search** → user enters a location (matching places are suggested while typing, from `GET /api/locations`), picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser. The ◎ button in the search box (**Use my location**) asks the browser for the visitor's position, only when tapped; the page rounds it to about 1 km, gets the town there from `POST /api/place` and searches for it. A refusal, a timeout, a browser without geolocation or a page not served over https each get a plain message suggesting a search instead.
+1. **Search** → user enters a location (matching places are suggested while typing, from `GET /api/locations`), picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser. The ◎ button in the search box (**Use my location**) asks the browser for the visitor's position, only when tapped; the page rounds it to about 1 km, gets the town there from `POST /api/place` and searches for it. A refusal, a timeout, a browser without geolocation or a page not served over https each get a plain message suggesting a search instead. The ▦ button (**Choose on map**) in the search box opens a map under it (and closes it again). Nothing of the map loads until then. Tapping a point rounds it to about 1 km, finds the town there (`POST /api/place`) and its weather (`GET /api/wellbeing/{location}`), and shows a small pop-up: the town, condition and temperature, the mood score and label, and **See full forecast**, which closes the map and searches the town. The place on screen has a blue dot. Taps less than a second apart, or while a place is being found, are ignored, to spare the map services. With a keyboard, the map takes focus: arrow keys move it, + and − zoom, Enter picks the middle, Escape closes the pop-up, and Tab carries on out of it. Tiles are OpenStreetMap's standard ones, loaded by the browser straight from `tile.openstreetmap.org`, with the site's origin as the Referer (their tile policy asks for one; the page sends none elsewhere), zoom 2-12 and no prefetching, as the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks.
 2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`, in parallel
 3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
 4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score
@@ -88,7 +89,7 @@ Errors show the message returned by the API.
 
 ## Attribution
 
-The footer credits Open-Meteo and OpenStreetMap. Both licences require this, so keep it when changing the layout.
+The footer credits Open-Meteo and OpenStreetMap, and the map shows OpenStreetMap's attribution on the map itself. The licences require both, so keep them when changing the layout.
 
 ## Browser Support
 
