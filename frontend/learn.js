@@ -246,5 +246,5 @@ const Learner = (() => {
         }
     }
 
-    return { STORAGE_KEY, context, describeContext, vote, evidence, hasLearned, choose, rank, reason, forget, beta };
+    return { context, vote, evidence, hasLearned, choose, rank, reason, forget };
 })();

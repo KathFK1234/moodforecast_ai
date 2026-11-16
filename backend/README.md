@@ -78,7 +78,7 @@ tests/
   test_mailer.py         # Mailer tests (fake SMTP)
   test_postgres.py       # Database code on real PostgreSQL (needs TEST_DATABASE_URL)
   test_alerts.py         # Alert emails and the daily send (fake SMTP and weather)
-  test_static_sync.py    # static/ matches ../frontend
+  test_static_sync.py    # static/ matches ../frontend; Leaflet is byte for byte the 1.9.4 release
 ```
 
 ## API Endpoints
