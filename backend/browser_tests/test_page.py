@@ -237,7 +237,7 @@ def test_the_form_points_to_a_field_left_empty(page, site):
 # A place's answers, for the tests that need results on screen
 WEATHER = {"temp_c": 18, "feels_like_c": 17, "condition": "Partly Cloudy", "humidity": 60, "wind_kph": 10, "is_day": True}
 FORECAST = {
-    "location": "Nairobi, KE", "weather": WEATHER, "forecast_days": 1, "ai_summary": "",
+    "location": "Nairobi, KE", "lat": -1.29, "lon": 36.82, "weather": WEATHER, "forecast_days": 1, "ai_summary": "",
     "daily": [{
         "date": "2026-11-16", "condition": "Clear", "temp_max_c": 24, "temp_min_c": 14,
         "precipitation_chance": 10, "uv_index": 9, "sunrise": "06:20", "sunset": "18:30",

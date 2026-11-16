@@ -114,6 +114,8 @@ class DailyForecast(BaseModel):
 class ForecastResponse(BaseModel):
     """Forecast endpoint response."""
     location: str
+    lat: float = Field(..., description="The place's latitude, e.g. to show it on a map")
+    lon: float = Field(..., description="The place's longitude")
     weather: WeatherData
     forecast_days: int
     daily: list[DailyForecast]

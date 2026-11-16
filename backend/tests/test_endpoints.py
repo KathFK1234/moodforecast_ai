@@ -550,6 +550,7 @@ def test_forecast_endpoint(mock_weather):
     assert response.status_code == 200
     data = response.json()
     assert data["location"] == "Nairobi, KE"
+    assert (data["lat"], data["lon"]) == (-1.2921, 36.8219)
     assert data["weather"] == {
         "temp_c": 18,
         "feels_like_c": 16.5,

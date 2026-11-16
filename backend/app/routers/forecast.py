@@ -52,6 +52,8 @@ async def get_forecast(location: LocationPath) -> ForecastResponse:
     
     return ForecastResponse(
         location=resolved_location,
+        lat=lat,
+        lon=lon,
         weather=weather,
         forecast_days=len(daily),
         daily=daily,

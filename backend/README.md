@@ -94,6 +94,7 @@ curl http://localhost:8000/api/forecast/Nairobi
 ```json
 {
   "location": "Nairobi, KE",
+  "lat": -1.2921, "lon": 36.8219,
   "weather": {
     "temp_c": 18.0, "feels_like_c": 16.7, "condition": "Mainly Clear",
     "humidity": 65.0, "wind_kph": 10.9, "is_day": false
@@ -112,7 +113,7 @@ curl http://localhost:8000/api/forecast/Nairobi
 }
 ```
 
-`sunrise` and `sunset` are local times at the location. A day's mood score uses its condition, the average of its maximum and minimum temperature, and its mean humidity.
+`lat` and `lon` are the place's coordinates, which the page uses to show it on the map. `sunrise` and `sunset` are local times at the location. A day's mood score uses its condition, the average of its maximum and minimum temperature, and its mean humidity.
 
 ### GET /api/wellbeing/{location}
 
