@@ -232,3 +232,173 @@ def test_the_form_points_to_a_field_left_empty(page, site):
     page.click("#subscribeBtn")
     expect(page.locator("#subLocationInput")).to_be_focused()
     expect(page.locator("#emailInput")).to_have_attribute("aria-invalid", "false")
+
+
+# A place's answers, for the tests that need results on screen
+WEATHER = {"temp_c": 18, "feels_like_c": 17, "condition": "Partly Cloudy", "humidity": 60, "wind_kph": 10, "is_day": True}
+FORECAST = {
+    "location": "Nairobi, KE", "weather": WEATHER, "forecast_days": 1, "ai_summary": "",
+    "daily": [{
+        "date": "2026-11-16", "condition": "Clear", "temp_max_c": 24, "temp_min_c": 14,
+        "precipitation_chance": 10, "uv_index": 9, "sunrise": "06:20", "sunset": "18:30",
+        "mood_score": 80, "mood_label": "Upbeat",
+    }],
+}
+WELLBEING = {
+    "location": "Nairobi, KE", "weather": WEATHER, "mood_score": 80, "mood_label": "Upbeat", "baseline_score": 65,
+    "factors": [{"label": "Comfortable temperature", "delta": 10}], "energy_level": "High", "risk_level": "Minimal",
+    "ai_summary": "Mild in Nairobi.", "recommendations": ["Take a walk."], "curiosity": [],
+}
+CHOICES = [
+    {"name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": True,
+     "family": "runs, walks and workouts", "suited": True},
+    {"name": "cycling", "prompt": "Ride a bike", "group": "Sport and exercise", "favourite": False,
+     "family": "rides and wheels", "suited": True},
+    {"name": "skateboarding", "prompt": "Go skateboarding", "group": "Sport and exercise", "favourite": False,
+     "family": "rides and wheels", "suited": False},
+    {"name": "kayaking", "prompt": "Go kayaking", "group": "On the water", "favourite": False,
+     "family": "time on the water", "suited": False},
+    {"name": "reading", "prompt": "Read a book", "group": "Indoors", "favourite": False,
+     "family": "quiet time in", "suited": True},
+]
+# Math.random from a seed, so a learned pick is made the same way every run
+SEEDED_RANDOM = """
+(() => {
+    let seed = 12345;
+    Math.random = () => {
+        seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+})();
+"""
+
+
+def pick_of(name):
+    return {
+        "location": "Nairobi, KE", "weather": WEATHER, "activity": name, "recognised": True, "verdict": "go",
+        "headline": f"How about {name} in Nairobi?", "reasons": ["Mild and dry."], "suggestion": None,
+        "curiosity": {"question": "Compare with:", "places": ["Lisbon"]},
+    }
+
+
+def serve_place(page, picks):
+    """Answer a search for Nairobi; random picks are recorded in `picks` and answered with the chosen or a first pick."""
+    page.route("**/api/forecast/**", lambda route: route.fulfill(json=FORECAST))
+    page.route("**/api/wellbeing/**", lambda route: route.fulfill(json=WELLBEING))
+    page.route("**/api/activities/**", lambda route: route.fulfill(json=CHOICES))
+    
+    def random_pick(route):
+        query = dict(part.split("=", 1) for part in route.request.url.split("?", 1)[1].split("&"))
+        picks.append(query)
+        route.fulfill(json=pick_of(query.get("choose") or "running"))
+    page.route("**/api/random-activity/**", random_pick)
+    page.route("**/api/activity/**", lambda route: route.fulfill(json={**pick_of("running"), "headline": "Go on, then."}))
+
+
+def test_learned_picks_stay_within_what_the_rules_allow(page, site):
+    page.route("**/api/**", lambda route: route.abort())
+    page.goto(f"{site}/")
+    allowed = page.evaluate("""(choices) => {
+        // Love everything, the ruled-out ones most of all
+        choices.forEach((c) => { for (let i = 0; i < 30; i++) Learner.vote({ ...c, ctx: 'mild-dry-day' }, c.suited ? 1 : 1); });
+        for (let i = 0; i < 30; i++) Learner.vote({ name: 'kayaking', family: 'time on the water', ctx: 'mild-dry-day' }, 1);
+        const picked = new Set();
+        for (let i = 0; i < 2000; i++) picked.add(Learner.choose(choices, 'mild-dry-day', 'running'));
+        return [...picked];
+    }""", CHOICES)
+    assert set(allowed) <= {"cycling", "reading", None}
+    assert {"cycling", "reading"} <= set(allowed)
+
+
+def test_learning_does_not_trap_the_visitor_in_one_activity(page, site):
+    page.route("**/api/**", lambda route: route.abort())
+    page.goto(f"{site}/")
+    counts = page.evaluate("""(choices) => {
+        for (let i = 0; i < 50; i++) Learner.vote({ name: 'cycling', family: 'rides and wheels', ctx: 'mild-dry-day' }, 1);
+        // As the page does it: each "Surprise me" leaves out the pick on screen
+        const counts = {};
+        let shown = '';
+        for (let i = 0; i < 3000; i++) {
+            const chosen = Learner.choose(choices, 'mild-dry-day', shown);
+            // The server's own random pick, when learning leaves it to chance
+            shown = chosen || ['running', 'cycling', 'reading'].filter((n) => n !== shown)[i % 2];
+            counts[chosen || 'random'] = (counts[chosen || 'random'] || 0) + 1;
+        }
+        return counts;
+    }""", CHOICES)
+    # Liked most, but never every time, and the others and the server's own random pick still come up
+    assert counts["cycling"] > counts["running"]
+    assert counts["cycling"] < 1600
+    assert counts["running"] > 300 and counts["reading"] > 100 and counts["random"] > 250
+
+
+def test_a_vote_is_kept_shown_and_can_be_forgotten(page, site):
+    picks = []
+    serve_place(page, picks)
+    page.goto(f"{site}/")
+    feedback = page.locator("#pickFeedback")
+    expect(feedback).to_be_visible()
+    expect(page.locator("#pickMemory")).to_be_hidden()
+    
+    page.click("#likeButton")
+    expect(page.locator("#likeButton")).to_have_attribute("aria-pressed", "true")
+    expect(page.locator("#pickThanks")).to_contain_text("more like this")
+    expect(page.locator("#pickMemory")).to_be_visible()
+    assert "running" in page.evaluate("localStorage.getItem('moodforecast:tastes')")
+    
+    # Changing one's mind replaces the vote rather than adding to it
+    page.click("#dislikeButton")
+    expect(page.locator("#likeButton")).to_have_attribute("aria-pressed", "false")
+    expect(page.locator("#dislikeButton")).to_have_attribute("aria-pressed", "true")
+    likes, dislikes = page.evaluate("(() => { const e = Learner.evidence('running', '', 'mild-dry-day'); return [e.likes, e.dislikes]; })()")
+    assert likes < 0.01 and 0.99 < dislikes < 1.01
+    
+    page.click("#forgetButton")
+    expect(page.locator("#pickThanks")).to_contain_text("Forgotten")
+    expect(page.locator("#pickMemory")).to_be_hidden()
+    expect(page.locator("#likeButton")).to_be_focused()
+    assert page.evaluate("localStorage.getItem('moodforecast:tastes')") is None
+    
+    # A question that was asked, not picked, has nothing to vote on
+    page.fill("#activityInput", "Can I go for a run?")
+    page.click("#activityButton")
+    expect(page.locator("#activityHeadline")).to_have_text("Go on, then.")
+    expect(feedback).to_be_hidden()
+
+
+def test_a_learned_pick_is_asked_for_and_says_why(page, site):
+    page.add_init_script(SEEDED_RANDOM)
+    page.add_init_script("""localStorage.setItem('moodforecast:tastes', JSON.stringify({
+        v: 1, a: {cycling: {'mild-dry-day': [5, 0, Date.now()]}}, f: {'rides and wheels': {'mild-dry-day': [5, 0, Date.now()]}}
+    }))""")
+    picks = []
+    serve_place(page, picks)
+    page.goto(f"{site}/")
+    expect(page.locator("#activityHeadline")).to_contain_text("How about")
+    for _ in range(6):
+        if picks[-1].get("choose") == "cycling":
+            break
+        page.click("#surpriseButton")
+        expect(page.locator("#activityResult")).not_to_have_class(re.compile("is-refreshing"))
+    assert picks[-1].get("choose") == "cycling"
+    expect(page.locator("#pickWhy")).to_have_text("✦ You've liked cycling on mild, dry days.")
+    # The quick picks put what's liked first
+    expect(page.locator("#activityChips .chip").first).to_have_text("Ride a bike")
+
+
+def test_the_page_works_with_storage_blocked(page, site):
+    page.add_init_script("""Object.defineProperty(window, 'localStorage', {
+        get() { throw new DOMException('Blocked', 'SecurityError'); }
+    })""")
+    picks = []
+    serve_place(page, picks)
+    page.goto(f"{site}/")
+    expect(page.locator("#pickFeedback")).to_be_visible()
+    page.click("#likeButton")
+    expect(page.locator("#pickThanks")).to_contain_text("more like this")
+    # Learned for this visit only
+    expect(page.locator("#pickMemory")).to_be_visible()
+    page.click("#forgetButton")
+    expect(page.locator("#pickMemory")).to_be_hidden()

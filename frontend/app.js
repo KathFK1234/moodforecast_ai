@@ -88,6 +88,10 @@ let currentLocation = '';  // The place the results on screen are for
 let lastActivity = '';     // Re-asked when the place changes; empty means a random pick
 let shownActivity = '';    // Left out of the next random pick
 let activityToken = 0;
+let currentWeather = null; // The weather on screen, which learned picks are judged in
+let localChoices = null;   // What can be done at the current place, from /api/activities
+let choicesReady = Promise.resolve(null);  // The request for localChoices, for picks made before it's back
+let currentPick = null;    // The random pick on screen, for its 👍 / 👎
 
 // Read the API's error message, whatever shape it comes in
 async function errorMessage(response, fallback) {
@@ -130,6 +134,8 @@ async function handleSearch(location, record = true) {
 
     try {
         const encoded = encodeURIComponent(location);
+        // Alongside the weather, so a learned pick can be made as soon as it's on screen
+        const choicesRequest = fetchLocalActivities(location).catch(() => null);
         const [forecastData, wellbeingData] = await Promise.all([
             fetchJson(`/api/forecast/${encoded}`, 'Could not load the forecast.'),
             fetchJson(`/api/wellbeing/${encoded}`, 'Could not calculate wellbeing.'),
@@ -143,8 +149,11 @@ async function handleSearch(location, record = true) {
 
         el('subLocationInput').value = location;
         currentLocation = location;
+        currentWeather = wellbeingData.weather;
+        localChoices = null;
+        choicesReady = choicesRequest;
         el('activityPlace').textContent = wellbeingData.location;
-        showLocalActivities(location);
+        showLocalActivities(choicesRequest);
         describePage(wellbeingData, location, record);
         if (lastActivity) askActivity(lastActivity);
         else surpriseMe();
@@ -515,19 +524,26 @@ function askActivity(question) {
     );
 }
 
-// Pick something at random that the weather at the current place suits
-function surpriseMe() {
+// Pick something that the weather at the current place suits: one this visitor is
+// likely to enjoy once they've voted on a few picks, otherwise at random. The server
+// takes the learned choice only if its rules allow it right now.
+async function surpriseMe() {
     if (!currentLocation) return;
 
     lastActivity = '';
     el('activityInput').value = '';
-    loadActivity(
-        `/api/random-activity/${encodeURIComponent(currentLocation)}?exclude=${encodeURIComponent(shownActivity)}`,
-        'Could not pick an activity.'
-    );
+    const place = currentLocation;
+    const choices = await choicesReady;
+    // A newer search or question has taken over while the choices were on their way
+    if (place !== currentLocation || lastActivity) return;
+    const ctx = currentWeather ? Learner.context(currentWeather) : '';
+    const chosen = ctx ? Learner.choose(choices, ctx, shownActivity) : null;
+    let path = `/api/random-activity/${encodeURIComponent(currentLocation)}?exclude=${encodeURIComponent(shownActivity)}`;
+    if (chosen) path += `&choose=${encodeURIComponent(chosen)}`;
+    loadActivity(path, 'Could not pick an activity.', { ctx, chosen });
 }
 
-async function loadActivity(path, fallback) {
+async function loadActivity(path, fallback, pick = null) {
     const error = el('activityError');
     const buttons = [el('activityButton'), el('surpriseButton')];
     const token = ++activityToken;
@@ -540,6 +556,7 @@ async function loadActivity(path, fallback) {
         if (token !== activityToken) return;
         shownActivity = data.activity;
         displayActivity(data);
+        showPickFeedback(data, pick);
     } catch (e) {
         if (token !== activityToken) return;
         el('activityResult').classList.add('hidden');
@@ -582,6 +599,60 @@ function displayActivity(data) {
     });
 
     el('activityResult').classList.remove('hidden');
+}
+
+// The 👍 / 👎 row under a random pick, with a line on why it was picked when learning chose it
+function showPickFeedback(data, pick) {
+    currentPick = null;
+    el('pickFeedback').classList.toggle('hidden', !pick);
+    el('pickWhy').classList.add('hidden');
+    el('pickThanks').textContent = '';
+    setVoteButtons(0);
+    if (pick) {
+        const choice = (localChoices || []).find((c) => c.name === data.activity) || { name: data.activity, family: '' };
+        currentPick = { name: data.activity, family: choice.family || '', ctx: pick.ctx, vote: 0 };
+        // Only when the server took the learned choice: otherwise it was a plain random pick
+        const why = pick.chosen === data.activity ? Learner.reason(choice, pick.ctx) : '';
+        el('pickWhyText').textContent = why;
+        el('pickWhy').classList.toggle('hidden', !why);
+    }
+    showPickMemory();
+}
+
+function setVoteButtons(vote) {
+    el('likeButton').setAttribute('aria-pressed', String(vote === 1));
+    el('dislikeButton').setAttribute('aria-pressed', String(vote === -1));
+}
+
+// Tapping the same vote again takes it back
+function votePick(value) {
+    if (!currentPick || !currentPick.ctx) return;
+    const next = currentPick.vote === value ? 0 : value;
+    Learner.vote(currentPick, next, currentPick.vote);
+    currentPick.vote = next;
+    setVoteButtons(next);
+    el('pickThanks').textContent = {
+        1: "Noted: you'll see more like this.",
+        '-1': "Noted: you'll see less of this.",
+        0: '',
+    }[next];
+    showPickMemory();
+}
+
+// Where the learning lives, and a way to forget it: shown once there is something learned
+function showPickMemory() {
+    el('pickMemory').classList.toggle('hidden', el('pickFeedback').classList.contains('hidden') || !Learner.hasLearned());
+}
+
+function forgetLearning() {
+    Learner.forget();
+    if (currentPick) currentPick.vote = 0;
+    setVoteButtons(0);
+    el('pickWhy').classList.add('hidden');
+    el('pickThanks').textContent = 'Forgotten. Picks are random again.';
+    showPickMemory();
+    // The button has gone, so keep keyboard focus nearby
+    el('likeButton').focus();
 }
 
 function chipButton(text, onClick) {
@@ -893,25 +964,28 @@ function fetchLocalActivities(location) {
 }
 
 // After a search: quick picks for the place, and the same choices in the subscription form
-async function showLocalActivities(location) {
+async function showLocalActivities(request) {
     const token = searchToken;
-    try {
-        const choices = await fetchLocalActivities(location);
-        if (token !== searchToken) return;
-        renderActivityChips(choices);
-        fillActivityChoices(choices);
-    } catch (e) {
-        // Quick picks are optional - typing a question still works
-    }
+    const choices = await request;
+    // Quick picks are optional - typing a question still works without them
+    if (token !== searchToken || !choices) return;
+    localChoices = choices;
+    renderActivityChips(choices);
+    fillActivityChoices(choices);
 }
 
-// A few local favourites, then a different handful of the rest on each visit
+// A few local favourites, then a different handful of the rest on each visit.
+// Once this visitor has voted on some picks, the ones they're likely to enjoy tend to come first.
 function renderActivityChips(choices) {
-    const favourites = choices.filter((choice) => choice.favourite).slice(0, 3);
-    const rest = choices.filter((choice) => !favourites.includes(choice)).sort(() => Math.random() - 0.5);
+    let ordered = currentWeather ? Learner.rank(choices, Learner.context(currentWeather)) : null;
+    if (!ordered) {
+        const favourites = choices.filter((choice) => choice.favourite).slice(0, 3);
+        const rest = choices.filter((choice) => !favourites.includes(choice)).sort(() => Math.random() - 0.5);
+        ordered = favourites.concat(rest);
+    }
     const chips = el('activityChips');
     chips.innerHTML = '';
-    favourites.concat(rest).slice(0, ACTIVITY_CHIP_COUNT).forEach((choice) => {
+    ordered.slice(0, ACTIVITY_CHIP_COUNT).forEach((choice) => {
         chips.appendChild(chipButton(choice.prompt, () => {
             el('activityInput').value = choice.prompt;
             askActivity(choice.prompt);
@@ -1062,6 +1136,9 @@ function init() {
         askActivity(el('activityInput').value);
     });
     el('surpriseButton').addEventListener('click', surpriseMe);
+    el('likeButton').addEventListener('click', () => votePick(1));
+    el('dislikeButton').addEventListener('click', () => votePick(-1));
+    el('forgetButton').addEventListener('click', forgetLearning);
     el('subscribeForm').addEventListener('submit', handleSubscribe);
     el('optOutToggle').addEventListener('click', openOptOut);
     el('optOutClose').addEventListener('click', () => el('optOutDialog').close());

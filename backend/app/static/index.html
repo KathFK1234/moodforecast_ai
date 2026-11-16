@@ -39,7 +39,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <!-- ?v= gives these a new address, so copies cached before the server sent Cache-Control are not reused -->
-    <link rel="stylesheet" href="styles.css?v=6">
+    <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body data-theme="clear-night">
     <div class="sky" aria-hidden="true">
@@ -202,6 +202,15 @@
                     <span class="badge" id="activityVerdict"></span>
                     <p class="activity-headline" id="activityHeadline"></p>
                     <ul class="activity-reasons" id="activityReasons"></ul>
+                    <!-- Picks learn from these votes, in this browser only (learn.js) -->
+                    <p class="pick-why hidden" id="pickWhy"><span aria-hidden="true">✦</span> <span id="pickWhyText"></span></p>
+                    <div class="pick-feedback hidden" id="pickFeedback" role="group" aria-labelledby="pickQuestion">
+                        <span class="pick-question" id="pickQuestion">Good pick?</span>
+                        <button type="button" class="vote-button" id="likeButton" aria-pressed="false" aria-label="Good pick: suggest more like this" title="Good pick: suggest more like this"><span aria-hidden="true">👍</span></button>
+                        <button type="button" class="vote-button" id="dislikeButton" aria-pressed="false" aria-label="Not for me: suggest less like this" title="Not for me: suggest less like this"><span aria-hidden="true">👎</span></button>
+                        <span class="pick-thanks" id="pickThanks" role="status"></span>
+                    </div>
+                    <p class="pick-memory hidden" id="pickMemory">Picks learn from your votes, in this browser only. <button type="button" class="link-button" id="forgetButton">Forget what I've liked</button></p>
                     <p class="activity-suggestion hidden" id="activitySuggestion"></p>
                     <p class="card-note" id="activityCuriosity"></p>
                     <div class="chips" id="activityPlaces"></div>
@@ -287,6 +296,7 @@
         </footer>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="learn.js?v=1"></script>
+    <script src="app.js?v=6"></script>
 </body>
 </html>
