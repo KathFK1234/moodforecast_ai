@@ -6,7 +6,8 @@ import re
 import time
 from typing import Any
 import httpx
-from app.services.cache import cache
+from app.services.cache import TTLCache, cache
+from app.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -282,6 +283,17 @@ async def _search_nominatim(query: str) -> list[dict]:
 # nearby points share one cached answer
 COORDINATE_DECIMALS = 2
 NO_PLACE_THERE = "There's no named place there. Try a spot on land, or nearer a town."
+# Answers for points, kept apart from the main cache (whose expired entries stay until
+# pushed out) so the rounded points visitors sent are forgotten on time: dropped once
+# past the cache lifetime, at the next lookup or the next run of forget_old_points
+_points = TTLCache(settings.cache_ttl_seconds, max_entries=2000)
+
+
+def forget_old_points() -> None:
+    """Drop the answers for points looked up longer ago than the cache lifetime."""
+    _points.forget_older_than(_points.ttl_seconds)
+
+
 WARD = re.compile(r"\s+ward$", re.IGNORECASE)
 
 
@@ -291,7 +303,8 @@ async def place_at(lat: float, lon: float) -> dict:
     
     The point is rounded to about 1 km first. Uses Nominatim's reverse lookup
     at city level, within its one-request-per-second limit, and caches the
-    answer (cache key rev:{lat}:{lon}, rounded). The place is remembered under
+    answer by the rounded point for the cache lifetime, apart from the main
+    cache, so the point is forgotten on time (see forget_old_points). The place is remembered under
     its label, at the place's own coordinates, so searching for the label next
     finds exactly this place without another lookup.
     
@@ -301,8 +314,9 @@ async def place_at(lat: float, lon: float) -> dict:
     place's own coordinates, or {"error": str} if there is no place there.
     """
     lat, lon = round(float(lat), COORDINATE_DECIMALS), round(float(lon), COORDINATE_DECIMALS)
+    forget_old_points()
     cache_key = f"rev:{lat:.{COORDINATE_DECIMALS}f}:{lon:.{COORDINATE_DECIMALS}f}"
-    cached = cache.get(cache_key)
+    cached = _points.get(cache_key)
     if cached is not None:
         return cached.copy()
     
@@ -313,7 +327,7 @@ async def place_at(lat: float, lon: float) -> dict:
         pending.add_done_callback(lambda _: _pending_points.pop(cache_key, None))
     result = await asyncio.shield(pending)
     
-    cache.set(cache_key, result)
+    _points.set(cache_key, result)
     if "error" not in result:
         _remember(result["label"], {
             "lat": result["lat"],

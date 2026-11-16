@@ -243,7 +243,7 @@ The town or city at a point, for "Use my location" and choosing on the map. Body
 {"name": "Naivasha", "region": "Nakuru County", "country": "Kenya", "label": "Naivasha, Nakuru County, Kenya", "lat": -0.7167, "lon": 36.4333}
 ```
 
-Search for `label` to get the weather there: it resolves to exactly this place without another lookup. `lat` and `lon` are the place's own coordinates, not the point's. It is a POST so the coordinates travel in the body, never in an address, the browser's history or a request log. They are rounded to 2 decimal places (about 1 km) before anything else, and the rounded point is only kept as the key of the cached answer (`rev:{lat}:{lon}`, for the cache lifetime). Uses Nominatim's reverse lookup at town level, within the app's one request a second; each visitor can make 30 a minute. 422 if there's no named place there (out at sea), 503/504 if Nominatim can't be reached; there is no fallback for this one.
+Search for `label` to get the weather there: it resolves to exactly this place without another lookup. `lat` and `lon` are the place's own coordinates, not the point's. It is a POST so the coordinates travel in the body, never in an address, the browser's history or a request log. They are rounded to 2 decimal places (about 1 km) before anything else, and the rounded point is only kept as the key of its cached answer, in a cache of its own that drops answers once past the cache lifetime, at the next lookup or the next 10-minutely clean-up, so 20 minutes at most by default. Uses Nominatim's reverse lookup at town level, within the app's one request a second; each visitor can make 30 a minute. 422 if there's no named place there (out at sea), 503/504 if Nominatim can't be reached; there is no fallback for this one.
 
 ### GET /api/activities
 
@@ -445,7 +445,7 @@ Limits worth knowing:
 
 - In-memory, per process; cleared when the server restarts
 - TTL of 10 minutes by default (`CACHE_TTL_SECONDS`)
-- Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}`, `suggest:{query}` and `rev:{lat}:{lon}` (a point rounded to about 1 km)
+- Keys: `weather:{lat}:{lon}`, `sea:{lat}:{lon}`, `geo:{location}`, and `suggest:{query}`. Answers for points (`POST /api/place`) have a cache of their own, so they are deleted on time rather than left until pushed out
 - `/api/forecast` and `/api/wellbeing` share the same cached weather for a location
 - Requests for the same forecast made at the same moment share one call to Open-Meteo
 - A forecast request that times out or hits a server error is retried once. If Open-Meteo still can't be reached, the last forecast for that place is served if it is under an hour old

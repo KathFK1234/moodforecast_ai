@@ -1,6 +1,7 @@
 """Unit tests for the geocoding service - HTTP layer is mocked."""
 
 import asyncio
+import time
 
 import httpx
 import pytest
@@ -12,6 +13,7 @@ from app.services.cache import cache
 def clear_cache(monkeypatch):
     """Start every test with an empty cache and no wait for Nominatim."""
     cache.clear()
+    geocoding._points.clear()
     geocoding._suggested.clear()
     monkeypatch.setattr(geocoding, "NOMINATIM_INTERVAL", 0.0)
     monkeypatch.setattr(geocoding, "_next_nominatim_slot", 0.0)
@@ -525,3 +527,16 @@ async def test_a_refused_reverse_lookup_is_logged_without_the_point(monkeypatch,
         await geocoding.place_at(-0.7123, 36.4311)
     assert "Nominatim reverse lookup failed: 403" in caplog.text
     assert "36.43" not in caplog.text and "-0.71" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_point_is_forgotten_once_past_the_cache_lifetime(monkeypatch):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=NAIVASHA_REVERSE))
+    await geocoding.place_at(-0.71, 36.43)
+    assert len(geocoding._points) == 1
+    # Not in the main cache, whose expired entries stay until pushed out
+    assert not any(key.startswith("rev:") for key in cache._cache)
+    clock = time.time() + geocoding._points.ttl_seconds + 1
+    monkeypatch.setattr("app.services.cache.time.time", lambda: clock)
+    geocoding.forget_old_points()
+    assert len(geocoding._points) == 0

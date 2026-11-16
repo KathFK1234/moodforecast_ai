@@ -20,7 +20,7 @@ from app.config import settings
 from app.models.db import create_tables
 from app.routers import docs, forecast, wellbeing, activity, locations, subscribe
 from app.models.schemas import HealthResponse
-from app.services import alerts, mailer
+from app.services import alerts, geocoding, mailer
 from app.services.rate_limit import RateLimiter
 from app.services.weather import get_weather_client
 
@@ -156,6 +156,7 @@ async def forget_old_addresses() -> None:
             api_limiter.forget_old()
             form_limiter.forget_old()
             place_limiter.forget_old()
+            geocoding.forget_old_points()
             alerts.forget_old_addresses()
         except Exception:
             # Logged and tried again next time: stopping would keep addresses in memory for good

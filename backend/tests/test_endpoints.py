@@ -1173,12 +1173,13 @@ async def test_addresses_the_limits_no_longer_need_are_forgotten_regularly():
             patch.object(api_limiter, "forget_old") as api, \
             patch.object(form_limiter, "forget_old") as forms, \
             patch.object(place_limiter, "forget_old") as places, \
+            patch("app.main.geocoding.forget_old_points") as points, \
             patch("app.main.alerts.forget_old_addresses") as emails:
         with pytest.raises(asyncio.CancelledError):
             await forget_old_addresses()
     
     assert pauses == [FORGET_INTERVAL_SECONDS] * 3
-    assert api.call_count == forms.call_count == places.call_count == emails.call_count == 2
+    assert api.call_count == forms.call_count == places.call_count == points.call_count == emails.call_count == 2
 
 
 @pytest.mark.asyncio
