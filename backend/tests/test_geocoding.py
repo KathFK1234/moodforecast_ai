@@ -516,3 +516,12 @@ async def test_a_kenyan_ward_is_named_after_its_neighbourhood(monkeypatch):
     }
     mock_nominatim(monkeypatch, lambda request: httpx.Response(200, json=reply))
     assert (await geocoding.place_at(-4.04, 39.67))["label"] == "Tudor, Mombasa County, Kenya"
+
+
+@pytest.mark.asyncio
+async def test_a_refused_reverse_lookup_is_logged_without_the_point(monkeypatch, caplog):
+    mock_nominatim(monkeypatch, lambda request: httpx.Response(403))
+    with pytest.raises(RuntimeError):
+        await geocoding.place_at(-0.7123, 36.4311)
+    assert "Nominatim reverse lookup failed: 403" in caplog.text
+    assert "36.43" not in caplog.text and "-0.71" not in caplog.text

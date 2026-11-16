@@ -1,12 +1,15 @@
 """Geocoding service - Convert location names to coordinates."""
 
 import asyncio
+import logging
 import re
 import time
 from typing import Any
 import httpx
 from app.services.cache import cache
 
+
+logger = logging.getLogger(__name__)
 
 # What reading a reply of an unexpected shape raises
 UNUSABLE_REPLY = (AttributeError, IndexError, KeyError, TypeError, ValueError)
@@ -344,9 +347,14 @@ async def _reverse_nominatim(lat: float, lon: float) -> dict:
             response.raise_for_status()
             data = response.json()
     except httpx.TimeoutException:
+        logger.warning("Nominatim reverse lookup timed out")
         raise TimeoutError("Geocoding request timed out")
     except (httpx.HTTPError, ValueError) as e:
-        raise RuntimeError(f"Geocoding service unavailable: {e}")
+        # There's no fallback for this one, so say why in the log: a 403 or 429 would mean
+        # Nominatim is refusing the app. The status only, not the address, which has the point
+        status = e.response.status_code if isinstance(e, httpx.HTTPStatusError) else type(e).__name__
+        logger.warning("Nominatim reverse lookup failed: %s", status)
+        raise RuntimeError(f"Geocoding service unavailable: {status}")
     if not isinstance(data, dict):
         raise RuntimeError("Geocoding service sent an unusable reply")
     if "error" in data:
