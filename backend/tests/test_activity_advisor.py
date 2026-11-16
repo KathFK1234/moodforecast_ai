@@ -5,7 +5,8 @@ import random
 import pytest
 from app.services import activity_advisor
 from app.services.activity_advisor import (
-    ACTIVITIES, check_activity, find_activity, local_activities, random_activity, wind_chill
+    ACTIVITIES, FAMILIES, check_activity, family_of, find_activity, local_activities, random_activity,
+    suited_activities, wind_chill
 )
 from app.services.locality import SPORT_COUNTRIES, Place
 
@@ -656,3 +657,74 @@ class TestLateNightPicks:
         place = NAIROBI._replace(local_hour=2)
         advice = check_activity("barbecue", "Nairobi, KE", "Clear", 18, 50, 8, False, place=place)
         assert advice["verdict"] == "go"
+
+
+class TestChosenPicks:
+    """The page can ask for an activity it learned its visitor likes; the rules always win."""
+    
+    # Weather that rules things out in every way the rules know: storm, freezing rain,
+    # frostbite, heat, gales, wet ground, darkness, and calm weather for comparison
+    WEATHERS = [
+        ("Clear", 22, 50, 10, True), ("Thunderstorm", 20, 80, 30, True), ("Freezing Rain", -1, 90, 10, True),
+        ("Clear", -35, 50, 20, True), ("Clear", 40, 20, 5, True), ("Overcast", 15, 60, 70, True),
+        ("Light Rain", 16, 90, 10, True), ("Clear", 18, 50, 8, False), ("Snow", -4, 80, 5, True),
+        ("Drizzle", 8, 95, 25, False),
+    ]
+    PLACES = [None, NAIROBI, MOMBASA, CAPE_TOWN, INNSBRUCK, UNKNOWN, NAIROBI._replace(local_hour=2)]
+    
+    def test_every_activity_has_one_family(self):
+        named = [name for names in FAMILIES.values() for name in names]
+        assert sorted(named) == sorted(a.name for a in ACTIVITIES)
+        assert all(family_of(a) for a in ACTIVITIES)
+    
+    def test_a_chosen_activity_is_picked_only_when_the_rules_allow_it(self):
+        for condition, temp, humidity, wind, is_day in self.WEATHERS:
+            for place in self.PLACES:
+                allowed = {
+                    a.name for a in suited_activities(condition, temp, humidity, wind, is_day, place)
+                }
+                assert allowed, "there is always something to do"
+                for activity in ACTIVITIES:
+                    advice = random_activity(
+                        "Here", condition, temp, humidity, wind, is_day,
+                        rng=random.Random(7), place=place, choose=activity.name
+                    )
+                    assert advice["activity"] in allowed
+                    assert advice["verdict"] == "go"
+                    assert (advice["activity"] == activity.name) == (activity.name in allowed)
+    
+    def test_ruled_out_choices_are_ignored(self):
+        def picked(choose, condition, temp=20, humidity=50, wind=10, is_day=True, place=NAIROBI):
+            return random_activity(
+                "Nairobi, KE", condition, temp, humidity, wind, is_day,
+                rng=random.Random(1), place=place, choose=choose
+            )["activity"]
+        assert picked("running", "Thunderstorm") != "running"
+        assert picked("running", "Clear", temp=-35, wind=20) != "running"  # frostbite
+        assert picked("rock climbing", "Clear", wind=45) != "rock climbing"
+        assert picked("skateboarding", "Light Rain") != "skateboarding"
+        assert picked("horse riding", "Clear", is_day=False) != "horse riding"
+        assert picked("surfing", "Clear", temp=28) != "surfing"  # Nairobi is inland
+        assert picked("a barbecue", "Clear", place=NAIROBI._replace(local_hour=2)) != "a barbecue"
+        assert picked("nonsense", "Clear") in {a.name for a in local_activities(NAIROBI)}
+    
+    def test_an_allowed_choice_is_picked(self):
+        advice = random_activity(
+            "Nairobi, KE", "Clear", 22, 50, 10, True, rng=random.Random(1), place=NAIROBI, choose="cycling"
+        )
+        assert advice["activity"] == "cycling"
+        assert "cycling" in advice["headline"]
+        assert advice["reasons"][-1] == activity_advisor.PITCHES["cycling"]
+    
+    def test_exclude_wins_over_choose(self):
+        advice = random_activity(
+            "Nairobi, KE", "Clear", 22, 50, 10, True, rng=random.Random(1), place=NAIROBI,
+            choose="cycling", exclude="cycling"
+        )
+        assert advice["activity"] != "cycling"
+    
+    def test_suited_activities_are_all_a_go_when_asked_about(self):
+        for condition, temp, humidity, wind, is_day in self.WEATHERS:
+            for activity in suited_activities(condition, temp, humidity, wind, is_day, MOMBASA):
+                advice = check_activity(activity.name, "Mombasa, KE", condition, temp, humidity, wind, is_day, place=MOMBASA)
+                assert advice["verdict"] == "go", (activity.name, condition, temp)

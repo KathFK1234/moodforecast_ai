@@ -212,6 +212,8 @@ The place is judged before the weather (see [Local Fit](#local-fit)). Asking abo
 
 A random activity that suits the place and its current weather, in the same shape as the activity check. Activities the place can't offer, or where they aren't commonly done, are never picked, and ones that are popular in its country come up more often. Only activities with nothing in their way are picked, so `verdict` is always `go`; outdoor ones are preferred when any qualify, and indoor ones always do. Pass `exclude=<activity>` (the `activity` from the previous pick) to get a different one.
 
+Pass `choose=<activity>` to ask for a particular one. The page does this when it has learned, in the visitor's browser, what they like (see [../frontend/README.md](../frontend/README.md)). It is picked only if the rules above allow it right now, i.e. it is `suited` in `/api/activities/{location}`; otherwise it is ignored and the pick is made as usual. So learning can reorder what the rules allow but never get past them.
+
 ```bash
 curl "http://localhost:8000/api/random-activity/Nairobi?exclude=camping"
 ```
@@ -238,7 +240,7 @@ The names of every activity the advisor knows: `["running", "a walk", "cycling",
 
 ### GET /api/activities/{location}
 
-The activities that are practical at a location, local favourites first. Each has a `group` (Sport and exercise, Out and about, On the water, Snow or Indoors) and `favourite`, which is `true` when it is especially popular in the location's country. The page uses it for the quick picks and for the subscription form's activity list, where favourites are listed first under "Popular here" and the rest by group.
+The activities that are practical at a location, local favourites first. Each has a `group` (Sport and exercise, Out and about, On the water, Snow or Indoors); `favourite`, which is `true` when it is especially popular in the location's country; `family`, a closer kinship such as "ball games" or "time on the water" (`FAMILIES` in `activity_advisor.py`), which the page's learning shares likes across; and `suited`, which is `true` when nothing in the current weather or the hour stands in its way, i.e. a random pick may choose it. The page uses it for the quick picks and for the subscription form's activity list, where favourites are listed first under "Popular here" and the rest by group. The list itself doesn't depend on the weather, so the form can offer activities for other days.
 
 ```bash
 curl http://localhost:8000/api/activities/Nairobi
@@ -246,10 +248,11 @@ curl http://localhost:8000/api/activities/Nairobi
 
 ```json
 [
-  {"name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": true},
-  {"name": "hiking", "prompt": "Go hiking", "group": "Sport and exercise", "favourite": true},
+  {"name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": true,
+   "family": "runs, walks and workouts", "suited": true},
   ...
-  {"name": "a nap", "prompt": "Take a nap", "group": "Indoors", "favourite": false}
+  {"name": "a nap", "prompt": "Take a nap", "group": "Indoors", "favourite": false,
+   "family": "quiet time in", "suited": true}
 ]
 ```
 

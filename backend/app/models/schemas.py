@@ -143,6 +143,11 @@ class ActivityChoice(BaseModel):
     prompt: str = Field(..., description="How someone would ask about it, e.g. 'Go for a run'")
     group: str = Field(..., description="Kind of activity, e.g. 'Sport and exercise' or 'Indoors'")
     favourite: bool = Field(False, description="Especially popular in the location's country")
+    family: str = Field(..., description="Closely related activities it shares likes with, e.g. 'ball games'")
+    suited: bool = Field(
+        False,
+        description="Nothing in the current weather or the hour stands in its way, so a random pick may choose it"
+    )
 
 
 class ActivityCuriosity(BaseModel):

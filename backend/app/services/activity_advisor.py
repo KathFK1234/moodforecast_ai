@@ -391,6 +391,41 @@ _CATEGORY_GROUPS = {
     "indoor": "Indoors",
 }
 
+# Closer kinships than the groups, for the page's learning: liking one activity
+# lifts its family a little, so a few taps already change the picks. The names
+# are shown to visitors ("you've liked ball games"), so they read as plain words.
+FAMILIES = {
+    "runs, walks and workouts": ("running", "a walk", "hiking", "an outdoor workout", "an indoor workout"),
+    "ball games": (
+        "football", "basketball", "tennis", "cricket", "baseball", "rugby", "volleyball", "frisbee",
+        "netball", "kabaddi", "sepak takraw", "Gaelic football", "Aussie rules", "golf",
+    ),
+    "rides and wheels": ("cycling", "skateboarding", "roller skating", "horse riding"),
+    "climbing": ("rock climbing", "indoor climbing"),
+    "time on the water": (
+        "swimming", "a beach day", "surfing", "snorkelling", "a water park", "kayaking",
+        "a boat trip", "sailing", "fishing",
+    ),
+    "snow and ice": ("snow sports", "ice skating"),
+    "food outdoors": ("a picnic", "a barbecue", "a bonfire", "eating outdoors"),
+    "nature and sights": (
+        "a safari", "sightseeing", "birdwatching", "gardening", "photography", "camping",
+        "stargazing", "kite flying",
+    ),
+    "quiet time in": (
+        "reading", "a movie", "cooking", "games", "a nap", "arts and crafts", "meditation",
+        "a sauna", "music", "learning something new",
+    ),
+    "going out": ("an indoor outing", "bowling", "karaoke", "an escape room", "live music", "time with friends"),
+}
+_FAMILY_OF = {name: family for family, names in FAMILIES.items() for name in names}
+
+
+def family_of(activity: Activity) -> str:
+    """The family an activity's likes are shared with, e.g. "ball games"."""
+    return _FAMILY_OF[activity.name]
+
+
 # Places to compare for activities only some countries offer, by what they need
 NEEDS_CURIOSITY_PLACES = {
     "safari": curiosity.SAFARI_PLACES,
@@ -715,7 +750,8 @@ def random_activity(
     rng: random.Random | None = None,
     searched_as: str = "",
     exclude: str = "",
-    place: Place | None = None
+    place: Place | None = None,
+    choose: str = ""
 ) -> ActivityAdvice:
     """
     Pick something to try that suits the current weather and the place.
@@ -729,10 +765,19 @@ def random_activity(
     done are never picked, and local favourites come up more often. In the
     small hours there, only quiet picks are made.
 
+    `choose` names the activity the caller would like. It is picked only if it is
+    in the pool the rules allow (see suited_activities); otherwise it is ignored
+    and the pick is made here as usual, so a caller can never get past the rules.
+
     Returns the same shape as check_activity, with the verdict always "go".
     """
     rng = rng or random
-    activity = _pick(condition, temperature_c, humidity, wind_kph, is_day, rng, exclude, place)
+    pool = suited_activities(condition, temperature_c, humidity, wind_kph, is_day, place, exclude)
+    # The page's own pick, learned from what this visitor liked, is used only if
+    # the rules here allow it right now; anything else gets a pick of our own
+    activity = next((a for a in pool if choose and a.name == choose), None)
+    if activity is None:
+        activity = _pick(pool, rng, place)
 
     advice = _advise(
         activity, True, location,
@@ -751,17 +796,23 @@ def _pitch(activity: Activity, place: Place | None) -> str:
     return LOCAL_PITCHES.get((activity.name, country), PITCHES[activity.name])
 
 
-def _pick(
+def suited_activities(
     condition: str,
     temperature_c: float,
     humidity: float,
     wind_kph: float,
     is_day: bool,
-    rng: random.Random,
-    exclude: str,
-    place: Place | None
-) -> Activity:
-    """Choose an activity with nothing in its way, favouring the outdoors and local favourites."""
+    place: Place | None,
+    exclude: str = ""
+) -> list[Activity]:
+    """
+    The activities with nothing in their way at a place right now: what random picks come from.
+
+    Every rule applies: what the place can offer, thunderstorms, freezing rain,
+    frostbite, heat, wind, wet ground and daylight. In the small hours only
+    quiet activities are left. Indoor activities always qualify, so there is
+    always something. `exclude` is an activity name to leave out.
+    """
     suited = [
         activity for activity in local_activities(place, condition)
         if activity.name != exclude
@@ -770,6 +821,11 @@ def _pick(
     # Nobody wants to be told to light a barbecue at 2am
     if place is not None and is_late_night(place):
         suited = [activity for activity in suited if activity.name in LATE_NIGHT_PICKS] or suited
+    return suited
+
+
+def _pick(suited: list[Activity], rng: random.Random, place: Place | None) -> Activity:
+    """Choose from the suited activities, favouring the outdoors and local favourites."""
     outdoor = [activity for activity in suited if activity.category != "indoor"]
     pool = outdoor if outdoor and rng.random() < 0.75 else suited
     favourites = LOCAL_FAVOURITES.get(place.country, ()) if place is not None else ()
@@ -811,7 +867,9 @@ def _advise(
     suggestion = None
     if ruled_out_here:
         # The place rules it out, not the weather: offer something that works here
-        instead = _pick(condition, temperature_c, humidity, wind_kph, is_day, rng, activity.name, place)
+        instead = _pick(
+            suited_activities(condition, temperature_c, humidity, wind_kph, is_day, place, activity.name), rng, place
+        )
         suggestion = f"Something that does work in {place_name} right now: {instead.name}. {_pitch(instead, place)}"
     elif verdict == "skip":
         suggestion = rng.choice(INDOOR_SWAPS)

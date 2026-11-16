@@ -673,7 +673,8 @@ def test_local_activities_endpoint(mock_weather):
     assert response.status_code == 200
     choices = response.json()
     assert choices[0] == {
-        "name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": True
+        "name": "running", "prompt": "Go for a run", "group": "Sport and exercise", "favourite": True,
+        "family": "runs, walks and workouts", "suited": True,
     }
     # Kenya's favourites come first and are flagged; the rest are not
     favourites = [choice["name"] for choice in choices if choice["favourite"]]
@@ -689,6 +690,35 @@ def test_local_activities_endpoint(mock_weather):
     mock_weather.get_sea.return_value = {"coastal": True, "sea_temp_c": 27.6}
     names = [choice["name"] for choice in client.get("/api/activities/Mombasa").json()]
     assert "a beach day" in names
+
+
+def test_local_activities_say_which_suit_the_weather_now(mock_weather):
+    """`suited` marks the pool a random pick comes from: in a thunderstorm, indoor activities only."""
+    choices = client.get("/api/activities/Nairobi").json()
+    assert {c["name"] for c in choices if c["suited"]} > {"running", "cycling", "reading"}
+    stormy = dict(mock_weather.get_forecast.return_value["current"], condition="Thunderstorm")
+    mock_weather.get_forecast.return_value = dict(mock_weather.get_forecast.return_value, current=stormy)
+    choices = client.get("/api/activities/Nairobi").json()
+    suited = {c["name"] for c in choices if c["suited"]}
+    assert suited and all(c["group"] == "Indoors" for c in choices if c["suited"])
+    # Still listed, so the subscription form can offer them for other days
+    assert "running" in {c["name"] for c in choices}
+
+
+def test_random_activity_takes_a_choice_only_when_the_rules_allow_it(mock_weather):
+    picked = client.get("/api/random-activity/Nairobi", params={"choose": "cycling"}).json()
+    assert picked["activity"] == "cycling"
+    assert picked["verdict"] == "go"
+    # Surfing inland is never picked, whatever the page asks for
+    for _ in range(20):
+        assert client.get("/api/random-activity/Nairobi", params={"choose": "surfing"}).json()["activity"] != "surfing"
+    stormy = dict(mock_weather.get_forecast.return_value["current"], condition="Thunderstorm")
+    mock_weather.get_forecast.return_value = dict(mock_weather.get_forecast.return_value, current=stormy)
+    for _ in range(20):
+        data = client.get("/api/random-activity/Nairobi", params={"choose": "cycling"}).json()
+        assert data["activity"] != "cycling"
+        assert data["verdict"] == "go"
+    assert client.get("/api/random-activity/Nairobi", params={"choose": "x" * 41}).status_code == 422
 
 
 def test_local_checks_survive_a_failed_sea_lookup(mock_weather):
