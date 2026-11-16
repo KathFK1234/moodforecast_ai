@@ -293,6 +293,39 @@ body {
     transform: translateY(0);
 }
 
+/* Small round tools inside the search box: Search stays the one main button */
+.search .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-2);
+}
+
+.search .icon-button svg {
+    width: 22px;
+    height: 22px;
+}
+
+.search .icon-button:hover,
+.search .icon-button[aria-expanded="true"] {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--ink);
+}
+
+.search .icon-button.is-busy svg {
+    animation: locating 1.2s ease-in-out infinite;
+}
+
+@keyframes locating {
+    50% { opacity: 0.35; transform: scale(0.85); }
+}
+
 .search button:disabled,
 .activity-form button:disabled,
 .opt-out-form button:disabled,

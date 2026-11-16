@@ -52,7 +52,7 @@ API calls use relative paths, so the page must be opened through the backend rat
 
 ## How It Works
 
-1. **Search** → user enters a location (matching places are suggested while typing, from `GET /api/locations`), picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser.
+1. **Search** → user enters a location (matching places are suggested while typing, from `GET /api/locations`), picks a popular city, or opens a link with `?q=Kisumu`. The last search is remembered in the browser. The ◎ button in the search box (**Use my location**) asks the browser for the visitor's position, only when tapped; the page rounds it to about 1 km, gets the town there from `POST /api/place` and searches for it. A refusal, a timeout, a browser without geolocation or a page not served over https each get a plain message suggesting a search instead.
 2. **API calls** → `GET /api/forecast/{location}` and `GET /api/wellbeing/{location}`, in parallel
 3. **Weather card** → icon, temperature, feels-like, humidity, wind, rain chance, peak UV, sunrise, sunset
 4. **Mood card** → score gauge (0-100), mood label, energy and risk badges, summary, and the factors behind the score

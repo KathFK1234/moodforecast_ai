@@ -402,3 +402,57 @@ def test_the_page_works_with_storage_blocked(page, site):
     expect(page.locator("#pickMemory")).to_be_visible()
     page.click("#forgetButton")
     expect(page.locator("#pickMemory")).to_be_hidden()
+
+
+def test_my_location_is_asked_for_only_on_tap_and_sent_rounded(page, site):
+    page.add_init_script("""
+        window.locationAsks = 0;
+        const real = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+        navigator.geolocation.getCurrentPosition = (...args) => { window.locationAsks++; return real(...args); };
+    """)
+    page.context.grant_permissions(["geolocation"], origin=site)
+    page.context.set_geolocation({"latitude": -0.712345, "longitude": 36.431987})
+    sent = []
+    
+    def place(route):
+        sent.append(route.request.post_data_json)
+        route.fulfill(json={"name": "Naivasha", "region": "Nakuru County", "country": "Kenya",
+                            "label": "Naivasha, Nakuru County, Kenya", "lat": -0.7167, "lon": 36.4333})
+    serve_place(page, [])
+    page.route("**/api/place", place)
+    page.goto(f"{site}/")
+    expect(page.locator("#locationName")).to_have_text("Nairobi, KE")
+    assert page.evaluate("window.locationAsks") == 0
+    
+    searched = []
+    page.on("request", lambda request: searched.append(request.url) if "/api/forecast/" in request.url else None)
+    page.click("#locateButton")
+    expect(page.locator("#locationInput")).to_have_value("Naivasha, Nakuru County, Kenya")
+    page.wait_for_url(re.compile("q=Naivasha"))
+    assert sent == [{"lat": -0.71, "lon": 36.43}]
+    assert any("Naivasha" in url for url in searched)
+    # The coordinates are in no address the page used
+    assert all("36.43" not in url for url in searched + [page.url])
+
+
+@pytest.mark.parametrize("failure, message", [
+    ("navigator.geolocation.getCurrentPosition = (ok, fail) => fail({ code: 1 });", "Location access is off"),
+    ("navigator.geolocation.getCurrentPosition = (ok, fail) => fail({ code: 3 });", "took too long"),
+    ("Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => undefined });", "can't share your location"),
+])
+def test_my_location_failing_says_what_to_do_instead(page, site, failure, message):
+    page.add_init_script(failure)
+    page.route("**/api/place", lambda route: pytest.fail("No point should be sent"))
+    open_page(page, site)
+    page.click("#locateButton")
+    expect(page.locator("#errorState")).to_contain_text(message)
+    expect(page.locator("#errorState")).to_contain_text(re.compile("search", re.I))
+    expect(page.locator("#locateButton")).not_to_have_attribute("aria-busy", "true")
+
+
+def test_no_place_at_my_location_says_so(page, site):
+    page.add_init_script("navigator.geolocation.getCurrentPosition = (ok) => ok({ coords: { latitude: 0, longitude: -30 } });")
+    page.route("**/api/place", lambda route: route.fulfill(status=422, json={"detail": "There's no named place there."}))
+    open_page(page, site)
+    page.click("#locateButton")
+    expect(page.locator("#errorState")).to_have_text("There's no named place there.")

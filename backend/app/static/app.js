@@ -21,6 +21,7 @@ const ICONS = {
     'storm': CLOUD_HIGH + '<path d="M12.5 16.500l-2.5 3.500h3.500L11 23.5"/>',
     'search': '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
     'check': '<path d="M5 12.5l4.5 4.500L19 7.5"/>',
+    'locate': '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>',
 };
 
 // Mood score bands, matching the backend's energy levels
@@ -389,6 +390,74 @@ function displayCuriosity(prompts) {
         list.appendChild(li);
     });
     el('curiositySection').classList.toggle('hidden', prompts.length === 0);
+}
+
+// The town at a point, from the server. The point is rounded to about 1 km here first,
+// so the exact position never leaves the browser, and it travels in the request body,
+// so it never appears in an address or a log.
+async function placeAt(lat, lon) {
+    const point = { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };
+    let response;
+    try {
+        response = await fetch(`${API_BASE}/api/place`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(point),
+        });
+    } catch (e) {
+        throw new Error('Could not reach the server. Check your connection and try again.');
+    }
+    if (!response.ok) throw new Error(await errorMessage(response, "Couldn't find a place there. Try searching instead."));
+    return response.json();
+}
+
+const LOCATION_ERRORS = {
+    1: "Location access is off for this site. Allow it in your browser's settings, or search for a place.",
+    2: "Your location isn't available right now. Search for a place instead.",
+    3: 'Finding your location took too long. Try again, or search for a place.',
+};
+
+// Only when asked: the browser asks the visitor's permission, then the forecast for the town they're in
+function useMyLocation() {
+    if (!window.isSecureContext) {
+        showError('Your location can only be used over a secure (https) connection. Search for a place instead.');
+        return;
+    }
+    if (!navigator.geolocation) {
+        showError("This browser can't share your location. Search for a place instead.");
+        return;
+    }
+    const button = el('locateButton');
+    if (button.classList.contains('is-busy')) return;
+    hideError();
+    button.classList.add('is-busy');
+    button.setAttribute('aria-busy', 'true');
+    el('searchStatus').textContent = 'Finding your location.';
+    const done = () => {
+        button.classList.remove('is-busy');
+        button.removeAttribute('aria-busy');
+    };
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            try {
+                const place = await placeAt(position.coords.latitude, position.coords.longitude);
+                done();
+                el('locationInput').value = place.label;
+                handleSearch(place.label);
+            } catch (error) {
+                done();
+                el('searchStatus').textContent = '';
+                showError(error.message);
+            }
+        },
+        (error) => {
+            done();
+            el('searchStatus').textContent = '';
+            showError(LOCATION_ERRORS[error.code] || LOCATION_ERRORS[2]);
+        },
+        // A town-level answer is all that's needed, so a recent, rough position is fine
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 }
+    );
 }
 
 // Search a suggested place, by default bringing the results back into view
@@ -1121,6 +1190,8 @@ function init() {
 
     el('brandMark').innerHTML = icon('partly-day');
     el('searchIcon').innerHTML = icon('search');
+    el('locateButton').innerHTML = icon('locate');
+    el('locateButton').addEventListener('click', useMyLocation);
     buildChips();
 
     el('searchForm').addEventListener('submit', (event) => {
