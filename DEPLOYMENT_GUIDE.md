@@ -79,7 +79,7 @@ The service's settings live in `.railway/railway.ts`, Railway's [Infrastructure 
 To change a setting, edit `.railway/railway.ts`, then apply it with the [Railway CLI](https://docs.railway.com/cli) (`railway login`, then `railway link` to this project, `production`, the `moodforecast_ai` service), from the repository root:
 
 1. `npm ci` installs the `railway` package the file imports (pinned in `package.json`).
-2. `railway config plan` shows what would change. **Read every line.** It should only change the app's service; if it adds, deletes or destroys anything, above all the PostgreSQL service, its volume or a variable, don't apply it.
+2. `railway config plan` shows what would change. **Read every line.** It should only change the app's service; if it adds, deletes or destroys anything, above all the PostgreSQL service, its volume or a variable, don't apply it. It always lists `build.builder (null → "DOCKERFILE")`, even straight after an apply: Railway reports no builder for the service but builds `backend/Dockerfile` all the same, so that line is expected.
 3. `railway config apply` makes the change and redeploys. Then check the deploy finished and `/health` answers. Commit the edited file too, so the repository matches what runs.
 
 The CLI runs the file with Node.js, which must be able to run TypeScript (Node 22.6 or newer as built by nodejs.org; some Linux distributions' Node builds can't, and fail with `ERR_NO_TYPESCRIPT`). If `railway config plan` reports that the file needs a newer Railway CLI while yours is new enough, run `railway` directly rather than through another command such as `timeout`: the package checks the version of the program that started it.
