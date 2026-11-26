@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Only pins the railway package that .railway/railway.ts imports (see DEPLOYMENT_GUIDE.md)",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}

@@ -112,11 +112,14 @@ else
     fail "Dockerfile missing"
 fi
 
-# Railway stops reading railway.toml on 2026-12-01, so it can go once its settings are moved
-if [ -f "railway.toml" ]; then
-    pass "railway.toml exists (Railway stops reading it on 2026-12-01)"
+# Railway's settings live in the repository root's .railway/railway.ts; it no longer reads railway.toml
+if [ -f "../.railway/railway.ts" ]; then
+    pass "Railway settings file exists (.railway/railway.ts)"
 else
-    pass "No railway.toml: Railway takes its settings from the dashboard or .railway/"
+    fail "Railway settings file missing (.railway/railway.ts)"
+fi
+if [ -f "railway.toml" ]; then
+    fail "railway.toml is back: Railway ignores it, the settings belong in .railway/railway.ts"
 fi
 echo ""
 

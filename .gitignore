@@ -60,3 +60,6 @@ local_settings.py
 
 # Local session notes
 context.md
+
+# Railway CLI: local undo snapshot written by `railway config migrate cutover`
+.railway/.cac-migration.json

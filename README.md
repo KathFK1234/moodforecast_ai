@@ -74,9 +74,10 @@ moodforecast_ai/
 │   ├── pytest.ini           # Test settings
 │   ├── .env.example
 │   ├── Dockerfile
-│   ├── railway.toml
 │   └── verify_setup.sh        # Checks the local setup
 ├── frontend/                  # Frontend source (HTML, CSS, JS)
+├── .railway/railway.ts        # Railway service settings (see DEPLOYMENT_GUIDE.md)
+├── package.json               # Pins the railway package that file imports
 ├── run_tests.sh               # Checks a running backend end to end
 ├── DEPLOYMENT_GUIDE.md        # Deploying to Railway / Docker
 └── README.md

@@ -56,31 +56,34 @@ git push origin main
 1. Visit `https://railway.com`
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Select the `moodforecast_ai` repository
-4. In the service's settings, set **Root Directory** to `backend`, and **Config File** to `/backend/railway.toml` (the config file's path doesn't follow the root directory, so it needs the full path)
+4. In the service's settings, set **Root Directory** to `backend` and leave **Config File** empty; the other settings come from `.railway/railway.ts` (see below)
 5. Click "Deploy"
 
 The Dockerfile builds from `backend/`, so a service without that root directory can't find `requirements.txt`. Railway redeploys automatically on every push to `main`.
 
-#### Railway's config file
+#### Railway's settings
 
-Railway has deprecated `railway.toml` and **stops reading these files on 2026-12-01**, in favour of its [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) file, `.railway/railway.ts`. After that date the settings below come from the service's dashboard settings only, so move them before then:
+The service's settings live in `.railway/railway.ts`, Railway's [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) file. It replaced `backend/railway.toml`, which Railway stops reading on 2026-12-01 (moved on 2026-11-26). The file holds the app's service only, and leaves the variables (`BREVO_API_KEY`, `DATABASE_URL` and the rest) and the PostgreSQL service to the dashboard:
 
 | Setting | Value |
 | ------- | ----- |
-| Start command | Can be empty: the Docker image's own command is the same |
+| Builder | Dockerfile (`backend/Dockerfile`, from the root directory `/backend`) |
+| Start command | The Docker image's own command, repeated |
 | Healthcheck path | `/health` |
-| Healthcheck timeout | `60` seconds |
-| Draining seconds | `15` |
+| Healthcheck timeout | `60` seconds, longer than the database's 10 second connect timeout |
+| Draining seconds | `15`, a little longer than uvicorn's own 10 second shutdown limit |
 
-Either enter them in the dashboard, or move them with the [Railway CLI](https://docs.railway.com/cli). `railway config migrate` on its own only previews, and `--apply` only writes the new file: Railway keeps reading `railway.toml` until the cutover in step 4. Run every command from the repository root:
+`backend/tests/test_railway_config.py` checks these values against the Dockerfile and the database timeout.
 
-1. Install and sign in: `bash <(curl -fsSL railway.com/install.sh)` (or `brew install railway`), then `railway login` and `railway link` (pick this project, the `production` environment and the app's service).
-2. `railway config migrate --variables unmanaged` is a dry run: it shows what it would write and changes nothing (if it asks to write the file, say no). It should show the settings in the table above, for the app's service only. `--variables` is required; `unmanaged` leaves the variables (`BREVO_API_KEY`, `DATABASE_URL` and the rest) in the dashboard, out of the file.
-3. `railway config migrate --apply --variables unmanaged` writes `.railway/railway.ts` and nothing else. If it offers to cut over now, say no. Read the file: it should hold the settings in the table above for the app's service, and nothing for any other service. If a later step says the `railway` package is missing, run `npm install --save-dev railway` at the repository root.
-4. Do steps 4 to 6 one straight after another: between them the service runs on its dashboard settings. `railway config migrate cutover --service "<service name>"` stops Railway reading `railway.toml` for the service and redeploys it. `railway config migrate status` shows which services still read it, and `railway config migrate undo` puts it back.
-5. `railway config plan`. **Read every line before going on.** It should only set the settings in the table on the app's service. If it marks anything as destroyed or deleted, above all a PostgreSQL service or a variable, stop and run `railway config migrate undo`: a project file treats a service it leaves out as one to delete.
-6. `railway config apply`, and confirm only if the plan is what you read.
-7. Commit `.railway/` (and `package.json` and `package-lock.json` if step 3 made them) and remove `backend/railway.toml` in the same push, never before step 6: a service can't be managed by both. Then check the deploy finished and `/health` answers, and that the service's dashboard settings show the values above.
+To change a setting, edit `.railway/railway.ts`, then apply it with the [Railway CLI](https://docs.railway.com/cli) (`railway login`, then `railway link` to this project, `production`, the `moodforecast_ai` service), from the repository root:
+
+1. `npm ci` installs the `railway` package the file imports (pinned in `package.json`).
+2. `railway config plan` shows what would change. **Read every line.** It should only change the app's service; if it adds, deletes or destroys anything, above all the PostgreSQL service, its volume or a variable, don't apply it.
+3. `railway config apply` makes the change and redeploys. Then check the deploy finished and `/health` answers. Commit the edited file too, so the repository matches what runs.
+
+The CLI runs the file with Node.js, which must be able to run TypeScript (Node 22.6 or newer as built by nodejs.org; some Linux distributions' Node builds can't, and fail with `ERR_NO_TYPESCRIPT`). If `railway config plan` reports that the file needs a newer Railway CLI while yours is new enough, run `railway` directly rather than through another command such as `timeout`: the package checks the version of the program that started it.
+
+The move can be undone, while the `.railway/.cac-migration.json` the cutover left on the machine that ran it still exists: `railway config migrate undo` points the service back at `/backend/railway.toml`, which then has to be restored from Git history.
 
 ### 3. Set Variables
 

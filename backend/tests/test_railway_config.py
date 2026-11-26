@@ -1,38 +1,50 @@
-"""railway.toml must stay something Railway acts on: it ignores keys it doesn't know, without a word."""
+""".railway/railway.ts must keep the settings the app depends on on Railway (see DEPLOYMENT_GUIDE.md)."""
 
-import tomllib
+import re
 from pathlib import Path
 
-import pytest
+from app.models.db import DB_CONNECT_TIMEOUT_SECONDS
 
 BACKEND = Path(__file__).resolve().parent.parent
-# Railway stops reading it on 2026-12-01, and DEPLOYMENT_GUIDE.md says to remove it once its settings move
-if not (BACKEND / "railway.toml").exists():
-    pytest.skip("no railway.toml", allow_module_level=True)
-CONFIG = tomllib.loads((BACKEND / "railway.toml").read_text())
-# The keys in use today from Railway's published schema, https://railway.com/railway.schema.json
-KNOWN_KEYS = {
-    "build": {"builder", "dockerfilePath", "watchPatterns"},
-    "deploy": {
-        "startCommand", "healthcheckPath", "healthcheckTimeout", "drainingSeconds",
-        "restartPolicyType", "restartPolicyMaxRetries", "numReplicas",
-    },
-}
+REPO = BACKEND.parent
+IAC = (REPO / ".railway" / "railway.ts").read_text()
+DOCKERFILE = (BACKEND / "Dockerfile").read_text()
 
 
-def test_only_keys_railway_knows():
-    assert set(CONFIG) <= set(KNOWN_KEYS)
-    for section, keys in CONFIG.items():
-        assert set(keys) <= KNOWN_KEYS[section], f"[{section}] has a key Railway would ignore"
+def setting(name: str) -> str:
+    match = re.search(rf"\b{name}:\s*(\"[^\"]*\"|[0-9]+)", IAC)
+    assert match, f"{name} is missing from .railway/railway.ts"
+    return match.group(1).strip('"')
+
+
+def test_old_config_file_is_gone():
+    """Railway stops reading it on 2026-12-01, and a service can't be managed by both."""
+    assert not (BACKEND / "railway.toml").exists()
+    assert not (REPO / "railway.toml").exists()
+
+
+def test_builds_the_dockerfile_from_backend():
+    assert setting("builder") == "DOCKERFILE"
+    assert setting("rootDirectory") == "/backend"
 
 
 def test_health_check_points_at_the_health_route_and_outlasts_the_database_timeout():
-    from app.models.db import DB_CONNECT_TIMEOUT_SECONDS
-    
-    assert CONFIG["deploy"]["healthcheckPath"] == "/health"
-    assert CONFIG["deploy"]["healthcheckTimeout"] > DB_CONNECT_TIMEOUT_SECONDS
+    assert setting("healthcheck") == "/health"
+    assert int(setting("healthcheckTimeout")) > DB_CONNECT_TIMEOUT_SECONDS
+
+
+def test_draining_outlasts_uvicorns_graceful_shutdown():
+    graceful = int(re.search(r"--timeout-graceful-shutdown (\d+)", DOCKERFILE).group(1))
+    assert int(setting("drainingSeconds")) > graceful
 
 
 def test_start_command_matches_the_docker_image():
-    """Once Railway stops reading this file the image's own CMD runs, which must behave the same."""
-    assert CONFIG["deploy"]["startCommand"].removeprefix("sh -c '").removesuffix("'") in (BACKEND / "Dockerfile").read_text()
+    """Without a start command on Railway the image's own CMD runs, which must behave the same."""
+    start = re.search(r"\bstart:\s*\"(.*)\",", IAC).group(1)
+    assert start.removeprefix("sh -c '").removesuffix("'") in DOCKERFILE
+
+
+def test_variables_stay_out_of_the_file():
+    """Secrets such as BREVO_API_KEY stay in Railway's dashboard, never in the repository."""
+    assert "managed: false" in IAC
+    assert not re.search(r"\b(env|variables)\s*:\s*\{(?!\s*managed: false)", IAC)
