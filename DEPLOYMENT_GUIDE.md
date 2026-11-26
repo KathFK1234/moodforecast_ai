@@ -56,8 +56,9 @@ git push origin main
 1. Visit `https://railway.com`
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Select the `moodforecast_ai` repository
-4. In the service's settings, set **Root Directory** to `backend` and leave **Config File** empty; the other settings come from `.railway/railway.ts` (see below)
+4. In the service's settings, set **Root Directory** to `backend` and leave **Config File** empty
 5. Click "Deploy"
+6. Apply the rest of the settings from `.railway/railway.ts`, as in "Railway's settings" below: Railway doesn't take them from the repository on its own. In a copy of the repository, first change the project, service and repository names in that file to your own.
 
 The Dockerfile builds from `backend/`, so a service without that root directory can't find `requirements.txt`. Railway redeploys automatically on every push to `main`.
 
